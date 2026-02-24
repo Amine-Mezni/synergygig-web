@@ -218,10 +218,9 @@ public class LoginController {
                                     "success");
 
                             // Small delay to let user see the success message
-                            new Thread(() -> {
-                                try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
-                                javafx.application.Platform.runLater(() -> loadScene("/fxml/Dashboard.fxml"));
-                            }).start();
+                            javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(1500));
+                            pause.setOnFinished(ev -> loadScene("/fxml/Dashboard.fxml"));
+                            pause.play();
                         } else {
                             showAlert("Face Login Failed", "User not found in database.", "error");
                         }

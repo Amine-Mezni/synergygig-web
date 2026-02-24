@@ -62,7 +62,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
-public class CommunityController {
+public class CommunityController implements Stoppable {
 
     @FXML private VBox newPostForm;
     @FXML private TextArea postTextArea;
@@ -1663,5 +1663,14 @@ public class CommunityController {
                 });
             }
         }).start();
+    }
+
+    // ==================== Lifecycle cleanup ====================
+
+    @Override
+    public void stop() {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdownNow();
+        }
     }
 }

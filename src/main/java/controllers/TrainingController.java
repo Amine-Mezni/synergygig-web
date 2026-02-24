@@ -52,7 +52,6 @@ public class TrainingController {
     private boolean isHrOrAdmin;
     private Button activeTab;
 
-    private Map<Integer, String> userNameMap = new HashMap<>();
     private Map<Integer, TrainingCourse> courseMap = new HashMap<>();
 
     private static final HttpClient httpClient = HttpClient.newBuilder()
@@ -96,11 +95,7 @@ public class TrainingController {
     }
 
     private void loadUserNames() {
-        try {
-            for (User u : serviceUser.recuperer()) {
-                userNameMap.put(u.getId(), u.getFirstName() + " " + u.getLastName());
-            }
-        } catch (SQLException e) { e.printStackTrace(); }
+        utils.UserNameCache.refresh();
     }
 
     private void loadCourseMap() {
@@ -112,7 +107,7 @@ public class TrainingController {
     }
 
     private String getUserName(int userId) {
-        return userNameMap.getOrDefault(userId, "User #" + userId);
+        return utils.UserNameCache.getName(userId);
     }
 
     private void switchTab(Button btn, String tabName) {

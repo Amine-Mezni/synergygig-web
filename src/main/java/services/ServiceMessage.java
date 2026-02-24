@@ -144,4 +144,57 @@ public class ServiceMessage implements IService<Message> {
         }
         return messages;
     }
+
+    /**
+     * Returns the latest message timestamp for each room in a single query (JDBC)
+     * or with per-room API calls (API mode — only fetches last element from each response).
+     */
+    public Map<Integer, java.sql.Timestamp> getLatestTimestamps(List<Integer> roomIds) throws SQLException {
+        Map<Integer, java.sql.Timestamp> result = new HashMap<>();
+        if (roomIds == null || roomIds.isEmpty()) return result;
+
+        if (useApi) {
+            // API mode: fall back to per-room calls, but only extract the last timestamp
+            for (int roomId : roomIds) {
+                try {
+                    List<Message> msgs = getByRoom(roomId);
+                    if (!msgs.isEmpty()) {
+                        Message last = msgs.get(msgs.size() - 1);
+                        if (last.getTimestamp() != null) {
+                            result.put(roomId, last.getTimestamp());
+                        }
+                    }
+                } catch (Exception ignored) { /* skip rooms that fail */ }
+            }
+            return result;
+        }
+
+        // JDBC mode: single GROUP BY query
+        String sql = "SELECT room_id, MAX(timestamp) AS latest FROM messages WHERE room_id IN ("
+                + String.join(",", java.util.Collections.nCopies(roomIds.size(), "?"))
+                + ") GROUP BY room_id";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            for (int i = 0; i < roomIds.size(); i++) {
+                ps.setInt(i + 1, roomIds.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.put(rs.getInt("room_id"), rs.getTimestamp("latest"));
+                }
+            }
+        }
+        return result;
+    }
+
+    /** Returns total message count without loading all rows. */
+    public int count() throws SQLException {
+        if (useApi) {
+            // API mode: fall back to recuperer().size() (no dedicated count endpoint)
+            return recuperer().size();
+        }
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM messages")) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
 }

@@ -160,4 +160,15 @@ public class ServiceChatRoom implements IService<ChatRoom> {
         ajouter(new ChatRoom(name, isPrivate ? "private" : "group", 0));
         return getOrCreateRoom(name);
     }
+
+    /** Returns total chat room count without loading all rows. */
+    public int count() throws SQLException {
+        if (useApi) {
+            return recuperer().size();
+        }
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM chat_rooms")) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
 }

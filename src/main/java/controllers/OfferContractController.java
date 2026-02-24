@@ -84,7 +84,6 @@ public class OfferContractController {
     private boolean isOwnerOrAdmin;
     private Button activeTab;
     private String currentMarketFilter = "ALL";
-    private Map<Integer, String> userNameMap = new HashMap<>();
     private Map<Integer, Offer> offerMap = new HashMap<>();
     private List<Offer> allOffers = new ArrayList<>();
     private List<Map<String, String>> aiChatHistory = new ArrayList<>();
@@ -149,11 +148,7 @@ public class OfferContractController {
     // ==================== Data Loading ====================
 
     private void loadUserNames() {
-        try {
-            for (User u : serviceUser.recuperer()) {
-                userNameMap.put(u.getId(), u.getFirstName() + " " + u.getLastName());
-            }
-        } catch (SQLException e) { e.printStackTrace(); }
+        utils.UserNameCache.refresh();
     }
 
     private void loadOfferMap() {
@@ -165,7 +160,7 @@ public class OfferContractController {
     }
 
     private String getUserName(int userId) {
-        return userNameMap.getOrDefault(userId, "User #" + userId);
+        return utils.UserNameCache.getName(userId);
     }
 
     // ==================== Tab Switching ====================

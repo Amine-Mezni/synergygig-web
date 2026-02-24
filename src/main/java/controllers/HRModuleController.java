@@ -58,7 +58,6 @@ public class HRModuleController {
 
     // Cached data
     private List<User> allUsers = new ArrayList<>();
-    private Map<Integer, String> userNameMap = new HashMap<>();
 
     // HTTP client for API calls
     private static final HttpClient httpClient = HttpClient.newBuilder()
@@ -107,18 +106,11 @@ public class HRModuleController {
     }
 
     private void loadUserNames() {
-        try {
-            allUsers = serviceUser.recuperer();
-            for (User u : allUsers) {
-                userNameMap.put(u.getId(), u.getFirstName() + " " + u.getLastName());
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        allUsers = utils.UserNameCache.refresh();
     }
 
     private String getUserName(int userId) {
-        return userNameMap.getOrDefault(userId, "User #" + userId);
+        return utils.UserNameCache.getName(userId);
     }
 
     private void switchTab(Button btn, String tabName) {
@@ -1836,7 +1828,10 @@ public class HRModuleController {
             File file = fc.showSaveDialog(rootPane.getScene().getWindow());
             if (file == null) return;
 
-            PayrollPdfExporter.exportAllPayroll(file, payrolls, userNameMap);
+            // Build name map from cache for PDF export
+            Map<Integer, String> nameMap = new HashMap<>();
+            for (User u : allUsers) nameMap.put(u.getId(), u.getFirstName() + " " + u.getLastName());
+            PayrollPdfExporter.exportAllPayroll(file, payrolls, nameMap);
             showInfo("Payroll report saved (" + payrolls.size() + " records):\n" + file.getAbsolutePath());
         } catch (SQLException ex) {
             showError("Failed to load payroll data: " + ex.getMessage());

@@ -50,7 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 
-public class ChatController {
+public class ChatController implements Stoppable {
 
     // ── FXML bindings ──
     @FXML private ListView<ChatRoom> roomsList;
@@ -327,7 +327,7 @@ public class ChatController {
                     try { favoriteRoomIds.add(Integer.parseInt(s.trim())); } catch (NumberFormatException ignored) {}
                 }
             }
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { System.err.println("Chat: loadFavorites failed — " + e.getMessage()); }
     }
 
     private void saveFavorites() {
@@ -340,7 +340,7 @@ public class ChatController {
             }
             prefs.put(PREF_FAVORITES, sb.toString());
             prefs.flush();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { System.err.println("Chat: saveFavorites failed — " + e.getMessage()); }
     }
 
     private void toggleFavorite(int roomId) {
@@ -358,13 +358,13 @@ public class ChatController {
             List<ChatRoom> rooms = serviceChat.recuperer();
             boolean exists = rooms.stream().anyMatch(r -> AIAssistantService.AI_ROOM_NAME.equals(r.getName()));
             if (!exists) serviceChat.ajouter(new ChatRoom(AIAssistantService.AI_ROOM_NAME));
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println("Chat: ensureAIRoom failed — " + e.getMessage()); }
     }
 
     private void loadUsers() {
         try {
             for (User u : serviceUser.recuperer()) userCache.put(u.getId(), u);
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println("Chat: loadUsers failed — " + e.getMessage()); }
     }
 
     private void loadRooms() {
@@ -409,7 +409,7 @@ public class ChatController {
             });
             if (aiRoom != null) visible.add(0, aiRoom);
             roomsList.getItems().setAll(visible);
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println("Chat: loadRooms failed — " + e.getMessage()); }
     }
 
     // ═══════════════════════════════════════════
@@ -535,7 +535,10 @@ public class ChatController {
             for (ChatRoom r : roomsList.getItems()) {
                 if (r.getName().equals(roomName)) { roomsList.getSelectionModel().select(r); break; }
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) {
+            System.err.println("Chat: openDM failed — " + e.getMessage());
+            Platform.runLater(() -> showInputError("Failed to open DM."));
+        }
     }
 
     @FXML
@@ -548,7 +551,10 @@ public class ChatController {
                 roomNameField.clear();
                 hideSearch();
                 loadRooms();
-            } catch (SQLException e) { e.printStackTrace(); }
+            } catch (SQLException e) {
+                System.err.println("Chat: createRoom failed — " + e.getMessage());
+                showInputError("Failed to create room.");
+            }
         }
     }
 
@@ -650,7 +656,7 @@ public class ChatController {
                     renderMessages(messages);
                 });
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println("Chat: refreshMessages failed — " + e.getMessage()); }
     }
 
     /** Force-render right now (used on room switch). */
@@ -667,7 +673,7 @@ public class ChatController {
                 }
             }
             renderMessages(messages);
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println("Chat: forceRefreshMessages failed — " + e.getMessage()); }
     }
 
     /**
@@ -680,18 +686,24 @@ public class ChatController {
             if (me == null) return;
             List<ChatRoom> rooms = new ArrayList<>(roomsList.getItems());
 
-            boolean changed = false;
+            // Collect room ids (skip AI room)
+            List<Integer> roomIds = new ArrayList<>();
             for (ChatRoom room : rooms) {
-                if (AIAssistantService.AI_ROOM_NAME.equals(room.getName())) continue;
-                List<Message> msgs = serviceMessage.getByRoom(room.getId());
-                if (!msgs.isEmpty()) {
-                    Message last = msgs.get(msgs.size() - 1);
-                    java.sql.Timestamp prev = lastMessageTimeCache.get(room.getId());
-                    if (last.getTimestamp() != null &&
-                        (prev == null || last.getTimestamp().after(prev))) {
-                        lastMessageTimeCache.put(room.getId(), last.getTimestamp());
-                        changed = true;
-                    }
+                if (!AIAssistantService.AI_ROOM_NAME.equals(room.getName())) {
+                    roomIds.add(room.getId());
+                }
+            }
+
+            // Single batch query instead of N per-room queries
+            java.util.Map<Integer, java.sql.Timestamp> latestMap = serviceMessage.getLatestTimestamps(roomIds);
+
+            boolean changed = false;
+            for (var entry : latestMap.entrySet()) {
+                java.sql.Timestamp prev = lastMessageTimeCache.get(entry.getKey());
+                if (entry.getValue() != null &&
+                    (prev == null || entry.getValue().after(prev))) {
+                    lastMessageTimeCache.put(entry.getKey(), entry.getValue());
+                    changed = true;
                 }
             }
 
@@ -1232,7 +1244,10 @@ public class ChatController {
                     break;
                 }
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) {
+            System.err.println("Chat: sendMessage failed — " + e.getMessage());
+            showInputError("Failed to send message.");
+        }
     }
 
     /**
@@ -1320,7 +1335,7 @@ public class ChatController {
     private void deleteMessage(Message msg) {
         if (utils.StyledAlert.confirm(chatOwnerWindow(), "Delete Message", "Delete this message?")) {
             try { serviceMessage.supprimer(msg.getId()); forceRefreshMessages(); }
-            catch (SQLException e) { e.printStackTrace(); }
+            catch (SQLException e) { System.err.println("Chat: deleteMessage failed — " + e.getMessage()); }
         }
     }
 
@@ -1477,7 +1492,7 @@ public class ChatController {
             forceRefreshMessages();
         } catch (Exception e) {
             showInputError("Failed to send image.");
-            e.printStackTrace();
+            System.err.println("Chat: sendImage failed — " + e.getMessage());
         }
     }
 
@@ -1504,7 +1519,7 @@ public class ChatController {
                         forceRefreshMessages();
                     } catch (SQLException e) {
                         showInputError("Failed to send file message.");
-                        e.printStackTrace();
+                        System.err.println("Chat: sendFile failed — " + e.getMessage());
                     }
                 });
             } else {
@@ -1713,7 +1728,7 @@ public class ChatController {
                 aiChatHistory.clear();
                 updateKebabMenuVisibility();
                 loadRooms();
-            } catch (SQLException e) { e.printStackTrace(); }
+            } catch (SQLException e) { System.err.println("Chat: deleteRoom failed — " + e.getMessage()); }
         }
     }
 

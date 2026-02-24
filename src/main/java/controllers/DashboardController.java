@@ -388,10 +388,10 @@ public class DashboardController {
             statInterviewsTrend.setText(pendingInterviews + " pending");
 
             // Chat & messages
-            int chatRooms = serviceChatRoom.recuperer().size();
+            int chatRooms = serviceChatRoom.count();
             statChatRooms.setText(String.valueOf(chatRooms));
 
-            int totalMessages = serviceMessage.recuperer().size();
+            int totalMessages = serviceMessage.count();
             statMessages.setText(String.valueOf(totalMessages));
 
         } catch (SQLException e) {
@@ -782,11 +782,23 @@ public class DashboardController {
         contentArea.getChildren().setAll(placeholder);
     }
 
+    /** The currently loaded sub-controller (if it implements {@link Stoppable}). */
+    private Stoppable activeSubController;
+
     private void loadContent(String fxmlPath) {
         try {
+            // Stop the previous controller's background tasks before replacing the view
+            if (activeSubController != null) {
+                activeSubController.stop();
+                activeSubController = null;
+            }
             currentPage = fxmlPath;
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
             Parent content = loader.load();
+            Object ctrl = loader.getController();
+            if (ctrl instanceof Stoppable) {
+                activeSubController = (Stoppable) ctrl;
+            }
             contentArea.getChildren().setAll(content);
         } catch (IOException e) {
             showPlaceholder("Error", "Failed to load: " + e.getMessage());
@@ -1030,17 +1042,8 @@ public class DashboardController {
     }
 
     private void showGlobalIncomingCallToast(Call call) {
-        // Resolve caller name
-        String callerName = "Unknown";
-        try {
-            List<User> users = serviceUser.recuperer();
-            for (User u : users) {
-                if (u.getId() == call.getCallerId()) {
-                    callerName = u.getFirstName() + " " + u.getLastName();
-                    break;
-                }
-            }
-        } catch (Exception ignored) {}
+        // Resolve caller name from shared cache (avoids loading ALL users)
+        String callerName = utils.UserNameCache.getName(call.getCallerId());
 
         // Build toast UI
         VBox toast = new VBox(8);
