@@ -145,7 +145,7 @@ public class AudioCallService {
 
         } catch (Exception e) {
             System.err.println("Failed to start audio call: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             stop();
         }
     }

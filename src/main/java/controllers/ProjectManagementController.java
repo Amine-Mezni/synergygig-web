@@ -25,6 +25,7 @@ import utils.SoundManager;
 
 import com.google.gson.Gson;
 import utils.AppConfig;
+import utils.AppThreadPool;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -131,7 +132,7 @@ public class ProjectManagementController {
     }
 
     private void loadProjects() {
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 List<Project> projects;
                 if (isAdmin) {
@@ -154,7 +155,7 @@ public class ProjectManagementController {
             } catch (SQLException e) {
                 Platform.runLater(() -> showError("Failed to load projects: " + e.getMessage()));
             }
-        }).start();
+        });
     }
 
     // ════════════════════════════════════════════════════════
@@ -314,7 +315,7 @@ public class ProjectManagementController {
         detailDates.setText(dateStr.isEmpty() ? "" : "📅 " + dateStr);
 
         // Load team members
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 ServiceProjectMember spm = new ServiceProjectMember();
                 List<ServiceProjectMember.ProjectMember> members = spm.getMembers(project.getId());
@@ -326,7 +327,7 @@ public class ProjectManagementController {
             } catch (SQLException ignored) {
                 Platform.runLater(() -> detailTeam.setText(""));
             }
-        }).start();
+        });
 
         // The project's own manager OR any ADMIN can edit/delete/add tasks
         boolean canManage = project.getManagerId() == currentUser.getId() || isAdmin;
@@ -358,14 +359,14 @@ public class ProjectManagementController {
     }
 
     private void loadTaskBoard() {
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 List<Task> tasks = serviceTask.getByProject(currentProject.getId());
                 Platform.runLater(() -> renderKanban(tasks));
             } catch (SQLException e) {
                 Platform.runLater(() -> showError("Failed to load tasks: " + e.getMessage()));
             }
-        }).start();
+        });
     }
 
     private static final DataFormat TASK_ID_FORMAT = new DataFormat("application/x-synergygig-task-id");
@@ -572,7 +573,7 @@ public class ProjectManagementController {
     }
 
     private void changeTaskStatus(Task task, String newStatus) {
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 serviceTask.updateStatus(task.getId(), newStatus);
                 task.setStatus(newStatus);
@@ -581,7 +582,7 @@ public class ProjectManagementController {
             } catch (SQLException e) {
                 Platform.runLater(() -> showError("Failed to update status: " + e.getMessage()));
             }
-        }).start();
+        });
     }
 
     // ════════════════════════════════════════════════════════
@@ -644,7 +645,7 @@ public class ProjectManagementController {
     }
 
     private void loadTeamMembers() {
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 ServiceProjectMember spm = new ServiceProjectMember();
                 List<ServiceProjectMember.ProjectMember> members = spm.getMembers(currentProject.getId());
@@ -655,7 +656,7 @@ public class ProjectManagementController {
             } catch (SQLException e) {
                 Platform.runLater(() -> showError("Failed to load team: " + e.getMessage()));
             }
-        }).start();
+        });
     }
 
     private void renderTeamView(List<ServiceProjectMember.ProjectMember> members,
@@ -1186,7 +1187,7 @@ public class ProjectManagementController {
         final Map<String, Integer> finalMemberMap = memberNameToId;
 
         dialog.showAndWait().ifPresent(project -> {
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     if (isEdit) {
                         serviceProject.modifier(project);
@@ -1237,7 +1238,7 @@ public class ProjectManagementController {
                 } catch (SQLException e) {
                     Platform.runLater(() -> showError("Failed to save project: " + e.getMessage()));
                 }
-            }).start();
+            });
         });
     }
 
@@ -1253,7 +1254,7 @@ public class ProjectManagementController {
 
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.OK) {
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     try {
                         String deletedName = currentProject.getName();
                         int deletedId = currentProject.getId();
@@ -1270,7 +1271,7 @@ public class ProjectManagementController {
                     } catch (SQLException e) {
                         Platform.runLater(() -> showError("Failed to delete project: " + e.getMessage()));
                     }
-                }).start();
+                });
             }
         });
     }
@@ -1427,7 +1428,7 @@ public class ProjectManagementController {
         });
 
         dialog.showAndWait().ifPresent(task -> {
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     if (isEdit) {
                         serviceTask.modifier(task);
@@ -1455,7 +1456,7 @@ public class ProjectManagementController {
                 } catch (SQLException e) {
                     Platform.runLater(() -> showError("Failed to save task: " + e.getMessage()));
                 }
-            }).start();
+            });
         });
     }
 
@@ -1468,7 +1469,7 @@ public class ProjectManagementController {
 
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.OK) {
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     try {
                         serviceTask.supprimer(task.getId());
                         triggerN8nWebhook("task-delete", Map.of(
@@ -1484,7 +1485,7 @@ public class ProjectManagementController {
                     } catch (SQLException e) {
                         Platform.runLater(() -> showError("Failed to delete task: " + e.getMessage()));
                     }
-                }).start();
+                });
             }
         });
     }
@@ -1495,7 +1496,7 @@ public class ProjectManagementController {
 
     private void submitTaskForReview(Task task) {
         SoundManager.getInstance().play(SoundManager.TASK_SUBMITTED);
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 serviceTask.updateStatus(task.getId(), "DONE");
                 task.setStatus("DONE");
@@ -1514,7 +1515,7 @@ public class ProjectManagementController {
             } catch (SQLException e) {
                 Platform.runLater(() -> showError("Failed: " + e.getMessage()));
             }
-        }).start();
+        });
     }
 
     private void showReviewDialog(Task task) {
@@ -1592,7 +1593,7 @@ public class ProjectManagementController {
 
         dialog.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.OK && rating[0] > 0) {
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     try {
                         // Submit review via API
                         Map<String, Object> body = new HashMap<>();
@@ -1620,7 +1621,7 @@ public class ProjectManagementController {
                     } catch (Exception e) {
                         Platform.runLater(() -> showError("Review failed: " + e.getMessage()));
                     }
-                }).start();
+                });
             }
         });
     }
@@ -1645,7 +1646,7 @@ public class ProjectManagementController {
                 btnAiPlan.setDisable(true);
                 btnAiPlan.setText("🤖 Generating...");
 
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     try {
                         List<String[]> generatedTasks;
                         // Try Z.AI first, fall back to keyword-based
@@ -1698,7 +1699,7 @@ public class ProjectManagementController {
                             showError("AI planning failed: " + e.getMessage());
                         });
                     }
-                }).start();
+                });
             }
         });
     }
@@ -1782,7 +1783,7 @@ public class ProjectManagementController {
             final int sd = sprintDays;
             final String tj = taskJson.toString();
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     ZAIService zai = new ZAIService();
                     String result = zai.planSprint(tj, ts, sd);
@@ -1800,7 +1801,7 @@ public class ProjectManagementController {
                         showError("Sprint planning failed: " + e.getMessage());
                     });
                 }
-            }).start();
+            });
         });
     }
 
@@ -2058,7 +2059,7 @@ public class ProjectManagementController {
         final String ti = teamInfo;
         final String tj = tasksJson.toString();
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 ZAIService zai = new ZAIService();
                 String agenda = zai.prepMeeting(currentProject.getName(), tj, ti);
@@ -2076,7 +2077,7 @@ public class ProjectManagementController {
                     showError("Meeting prep failed: " + e.getMessage());
                 });
             }
-        }).start();
+        });
     }
 
     private void summarizeMeeting() {
@@ -2101,7 +2102,7 @@ public class ProjectManagementController {
             btnMeetingNotes.setDisable(true);
             btnMeetingNotes.setText("⏳ Summarizing...");
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     ZAIService zai = new ZAIService();
                     String summary = zai.summarizeMeeting(notes);
@@ -2119,7 +2120,7 @@ public class ProjectManagementController {
                         showError("Summarization failed: " + e.getMessage());
                     });
                 }
-            }).start();
+            });
         });
     }
 
@@ -2170,7 +2171,7 @@ public class ProjectManagementController {
             btnDecisionHelper.setDisable(true);
             btnDecisionHelper.setText("⏳ Analyzing...");
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     ZAIService zai = new ZAIService();
                     String analysis = zai.helpDecide(question,
@@ -2190,7 +2191,7 @@ public class ProjectManagementController {
                         showError("Decision analysis failed: " + e.getMessage());
                     });
                 }
-            }).start();
+            });
         });
     }
 
@@ -2311,7 +2312,7 @@ public class ProjectManagementController {
      * Fetches a random inspirational quote and displays it in the project detail banner.
      */
     private void fetchQuoteOfDay() {
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
                         .uri(java.net.URI.create("https://zenquotes.io/api/random"))
@@ -2336,7 +2337,7 @@ public class ProjectManagementController {
             } catch (Exception ignored) {
                 // Silently fail — quote is non-essential
             }
-        }).start();
+        });
     }
 
     /**
@@ -2348,7 +2349,7 @@ public class ProjectManagementController {
         btnDailyTip.setDisable(true);
         btnDailyTip.setText("⏳ Loading...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
                         .uri(java.net.URI.create("https://api.adviceslip.com/advice"))
@@ -2385,7 +2386,7 @@ public class ProjectManagementController {
                     showError("Network error: " + e.getMessage());
                 });
             }
-        }).start();
+        });
     }
 
     /**
@@ -2395,7 +2396,7 @@ public class ProjectManagementController {
      */
     private void fetchWeather() {
         Platform.runLater(() -> weatherLabel.setText(""));
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 // Default coordinates: Tunis, Tunisia (36.8, 10.18)
                 String url = "https://api.open-meteo.com/v1/forecast?latitude=36.8&longitude=10.18&current_weather=true";
@@ -2418,7 +2419,7 @@ public class ProjectManagementController {
             } catch (Exception ignored) {
                 // Weather is non-essential
             }
-        }).start();
+        });
     }
 
     private String weatherCodeToEmoji(int code) {
@@ -2446,7 +2447,7 @@ public class ProjectManagementController {
         });
         if (currentProject.getDeadline() == null) return;
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 java.sql.Date deadline = currentProject.getDeadline();
                 java.time.LocalDate dlDate = deadline.toLocalDate();
@@ -2491,7 +2492,7 @@ public class ProjectManagementController {
             } catch (Exception ignored) {
                 // Holiday check is non-essential
             }
-        }).start();
+        });
     }
 
     /**
@@ -2504,7 +2505,7 @@ public class ProjectManagementController {
         btnFunFact.setDisable(true);
         btnFunFact.setText("⏳ Loading...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
                         .uri(java.net.URI.create("https://uselessfacts.jsph.pl/api/v2/facts/random?language=en"))
@@ -2541,7 +2542,7 @@ public class ProjectManagementController {
                     showError("Network error: " + e.getMessage());
                 });
             }
-        }).start();
+        });
     }
 
     // ════════════════════════════════════════════════════════
@@ -2566,7 +2567,7 @@ public class ProjectManagementController {
     // ════════════════════════════════════════════════════════
 
     private void triggerN8nWebhook(String event, Map<String, Object> payload) {
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 String n8nBase = AppConfig.get("n8n.base_url", "");
                 if (n8nBase.isEmpty()) return;
@@ -2585,8 +2586,6 @@ public class ProjectManagementController {
                 // n8n optional — don't break the app
             }
         });
-        t.setDaemon(true);
-        t.start();
     }
 
     private void showError(String msg) {

@@ -106,7 +106,7 @@ public class ServiceNotification {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return rs.getInt(1);
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         return 0;
     }
@@ -117,25 +117,25 @@ public class ServiceNotification {
 
     public void markRead(int notifId) {
         if (useApi()) {
-            try { ApiClient.put("/notifications/" + notifId + "/read", Map.of()); } catch (Exception e) { e.printStackTrace(); }
+            try { ApiClient.put("/notifications/" + notifId + "/read", Map.of()); } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         } else {
             try (Connection conn = utils.MyDatabase.getInstance().getConnection();
                  PreparedStatement ps = conn.prepareStatement("UPDATE notifications SET is_read = 1 WHERE id = ?")) {
                 ps.setInt(1, notifId);
                 ps.executeUpdate();
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         }
     }
 
     public void markAllRead(int userId) {
         if (useApi()) {
-            try { ApiClient.put("/notifications/" + userId + "/read-all", Map.of()); } catch (Exception e) { e.printStackTrace(); }
+            try { ApiClient.put("/notifications/" + userId + "/read-all", Map.of()); } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         } else {
             try (Connection conn = utils.MyDatabase.getInstance().getConnection();
                  PreparedStatement ps = conn.prepareStatement("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0")) {
                 ps.setInt(1, userId);
                 ps.executeUpdate();
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         }
     }
 
@@ -154,7 +154,7 @@ public class ServiceNotification {
                 data.put("reference_id", refId);
                 data.put("reference_type", refType);
                 ApiClient.post("/notifications", data);
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         } else {
             try (Connection conn = utils.MyDatabase.getInstance().getConnection();
                  PreparedStatement ps = conn.prepareStatement(
@@ -166,7 +166,7 @@ public class ServiceNotification {
                 if (refId != null) ps.setInt(5, refId); else ps.setNull(5, Types.INTEGER);
                 ps.setString(6, refType);
                 ps.executeUpdate();
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         }
     }
 

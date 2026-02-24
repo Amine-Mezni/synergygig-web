@@ -156,7 +156,7 @@ public class OfferContractController {
             allOffers = serviceOffer.recuperer();
             offerMap.clear();
             for (Offer o : allOffers) offerMap.put(o.getId(), o);
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
     }
 
     private String getUserName(int userId) {
@@ -703,7 +703,7 @@ public class OfferContractController {
                     String ownerName = getUserName(offer.getOwnerId());
 
                     // Generate PDF + send email + notify in background
-                    new Thread(() -> {
+                    AppThreadPool.io(() -> {
                         try {
                             // 1) Generate contract PDF
                             File pdf = ContractPdfGenerator.generatePdf(c, offer.getTitle(), ownerName, applicantName);
@@ -730,7 +730,7 @@ public class OfferContractController {
                             Platform.runLater(() -> showInfo(
                                     "Contract created but email sending failed: " + ex.getMessage()));
                         }
-                    }).start();
+                    });
                 }
             }
             refreshApplications();
@@ -744,7 +744,7 @@ public class OfferContractController {
         if (offer == null) { showError("Offer not found."); return; }
 
         aiStatusLabel.setText("🤖 Scoring applicant...");
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             String result = zaiService.scoreApplicant(
                     offer.getTitle(),
                     offer.getRequiredSkills() != null ? offer.getRequiredSkills() : "",
@@ -770,7 +770,7 @@ public class OfferContractController {
                     showInfo("AI feedback received (raw):\n" + result.substring(0, Math.min(200, result.length())));
                 }
             });
-        }).start();
+        });
     }
 
     // ================================================================
@@ -964,7 +964,7 @@ public class OfferContractController {
         qrImageView.setFitHeight(180);
         qrImageView.setPreserveRatio(true);
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 byte[] qrBytes = ContractPdfGenerator.fetchQrCode(contract.getBlockchainHash());
                 if (qrBytes != null) {
@@ -972,7 +972,7 @@ public class OfferContractController {
                     Platform.runLater(() -> qrImageView.setImage(img));
                 }
             } catch (Exception ignored) {}
-        }).start();
+        });
 
         qrBox.getChildren().addAll(qrTitle, qrImageView);
 
@@ -1098,7 +1098,7 @@ public class OfferContractController {
         String ownerName = getUserName(c.getOwnerId());
         String applicantName = getUserName(c.getApplicantId());
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 File pdf = ContractPdfGenerator.generatePdf(c, offerTitle, ownerName, applicantName);
                 Platform.runLater(() -> {
@@ -1123,12 +1123,12 @@ public class OfferContractController {
             } catch (Exception ex) {
                 Platform.runLater(() -> showError("PDF generation failed: " + ex.getMessage()));
             }
-        }).start();
+        });
     }
 
     private void runRiskAnalysis(Contract c) {
         aiStatusLabel.setText("🤖 Analyzing risk...");
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             String terms = c.getTerms() != null ? c.getTerms() : "No terms specified";
             String duration = (c.getStartDate() != null && c.getEndDate() != null)
                     ? c.getStartDate() + " to " + c.getEndDate() : "Unknown";
@@ -1149,7 +1149,7 @@ public class OfferContractController {
                     showInfo("Risk analysis:\n" + result.substring(0, Math.min(300, result.length())));
                 }
             });
-        }).start();
+        });
     }
 
     // ================================================================
@@ -1164,7 +1164,7 @@ public class OfferContractController {
         addAiMessage("user", msg);
 
         aiStatusLabel.setText("🤖 Thinking...");
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             String response;
             if (selectedAiContract != null && selectedAiContract.getTerms() != null) {
                 response = zaiService.chatWithContract(selectedAiContract.getTerms(), aiChatHistory, msg);
@@ -1183,7 +1183,7 @@ public class OfferContractController {
                 aiStatusLabel.setText("");
                 addAiMessage("assistant", response);
             });
-        }).start();
+        });
     }
 
     @FXML private void aiGenerateContract() {
@@ -1197,7 +1197,7 @@ public class OfferContractController {
         addAiMessage("user", "Generate contract terms for: " + offer.getTitle());
         aiStatusLabel.setText("🤖 Generating contract...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             String result = zaiService.generateContract(
                     offer.getTitle(), offer.getDescription() != null ? offer.getDescription() : "",
                     offer.getAmount(), getUserName(selectedAiContract.getApplicantId()),
@@ -1222,7 +1222,7 @@ public class OfferContractController {
                     }
                 });
             });
-        }).start();
+        });
     }
 
     @FXML private void aiAnalyzeRisk() {
@@ -1237,13 +1237,13 @@ public class OfferContractController {
         }
         addAiMessage("user", "Improve the contract terms");
         aiStatusLabel.setText("🤖 Improving terms...");
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             String result = zaiService.improveTerms(selectedAiContract.getTerms());
             Platform.runLater(() -> {
                 aiStatusLabel.setText("");
                 addAiMessage("assistant", result);
             });
-        }).start();
+        });
     }
 
     @FXML private void aiSummarize() {
@@ -1253,13 +1253,13 @@ public class OfferContractController {
         }
         addAiMessage("user", "Summarize this contract");
         aiStatusLabel.setText("🤖 Summarizing...");
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             String result = zaiService.summarizeContract(selectedAiContract.getTerms());
             Platform.runLater(() -> {
                 aiStatusLabel.setText("");
                 addAiMessage("assistant", result);
             });
-        }).start();
+        });
     }
 
     @FXML private void aiDraftEmail() {
@@ -1276,7 +1276,7 @@ public class OfferContractController {
                 Offer offer = offerMap.get(selectedAiContract.getOfferId());
                 addAiMessage("user", "Draft a " + type + " email (" + style + " tone)");
                 aiStatusLabel.setText("🤖 Drafting email...");
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     String result = zaiService.draftEmail(type, style,
                             getUserName(selectedAiContract.getApplicantId()),
                             offer != null ? offer.getTitle() : "Contract #" + selectedAiContract.getId(),
@@ -1285,7 +1285,7 @@ public class OfferContractController {
                         aiStatusLabel.setText("");
                         addAiMessage("assistant", result);
                     });
-                }).start();
+                });
             });
         });
     }
@@ -1323,7 +1323,7 @@ public class OfferContractController {
                 offers.stream().filter(o -> o.getId() == offerId).findFirst().ifPresent(offer -> {
                     addAiMessage("user", "Analyze strategy for: " + offer.getTitle());
                     aiStatusLabel.setText("🤖 Analyzing strategy...");
-                    new Thread(() -> {
+                    AppThreadPool.io(() -> {
                         String result = zaiService.adviseOfferStrategy(offer.getTitle(),
                                 offer.getDescription() != null ? offer.getDescription() : "",
                                 offer.getAmount(),
@@ -1333,7 +1333,7 @@ public class OfferContractController {
                             aiStatusLabel.setText("");
                             addAiMessage("assistant", result);
                         });
-                    }).start();
+                    });
                 });
             });
         } catch (SQLException e) { showError(e.getMessage()); }
@@ -1351,13 +1351,13 @@ public class OfferContractController {
             titleDialog.showAndWait().ifPresent(title -> {
                 addAiMessage("user", "Enhance description for: " + title);
                 aiStatusLabel.setText("🤖 Enhancing...");
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     String result = zaiService.enhanceOfferDescription(bullets, title);
                     Platform.runLater(() -> {
                         aiStatusLabel.setText("");
                         addAiMessage("assistant", result);
                     });
-                }).start();
+                });
             });
         });
     }

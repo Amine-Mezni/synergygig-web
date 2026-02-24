@@ -25,6 +25,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import services.ServiceUser;
+import utils.AppThreadPool;
 import utils.FaceRecognitionUtil;
 import utils.SessionManager;
 
@@ -648,7 +649,7 @@ public class ProfileController {
         showFaceStatus("Opening camera for face enrollment...", false);
         enrollFaceBtn.setDisable(true);
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             com.google.gson.JsonObject result = FaceRecognitionUtil.enrollFace();
 
             javafx.application.Platform.runLater(() -> {
@@ -673,7 +674,7 @@ public class ProfileController {
                     showFaceStatus(error, true);
                 }
             });
-        }).start();
+        });
     }
 
     @FXML
@@ -695,7 +696,7 @@ public class ProfileController {
     private void handleTestFaceSetup() {
         showFaceStatus("Testing face recognition setup...", false);
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             com.google.gson.JsonObject result = FaceRecognitionUtil.testSetup();
 
             javafx.application.Platform.runLater(() -> {
@@ -707,7 +708,7 @@ public class ProfileController {
                     showFaceStatus(error, true);
                 }
             });
-        }).start();
+        });
     }
 
     private void showFaceStatus(String msg, boolean isError) {

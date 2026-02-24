@@ -33,6 +33,8 @@ import services.ServiceUser;
 import services.ServiceInterview;
 import services.ServiceChatRoom;
 import services.ServiceMessage;
+import utils.AnimatedWeatherIcons;
+import utils.AppThreadPool;
 import utils.AudioCallService;
 import utils.SessionManager;
 import utils.SignalingService;
@@ -258,10 +260,10 @@ public class DashboardController {
         notificationPanel.start(currentUser.getId());
 
         // Auto check-in attendance on login
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             ServiceAttendance attService = new ServiceAttendance();
             attService.autoCheckIn(currentUser.getId());
-        }).start();
+        });
 
         // Load weather for dashboard card
         loadWeatherCard();
@@ -712,7 +714,7 @@ public class DashboardController {
             inputField.setDisable(true);
 
             final String q = question;
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     ZAIService zai = new ZAIService();
                     String systemPrompt = "You are the SynergyGig AI Assistant. " +
@@ -749,7 +751,7 @@ public class DashboardController {
                         inputField.setDisable(false);
                     });
                 }
-            }).start();
+            });
         };
 
         sendBtn.setOnAction(e -> sendAction.run());
@@ -817,10 +819,10 @@ public class DashboardController {
         // Auto check-out attendance on logout
         User logoutUser = SessionManager.getInstance().getCurrentUser();
         if (logoutUser != null) {
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 ServiceAttendance attService = new ServiceAttendance();
                 attService.autoCheckOut(logoutUser.getId());
-            }).start();
+            });
         }
 
         SessionManager.getInstance().logout();
@@ -844,12 +846,12 @@ public class DashboardController {
     // ════════════════════════════════════════════════════════
 
     private void loadWeatherCard() {
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             WeatherService.CurrentWeather w = WeatherService.fetch("Tunis");
             if (w != null) {
                 Platform.runLater(() -> {
-                    String emoji = WeatherService.mapConditionEmoji(w.condition);
-                    weatherCardEmoji.setText(emoji);
+                    weatherCardEmoji.setText("");
+                    weatherCardEmoji.setGraphic(AnimatedWeatherIcons.forCondition(w.condition, 24));
                     weatherCardTitle.setText("Weather");
                     weatherCardSubtitle.setText(w.city + ", " + w.country);
                     weatherCardTemp.setText(w.tempC + "°C");
@@ -862,9 +864,7 @@ public class DashboardController {
                     weatherCardSubtitle.setText("Unable to load");
                 });
             }
-        }, "weather-card-loader");
-        t.setDaemon(true);
-        t.start();
+        });
     }
 
     @FXML
@@ -1204,7 +1204,7 @@ public class DashboardController {
             if (globalActiveCall == null) return;
             if (globalCallPollInFlight) return; // skip if previous request still pending
             globalCallPollInFlight = true;
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     Call c = serviceCall.getCall(globalActiveCall.getId());
                     if (c != null && (c.isEnded() || "rejected".equals(c.getStatus()) || "missed".equals(c.getStatus()))) {
@@ -1213,7 +1213,7 @@ public class DashboardController {
                 } finally {
                     globalCallPollInFlight = false;
                 }
-            }, "global-call-status-check").start();
+            });
         }));
         globalCallStatusPoller.setCycleCount(Timeline.INDEFINITE);
         globalCallStatusPoller.play();

@@ -200,7 +200,7 @@ public class InterviewCalendarPopup {
                         .collect(Collectors.toList());
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 

@@ -29,6 +29,7 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import services.ServiceUser;
 import utils.EmailService;
+import utils.AppThreadPool;
 import utils.FaceRecognitionUtil;
 import utils.SessionManager;
 import utils.CreepyButton;
@@ -170,7 +171,7 @@ public class LoginController {
             }
         } catch (SQLException e) {
             showAlert("Error", "A database error occurred.\nPlease try again later.", "error");
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
@@ -198,7 +199,7 @@ public class LoginController {
 
         showAlert("Face Login", "Opening camera for face authentication...\nPlease look at the camera.", "info");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             com.google.gson.JsonObject result = FaceRecognitionUtil.authenticateFace();
 
             javafx.application.Platform.runLater(() -> {
@@ -233,7 +234,7 @@ public class LoginController {
                     showAlert("Face Login Failed", error, "error");
                 }
             });
-        }).start();
+        });
     }
 
     // ==================== FORGOT PASSWORD (3-step OTP flow) ====================
@@ -375,7 +376,7 @@ public class LoginController {
             send.setDisable(true); send.setText("Sending\u2026");
             err.setVisible(false); err.setManaged(false);
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     JsonObject res = serviceUser.requestOtp(inp);
                     if (res == null || !res.has("otp")) {
@@ -397,7 +398,7 @@ public class LoginController {
                         send.setDisable(false); send.setText("Send Reset Code");
                     });
                 }
-            }).start();
+            });
         });
 
         card.getChildren().addAll(title, sub, sep, emailGrp, err, send, cancel);
@@ -516,7 +517,7 @@ public class LoginController {
             }
             verify.setDisable(true); verify.setText("Verifying\u2026");
             err.setVisible(false); err.setManaged(false);
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 boolean ok = serviceUser.verifyOtp(email[0], entered);
                 Platform.runLater(() -> {
                     if (ok) { timer.stop(); showResetStep3(card, dialog, root, email, otp, firstName); }
@@ -526,7 +527,7 @@ public class LoginController {
                         verify.setDisable(false); verify.setText("Verify Code");
                     }
                 });
-            }).start();
+            });
         });
 
         HBox timerRow = new HBox(timerLbl);
@@ -606,7 +607,7 @@ public class LoginController {
             }
             reset.setDisable(true); reset.setText("Resetting\u2026");
             err.setVisible(false); err.setManaged(false);
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     boolean ok = serviceUser.resetPassword(email[0], otp[0], p);
                     Platform.runLater(() -> {
@@ -626,7 +627,7 @@ public class LoginController {
                         reset.setDisable(false); reset.setText("Reset Password");
                     });
                 }
-            }).start();
+            });
         });
 
         card.getChildren().addAll(title, sub, sep, passGrp, strRow, confirmGrp, err, reset);
@@ -666,7 +667,7 @@ public class LoginController {
 
             utils.ResizeHelper.addResizeListener(stage);
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 

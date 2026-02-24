@@ -11,6 +11,8 @@ import javafx.scene.paint.Color;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import utils.AnimatedWeatherIcons;
+import utils.AppThreadPool;
 import utils.DialogHelper;
 import utils.SessionManager;
 import utils.WeatherService;
@@ -279,7 +281,8 @@ public class WeatherPopup {
         dayLabel.getStyleClass().add("weather-forecast-day");
         if (isToday) dayLabel.getStyleClass().add("weather-forecast-today");
 
-        Label emoji = new Label(df.getConditionEmoji());
+        Label emoji = new Label();
+        emoji.setGraphic(AnimatedWeatherIcons.forCondition(df.condition, 24));
         emoji.getStyleClass().add("weather-forecast-emoji");
 
         Label maxTemp = new Label(df.maxTempC + "°");
@@ -304,7 +307,7 @@ public class WeatherPopup {
     private void fetchWeather(String city) {
         loadingOverlay.setVisible(true);
 
-        Thread thread = new Thread(() -> {
+        AppThreadPool.io(() -> {
             CurrentWeather data = WeatherService.fetch(city);
             Platform.runLater(() -> {
                 loadingOverlay.setVisible(false);
@@ -316,9 +319,7 @@ public class WeatherPopup {
                     locationLabel.setText("Try a different search");
                 }
             });
-        }, "weather-fetch");
-        thread.setDaemon(true);
-        thread.start();
+        });
     }
 
     /**
@@ -331,9 +332,9 @@ public class WeatherPopup {
         String time = now.format(DateTimeFormatter.ofPattern("HH:mm"));
         dateTimeLabel.setText(dayOfWeek + ", " + time);
 
-        // Condition + emoji
-        String emoji = WeatherService.mapConditionEmoji(w.condition);
-        conditionEmoji.setText(emoji);
+        // Condition + animated icon
+        conditionEmoji.setText("");
+        conditionEmoji.setGraphic(AnimatedWeatherIcons.forCondition(w.condition, 48));
         conditionLabel.setText(w.condition + " " + w.tempC + "°C");
 
         // Location

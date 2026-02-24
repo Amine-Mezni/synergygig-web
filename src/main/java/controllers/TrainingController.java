@@ -15,6 +15,7 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import services.*;
 import utils.AppConfig;
+import utils.AppThreadPool;
 import utils.SessionManager;
 import utils.SoundManager;
 import utils.TrainingCertificatePdf;
@@ -103,7 +104,7 @@ public class TrainingController {
             for (TrainingCourse c : serviceCourse.recuperer()) {
                 courseMap.put(c.getId(), c);
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
     }
 
     private String getUserName(int userId) {
@@ -240,7 +241,7 @@ public class TrainingController {
     private void fetchTriviaQuestion(VBox container) {
         container.getChildren().setAll(new Label("Loading..."));
 
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 HttpRequest req = HttpRequest.newBuilder()
                         .uri(URI.create("https://opentdb.com/api.php?amount=1&type=multiple"))
@@ -339,8 +340,6 @@ public class TrainingController {
                 });
             }
         });
-        t.setDaemon(true);
-        t.start();
     }
 
     private String decodeHtml(String text) {
@@ -385,7 +384,7 @@ public class TrainingController {
                 "machine_learning", "software_engineering", "data_science", "communication", "productivity"};
         String subject = subjects[new Random().nextInt(subjects.length)];
 
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 HttpRequest req = HttpRequest.newBuilder()
                         .uri(URI.create("https://openlibrary.org/subjects/" + subject + ".json?limit=20"))
@@ -462,8 +461,6 @@ public class TrainingController {
                 });
             }
         });
-        t.setDaemon(true);
-        t.start();
     }
 
     private VBox createRecentEnrollmentsSection() {
@@ -1494,7 +1491,7 @@ public class TrainingController {
     }
 
     private void triggerN8nWebhook(String event, Map<String, Object> payload) {
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 String n8nBase = AppConfig.get("n8n.base_url", "");
                 if (n8nBase.isEmpty()) return;
@@ -1513,8 +1510,6 @@ public class TrainingController {
                 // n8n optional — don't break the app
             }
         });
-        t.setDaemon(true);
-        t.start();
     }
 
     private String formatCategory(String cat) {
@@ -1563,7 +1558,7 @@ public class TrainingController {
             btnRecommend.setText("⏳ Analyzing...");
             statusLabel.setText("AI is analyzing your learning profile...");
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     // Gather user data
                     List<TrainingEnrollment> myEnrolls = serviceEnrollment.getByUser(currentUser.getId());
@@ -1610,7 +1605,7 @@ public class TrainingController {
                         btnRecommend.setText("🧠 Get Recommendations");
                     });
                 }
-            }).start();
+            });
         });
 
         btnLearningPath.setOnAction(e -> {
@@ -1623,7 +1618,7 @@ public class TrainingController {
                 btnLearningPath.setText("⏳ Generating...");
                 statusLabel.setText("Generating personalized learning path...");
 
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     try {
                         List<TrainingEnrollment> myEnrolls = serviceEnrollment.getByUser(currentUser.getId());
                         StringBuilder skills = new StringBuilder();
@@ -1654,7 +1649,7 @@ public class TrainingController {
                             btnLearningPath.setText("📍 Learning Path");
                         });
                     }
-                }).start();
+                });
             });
         });
 

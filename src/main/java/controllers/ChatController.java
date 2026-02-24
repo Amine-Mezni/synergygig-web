@@ -31,6 +31,7 @@ import utils.ApiClient;
 import utils.AudioCallService;
 import utils.DocumentExtractor;
 import utils.ScreenShareService;
+import utils.AppThreadPool;
 import utils.SessionManager;
 import utils.SignalingService;
 import utils.SoundManager;
@@ -269,7 +270,7 @@ public class ChatController implements Stoppable {
                     String callerName = data.has("callerName") ? data.get("callerName").getAsString() : "Unknown";
                     if (activeCall != null || incomingCallOverlay != null) return;
                     // Fetch call details on background thread
-                    new Thread(() -> {
+                    AppThreadPool.io(() -> {
                         Call incoming = serviceCall.getCall(callId);
                         if (incoming != null && "pending".equals(incoming.getStatus())) {
                             Platform.runLater(() -> {
@@ -281,7 +282,7 @@ public class ChatController implements Stoppable {
                                 }
                             });
                         }
-                    }, "chat-call-signal").start();
+                    });
                 }
             } catch (Exception e) {
                 System.err.println("[Chat] call-state handler error: " + e.getMessage());
@@ -1500,7 +1501,7 @@ public class ChatController implements Stoppable {
     private void sendFile(File file, User me) {
         showToast("Upload", "Uploading " + file.getName() + "...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             JsonElement resp = ApiClient.uploadFile("/files/upload", file);
             if (resp != null && resp.isJsonObject()) {
                 JsonObject obj = resp.getAsJsonObject();
@@ -1525,7 +1526,7 @@ public class ChatController implements Stoppable {
             } else {
                 Platform.runLater(() -> showInputError("Failed to upload file."));
             }
-        }, "file-upload").start();
+        });
     }
 
     /** Format file size bytes into human-readable string. */
@@ -1595,7 +1596,7 @@ public class ChatController implements Stoppable {
         Platform.runLater(() -> messagesScroll.setVvalue(1.0));
 
         // Extract on background thread
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 String extracted = DocumentExtractor.extract(file);
                 String analysis = DocumentExtractor.analyzeText(extracted, fileName);
@@ -1634,7 +1635,7 @@ public class ChatController implements Stoppable {
                     renderAIChat();
                 });
             }
-        }, "doc-extract").start();
+        });
     }
 
     /** Handle downloading a file attachment. */
@@ -1669,7 +1670,7 @@ public class ChatController implements Stoppable {
 
         showToast("Download", "Downloading " + fileName + "...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             boolean ok = ApiClient.downloadFile("/files/download/" + fileId, dest);
             Platform.runLater(() -> {
                 if (ok) {
@@ -1678,7 +1679,7 @@ public class ChatController implements Stoppable {
                     showToast("Download", "Failed to download " + fileName);
                 }
             });
-        }, "file-download").start();
+        });
     }
 
     private void showImagePopup(Image img) {
@@ -1855,7 +1856,7 @@ public class ChatController implements Stoppable {
             if (activeCall == null || activeCall.getId() != callId) return;
             if (callPollInFlight) return; // skip if previous request still in flight
             callPollInFlight = true;
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     Call c = serviceCall.getCall(callId);
                     if (c == null) {
@@ -1888,7 +1889,7 @@ public class ChatController implements Stoppable {
                 } finally {
                     callPollInFlight = false;
                 }
-            }, "outgoing-call-poll").start();
+            });
         }));
         outgoingCallPoller.setCycleCount(30); // poll for up to 60s (2s interval)
         outgoingCallPoller.play();
@@ -2028,7 +2029,7 @@ public class ChatController implements Stoppable {
             if (activeCall == null) return;
             if (callPollInFlight) return; // skip if previous request still pending
             callPollInFlight = true;
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     Call c = serviceCall.getCall(activeCall.getId());
                     if (c == null) {
@@ -2045,7 +2046,7 @@ public class ChatController implements Stoppable {
                 } finally {
                     callPollInFlight = false;
                 }
-            }, "call-status-check").start();
+            });
         }));
         activeCallPoller.setCycleCount(Animation.INDEFINITE);
         activeCallPoller.play();
@@ -2066,7 +2067,7 @@ public class ChatController implements Stoppable {
                 openVideoCallPopup();
             });
             // Start capture on a background thread (waits for WS connection)
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 screenShareService.startCapture();
                 Platform.runLater(() -> {
                     if (btnScreenShare != null) {
@@ -2076,7 +2077,7 @@ public class ChatController implements Stoppable {
                     }
                     updateVideoShareButton(true);
                 });
-            }, "video-capture-start").start();
+            });
         }
     }
 
@@ -2114,7 +2115,7 @@ public class ChatController implements Stoppable {
             showToast("Screen Share", "Screen sharing stopped.");
         } else {
             // Start capture on background thread (may need to wait for WS connection)
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 screenShareService.startCapture();
                 Platform.runLater(() -> {
                     if (btnScreenShare != null) {
@@ -2125,7 +2126,7 @@ public class ChatController implements Stoppable {
                     updateVideoShareButton(true);
                     showToast("Screen Share", "Sharing your screen (" + screenShareService.getResolution().label + ")");
                 });
-            }, "screen-share-toggle").start();
+            });
         }
     }
 
@@ -2169,14 +2170,14 @@ public class ChatController implements Stoppable {
             screenShareService.setCaptureMode(utils.ScreenShareService.CaptureMode.WEBCAM);
             updateVideoShareButton(false);
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 screenShareService.startCapture();
                 Platform.runLater(() -> {
                     if (localPreviewView != null) localPreviewView.setVisible(true);
                     updateVideoCameraButton(true);
                     showToast("Camera", "Camera is live.");
                 });
-            }, "camera-toggle").start();
+            });
         }
     }
 

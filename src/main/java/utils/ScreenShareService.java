@@ -321,7 +321,7 @@ public class ScreenShareService {
 
             } catch (Exception e) {
                 System.err.println("[Video] Failed to connect: " + e.getMessage());
-                e.printStackTrace();
+                System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             }
         }, "video-ws-connect");
         connectThread.setDaemon(true);

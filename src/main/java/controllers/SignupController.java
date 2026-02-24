@@ -25,6 +25,7 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import services.ServiceUser;
 import utils.AppConfig;
+import utils.AppThreadPool;
 import utils.EmailService;
 import utils.SparkleCanvas;
 import utils.SpotlightBorder;
@@ -192,7 +193,7 @@ public class SignupController {
             serviceUser.ajouter(newUser);
 
             // Send verification email asynchronously
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     JsonObject verif = serviceUser.requestVerification(email);
                     if (verif != null && verif.has("token")) {
@@ -204,7 +205,7 @@ public class SignupController {
                 } catch (Exception ex) {
                     System.err.println("Failed to send verification email: " + ex.getMessage());
                 }
-            }).start();
+            });
 
             showAlert("Verify Your Email",
                     "We sent a verification link to\n" + email
@@ -213,7 +214,7 @@ public class SignupController {
 
         } catch (SQLException e) {
             showAlert("Error", "A database error occurred.\nPlease try again later.", "error");
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
@@ -234,7 +235,7 @@ public class SignupController {
 
             utils.ResizeHelper.addResizeListener(stage);
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 

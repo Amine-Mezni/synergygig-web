@@ -15,6 +15,7 @@ import javafx.util.Duration;
 import services.ServiceNotification;
 import services.ServiceNotification.Notification;
 import utils.SessionManager;
+import utils.AppThreadPool;
 import utils.SoundManager;
 
 import java.time.LocalDateTime;
@@ -107,10 +108,10 @@ public class NotificationPanel {
     }
 
     private void refreshCount() {
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             int count = service.getUnreadCount(userId);
             Platform.runLater(() -> updateBadge(count));
-        }).start();
+        });
     }
 
     private void updateBadge(int count) {
@@ -162,13 +163,13 @@ public class NotificationPanel {
         markAll.getStyleClass().add("notification-mark-all");
         markAll.setOnAction(e -> {
             SoundManager.getInstance().play(SoundManager.NOTIFICATION_CLEAR);
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 service.markAllRead(userId);
                 Platform.runLater(() -> {
                     refreshCount();
                     loadNotifications();
                 });
-            }).start();
+            });
         });
 
         header.getChildren().addAll(title, spacer, markAll);
@@ -205,7 +206,7 @@ public class NotificationPanel {
 
     private void loadNotifications() {
         notifList.getChildren().clear();
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             List<Notification> notifications = service.getNotifications(userId);
             Platform.runLater(() -> {
                 if (notifications.isEmpty()) {
@@ -218,7 +219,7 @@ public class NotificationPanel {
                     notifList.getChildren().add(buildNotificationItem(n));
                 }
             });
-        }).start();
+        });
     }
 
     private VBox buildNotificationItem(Notification n) {
@@ -270,13 +271,13 @@ public class NotificationPanel {
         item.setOnMouseClicked(e -> {
             SoundManager.getInstance().play(SoundManager.NOTIFICATION_CLEAR);
             if (!n.isRead) {
-                new Thread(() -> {
+                AppThreadPool.io(() -> {
                     service.markRead(n.id);
                     Platform.runLater(() -> {
                         item.getStyleClass().remove("notification-item-unread");
                         refreshCount();
                     });
-                }).start();
+                });
             }
             if (onNotificationClick != null) {
                 onNotificationClick.run();

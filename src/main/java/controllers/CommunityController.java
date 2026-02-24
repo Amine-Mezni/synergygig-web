@@ -32,6 +32,7 @@ import services.ServicePost;
 import services.ServiceReaction;
 import services.ServiceUser;
 import utils.AnimatedButton;
+import utils.AppThreadPool;
 import utils.BadWordsService;
 import utils.SessionManager;
 import utils.SoundManager;
@@ -238,7 +239,7 @@ public class CommunityController implements Stoppable {
         try {
             List<User> users = serviceUser.recuperer();
             for (User u : users) userCache.put(u.getId(), u);
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
     }
 
     /** Estimate server→local offset by comparing a known server timestamp */
@@ -266,7 +267,7 @@ public class CommunityController implements Stoppable {
                     try { savedPostIds.add(Integer.parseInt(s.trim())); } catch (NumberFormatException ignored) {}
                 }
             }
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
     }
 
     private void saveSavedPosts() {
@@ -275,7 +276,7 @@ public class CommunityController implements Stoppable {
             String csv = savedPostIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             prefs.put(PREF_SAVED_POSTS, csv);
             prefs.flush();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
     }
 
     private void toggleSavePost(int postId) {
@@ -356,7 +357,7 @@ public class CommunityController implements Stoppable {
     }
 
     private void loadBookmarkFeed() {
-        Thread loader = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 List<Post> all = filterHumanPosts(servicePost.recuperer());
                 List<Post> saved = all.stream()
@@ -365,11 +366,9 @@ public class CommunityController implements Stoppable {
                 prefetchReactions(saved);
                 Platform.runLater(() -> renderFeed(saved));
             } catch (SQLException e) {
-                e.printStackTrace();
+                System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             }
-        }, "community-bookmarks");
-        loader.setDaemon(true);
-        loader.start();
+        });
     }
 
     @FXML
@@ -445,7 +444,7 @@ public class CommunityController implements Stoppable {
 
     /** Load the next page of posts (called from "Load more" button). */
     private void loadMorePosts() {
-        Thread loader = new Thread(() -> {
+        AppThreadPool.io(() -> {
             int newEnd = Math.min(allPosts.size(), displayedPostCount + PAGE_SIZE);
             List<Post> newPage = allPosts.subList(displayedPostCount, newEnd);
             prefetchReactions(newPage);
@@ -475,9 +474,7 @@ public class CommunityController implements Stoppable {
                     feedContainer.getChildren().add(wrapper);
                 }
             });
-        }, "community-more");
-        loader.setDaemon(true);
-        loader.start();
+        });
     }
 
     // ═══════════════════════════════════════════
@@ -529,7 +526,7 @@ public class CommunityController implements Stoppable {
 
     private void loadFeed() {
         // Run API calls on background thread to avoid blocking FX thread
-        Thread loader = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 List<Post> posts = filterHumanPosts(servicePost.recuperer());
                 int limit = Math.min(posts.size(), PAGE_SIZE);
@@ -541,11 +538,9 @@ public class CommunityController implements Stoppable {
                     renderFeed(page, posts.size() > limit);
                 });
             } catch (SQLException e) {
-                e.printStackTrace();
+                System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             }
-        }, "community-load");
-        loader.setDaemon(true);
-        loader.start();
+        });
     }
 
     private void renderFeed(List<Post> posts) {
@@ -879,7 +874,7 @@ public class CommunityController implements Stoppable {
 
     private void toggleReaction(Post post, int userId, String type) {
         // Run API calls on background thread
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 serviceReaction.toggleReaction(post.getId(), userId, type);
                 // Refresh only this post's reactions in cache
@@ -896,11 +891,9 @@ public class CommunityController implements Stoppable {
                     }
                 });
             } catch (SQLException e) {
-                e.printStackTrace();
+                System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             }
-        }, "community-react");
-        t.setDaemon(true);
-        t.start();
+        });
     }
 
     // ═══════════════════════════════════════════
@@ -1098,7 +1091,7 @@ public class CommunityController implements Stoppable {
                 } else {
                     loadFeed();
                 }
-            } catch (SQLException e) { e.printStackTrace(); }
+            } catch (SQLException e) { System.err.println(e.getClass().getSimpleName() + ": " + e.getMessage()); }
         }
     }
 
@@ -1295,7 +1288,7 @@ public class CommunityController implements Stoppable {
         loadingBox.getChildren().addAll(spinner, loadingText);
         wikiResultBox.getChildren().add(loadingBox);
 
-        Thread t = new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
 
@@ -1383,9 +1376,7 @@ public class CommunityController implements Stoppable {
                     wikiResultBox.getChildren().add(err);
                 });
             }
-        }, "wiki-search");
-        t.setDaemon(true);
-        t.start();
+        });
     }
 
     /** Parse sections from plain-text extract with == Heading == markers. */
@@ -1578,7 +1569,7 @@ public class CommunityController implements Stoppable {
         btnAiImprove.setDisable(true);
         btnAiImprove.setText("⏳ Improving...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 ZAIService zai = new ZAIService();
                 String improved = zai.improvePost(text.trim(), "professional, engaging, and concise");
@@ -1596,7 +1587,7 @@ public class CommunityController implements Stoppable {
                     showToast("AI improvement failed: " + ex.getMessage(), true);
                 });
             }
-        }).start();
+        });
     }
 
     @FXML
@@ -1610,7 +1601,7 @@ public class CommunityController implements Stoppable {
         btnAiSentiment.setDisable(true);
         btnAiSentiment.setText("⏳ Checking...");
 
-        new Thread(() -> {
+        AppThreadPool.io(() -> {
             try {
                 ZAIService zai = new ZAIService();
                 String analysis = zai.analyzeSentiment(text.trim());
@@ -1662,7 +1653,7 @@ public class CommunityController implements Stoppable {
                     showToast("Tone check failed: " + ex.getMessage(), true);
                 });
             }
-        }).start();
+        });
     }
 
     // ==================== Lifecycle cleanup ====================

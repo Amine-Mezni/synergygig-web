@@ -16,6 +16,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import services.*;
+import utils.AppThreadPool;
 import utils.DialogHelper;
 import utils.PayrollPdfExporter;
 import utils.SessionManager;
@@ -1873,7 +1874,7 @@ public class HRModuleController {
             btnGenerate.setText("⏳ Analyzing...");
             statusLabel.setText("Gathering HR data and sending to AI...");
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     // Gather attendance summary
                     String attendanceSummary = buildAttendanceSummary();
@@ -1898,7 +1899,7 @@ public class HRModuleController {
                         btnGenerate.setText("🧠 Generate Insights");
                     });
                 }
-            }).start();
+            });
         });
 
         // Meeting prep button
@@ -1908,7 +1909,7 @@ public class HRModuleController {
             btnMeetingPrep.setDisable(true);
             btnMeetingPrep.setText("⏳ Preparing...");
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     String attendanceSummary = buildAttendanceSummary();
                     String leaveSummary = buildLeaveSummary();
@@ -1932,7 +1933,7 @@ public class HRModuleController {
                         btnMeetingPrep.setText("📋 Prepare HR Meeting");
                     });
                 }
-            }).start();
+            });
         });
 
         HBox buttons = new HBox(12, btnGenerate, btnMeetingPrep);

@@ -15,6 +15,7 @@ import services.ServiceUser;
 import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 import utils.AnimatedButton;
+import utils.AppThreadPool;
 import utils.SessionManager;
 import utils.StyledAlert;
 import utils.SoundManager;
@@ -693,7 +694,7 @@ public class InterviewController {
             generateBtn.setText("Generating...");
             resultArea.setText("⏳ Asking AI...");
 
-            new Thread(() -> {
+            AppThreadPool.io(() -> {
                 try {
                     java.util.Map<String, Object> body = new java.util.HashMap<>();
                     body.put("position", position);
@@ -732,7 +733,7 @@ public class InterviewController {
                         generateBtn.setText("Generate Questions");
                     });
                 }
-            }).start();
+            });
         });
 
         content.getChildren().addAll(header, desc,
