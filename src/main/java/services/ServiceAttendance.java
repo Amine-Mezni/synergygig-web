@@ -23,6 +23,37 @@ public class ServiceAttendance implements IService<Attendance> {
 
     // ==================== JSON helpers ====================
 
+    /**
+     * Parse a TIME value that may arrive as "HH:mm:ss", "HH:mm", or seconds-float (timedelta serialization).
+     */
+    private Time parseTime(JsonElement el) {
+        try {
+            // Try as number first (Python timedelta serialized as total seconds)
+            if (el.isJsonPrimitive() && el.getAsJsonPrimitive().isNumber()) {
+                long totalSeconds = (long) el.getAsDouble();
+                long h = totalSeconds / 3600;
+                long m = (totalSeconds % 3600) / 60;
+                long s = totalSeconds % 60;
+                return Time.valueOf(String.format("%02d:%02d:%02d", h, m, s));
+            }
+            // Try as string
+            String str = el.getAsString().trim();
+            // Handle "69064.0" style strings (float-as-string)
+            if (str.matches("\\d+\\.\\d+")) {
+                long totalSeconds = (long) Double.parseDouble(str);
+                long h = totalSeconds / 3600;
+                long m = (totalSeconds % 3600) / 60;
+                long s = totalSeconds % 60;
+                return Time.valueOf(String.format("%02d:%02d:%02d", h, m, s));
+            }
+            // Normal "HH:mm:ss" or "HH:mm"
+            return Time.valueOf(str.length() == 5 ? str + ":00" : str);
+        } catch (Exception e) {
+            System.err.println("⚠ Failed to parse time: " + el + " — " + e.getMessage());
+            return null;
+        }
+    }
+
     private Attendance jsonToAttendance(JsonObject obj) {
         Timestamp createdAt = null;
         if (obj.has("created_at") && !obj.get("created_at").isJsonNull()) {
@@ -34,13 +65,11 @@ public class ServiceAttendance implements IService<Attendance> {
         }
         Time checkIn = null;
         if (obj.has("check_in") && !obj.get("check_in").isJsonNull()) {
-            String ci = obj.get("check_in").getAsString();
-            checkIn = Time.valueOf(ci.length() == 5 ? ci + ":00" : ci);
+            checkIn = parseTime(obj.get("check_in"));
         }
         Time checkOut = null;
         if (obj.has("check_out") && !obj.get("check_out").isJsonNull()) {
-            String co = obj.get("check_out").getAsString();
-            checkOut = Time.valueOf(co.length() == 5 ? co + ":00" : co);
+            checkOut = parseTime(obj.get("check_out"));
         }
         return new Attendance(
                 obj.get("id").getAsInt(),

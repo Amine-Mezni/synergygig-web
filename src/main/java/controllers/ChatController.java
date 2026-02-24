@@ -29,8 +29,10 @@ import utils.BadWordsService;
 import utils.AIAssistantService;
 import utils.ApiClient;
 import utils.AudioCallService;
+import utils.DocumentExtractor;
 import utils.ScreenShareService;
 import utils.SessionManager;
+import utils.SignalingService;
 import utils.SoundManager;
 
 import com.google.gson.JsonElement;
@@ -95,11 +97,17 @@ public class ChatController {
     private final Set<Integer> favoriteRoomIds = new LinkedHashSet<>();
     private static final String PREF_FAVORITES = "chat_favorite_rooms";
 
+    // ── Room ordering: last message timestamp per room ──
+    private final Map<Integer, java.sql.Timestamp> lastMessageTimeCache = new HashMap<>();
+
     // ── Call state ──
     private Call activeCall = null;
     private long callStartTime = 0;
     private Timeline callTimer = null;
     private Timeline activeCallPoller = null;
+    private Timeline outgoingCallPoller = null;
+    private volatile boolean callPollInFlight = false;
+    private int callPollErrorCount = 0;
     private VBox incomingCallOverlay = null;
     @FXML private Button btnScreenShare;
     private javafx.stage.Stage videoCallStage = null;
@@ -239,13 +247,46 @@ public class ChatController {
         });
         // Messages: network call on background thread
         scheduler.scheduleAtFixedRate(this::pollMessagesBackground, 2, 2, TimeUnit.SECONDS);
+        // Re-sort rooms every 5s so conversations with new messages bubble to top
+        scheduler.scheduleAtFixedRate(() -> {
+            refreshRoomOrder();
+        }, 5, 5, TimeUnit.SECONDS);
         // Refresh user cache (online status) every 10s
         scheduler.scheduleAtFixedRate(() -> {
             loadUsers();
             Platform.runLater(() -> roomsList.refresh());
         }, 10, 10, TimeUnit.SECONDS);
         // Poll for incoming calls on background thread
-        scheduler.scheduleAtFixedRate(this::pollIncomingCallsBackground, 2, 2, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::pollIncomingCallsBackground, 2, 3, TimeUnit.SECONDS);
+
+        // ── Instant incoming call via signaling (no polling delay) ──
+        SignalingService.getInstance().onMessage("call-state", msg -> {
+            try {
+                JsonObject data = msg.getAsJsonObject("data");
+                String state = data.has("state") ? data.get("state").getAsString() : "";
+                if ("incoming-call".equals(state)) {
+                    int callId = data.get("callId").getAsInt();
+                    String callerName = data.has("callerName") ? data.get("callerName").getAsString() : "Unknown";
+                    if (activeCall != null || incomingCallOverlay != null) return;
+                    // Fetch call details on background thread
+                    new Thread(() -> {
+                        Call incoming = serviceCall.getCall(callId);
+                        if (incoming != null && "pending".equals(incoming.getStatus())) {
+                            Platform.runLater(() -> {
+                                if (incomingCallOverlay == null && activeCall == null) {
+                                    User caller = userCache.get(incoming.getCallerId());
+                                    String name = caller != null ? caller.getFirstName() + " " + caller.getLastName() : callerName;
+                                    SoundManager.getInstance().playLoop(SoundManager.INCOMING_CALL);
+                                    showIncomingCallOverlay(incoming, name, caller);
+                                }
+                            });
+                        }
+                    }, "chat-call-signal").start();
+                }
+            } catch (Exception e) {
+                System.err.println("[Chat] call-state handler error: " + e.getMessage());
+            }
+        });
 
         // ── Twemoji icons on emoji & attach buttons ──
         Platform.runLater(() -> {
@@ -354,13 +395,16 @@ public class ChatController {
                 }
             }
 
-            // Sort: favorites first, then by date descending
+            // Sort: favorites first, then by last message time (most recent on top)
             visible.sort((a, b) -> {
                 boolean aFav = favoriteRoomIds.contains(a.getId());
                 boolean bFav = favoriteRoomIds.contains(b.getId());
                 if (aFav != bFav) return aFav ? -1 : 1;
-                if (b.getCreatedAt() != null && a.getCreatedAt() != null)
-                    return b.getCreatedAt().compareTo(a.getCreatedAt());
+                java.sql.Timestamp aTime = lastMessageTimeCache.getOrDefault(a.getId(), a.getCreatedAt());
+                java.sql.Timestamp bTime = lastMessageTimeCache.getOrDefault(b.getId(), b.getCreatedAt());
+                if (bTime != null && aTime != null) return bTime.compareTo(aTime);
+                if (bTime != null) return 1;
+                if (aTime != null) return -1;
                 return 0;
             });
             if (aiRoom != null) visible.add(0, aiRoom);
@@ -575,6 +619,14 @@ public class ChatController {
                 lastMessageCount = count;
                 lastMessageId = latestId;
 
+                // Update last message time for this room
+                if (!messages.isEmpty()) {
+                    Message last = messages.get(messages.size() - 1);
+                    if (last.getTimestamp() != null) {
+                        lastMessageTimeCache.put(currentRoom.getId(), last.getTimestamp());
+                    }
+                }
+
                 Platform.runLater(() -> {
                     if (prevLastId > 0 && latestId > prevLastId) {
                         for (int i = messages.size() - 1; i >= 0; i--) {
@@ -607,8 +659,57 @@ public class ChatController {
             List<Message> messages = serviceMessage.getByRoom(currentRoom.getId());
             lastMessageCount = messages.size();
             lastMessageId = messages.isEmpty() ? 0 : messages.get(messages.size() - 1).getId();
+            // Update last message time cache
+            if (!messages.isEmpty()) {
+                Message last = messages.get(messages.size() - 1);
+                if (last.getTimestamp() != null) {
+                    lastMessageTimeCache.put(currentRoom.getId(), last.getTimestamp());
+                }
+            }
             renderMessages(messages);
         } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    /**
+     * Background task: check all visible rooms for their latest message timestamp
+     * and re-sort the room list so the most recently active conversation is on top.
+     */
+    private void refreshRoomOrder() {
+        try {
+            User me = SessionManager.getInstance().getCurrentUser();
+            if (me == null) return;
+            List<ChatRoom> rooms = new ArrayList<>(roomsList.getItems());
+
+            boolean changed = false;
+            for (ChatRoom room : rooms) {
+                if (AIAssistantService.AI_ROOM_NAME.equals(room.getName())) continue;
+                List<Message> msgs = serviceMessage.getByRoom(room.getId());
+                if (!msgs.isEmpty()) {
+                    Message last = msgs.get(msgs.size() - 1);
+                    java.sql.Timestamp prev = lastMessageTimeCache.get(room.getId());
+                    if (last.getTimestamp() != null &&
+                        (prev == null || last.getTimestamp().after(prev))) {
+                        lastMessageTimeCache.put(room.getId(), last.getTimestamp());
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed) {
+                Platform.runLater(() -> {
+                    ChatRoom selected = roomsList.getSelectionModel().getSelectedItem();
+                    loadRooms();
+                    if (selected != null) {
+                        for (ChatRoom r : roomsList.getItems()) {
+                            if (r.getId() == selected.getId()) {
+                                roomsList.getSelectionModel().select(r);
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (Exception e) { /* ignore polling errors */ }
     }
 
     private void renderMessages(List<Message> messages) {
@@ -1117,10 +1218,39 @@ public class ChatController {
             } else {
                 serviceMessage.ajouter(new Message(currentUser.getId(), currentRoom.getId(), content));
                 SoundManager.getInstance().play(SoundManager.MESSAGE_SENT);
+                notifyNewMessage(content);
             }
             messageArea.clear();
+            // Bump this room to top of the list immediately
+            lastMessageTimeCache.put(currentRoom.getId(), new java.sql.Timestamp(System.currentTimeMillis()));
             forceRefreshMessages();
+            ChatRoom selected = currentRoom;
+            loadRooms();
+            for (ChatRoom r : roomsList.getItems()) {
+                if (r.getId() == selected.getId()) {
+                    roomsList.getSelectionModel().select(r);
+                    break;
+                }
+            }
         } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    /**
+     * Send a "new-message" signaling notification to the other user in a DM room.
+     * This triggers an instant toast on the recipient's dashboard.
+     */
+    private void notifyNewMessage(String content) {
+        if (currentRoom == null || !currentRoom.isPrivate() || isAIRoom) return;
+        User me = SessionManager.getInstance().getCurrentUser();
+        User other = getOtherUser(currentRoom);
+        if (me == null || other == null) return;
+
+        String preview = content.length() > 80 ? content.substring(0, 80) + "…" : content;
+        JsonObject data = new JsonObject();
+        data.addProperty("senderName", me.getFirstName());
+        data.addProperty("preview", preview);
+        data.addProperty("roomId", currentRoom.getId());
+        SignalingService.getInstance().send(other.getId(), "new-message", data);
     }
 
     private void startEdit(Message msg) {
@@ -1275,9 +1405,15 @@ public class ChatController {
     @FXML
     private void handleAttachImage() {
         SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
-        if (currentRoom == null || isAIRoom) return;
+        if (currentRoom == null) return;
         User me = SessionManager.getInstance().getCurrentUser();
         if (me == null) return;
+
+        // In AI room — only allow PDF/Excel for document extraction
+        if (isAIRoom) {
+            handleAIDocumentUpload(me);
+            return;
+        }
 
         FileChooser fc = new FileChooser();
         fc.setTitle("Attach File");
@@ -1337,6 +1473,7 @@ public class ChatController {
             String content = IMAGE_PREFIX + base64 + IMAGE_SUFFIX;
             serviceMessage.ajouter(new Message(me.getId(), currentRoom.getId(), content));
             SoundManager.getInstance().play(SoundManager.MESSAGE_SENT);
+            notifyNewMessage("🖼 Image");
             forceRefreshMessages();
         } catch (Exception e) {
             showInputError("Failed to send image.");
@@ -1363,6 +1500,7 @@ public class ChatController {
                     try {
                         serviceMessage.ajouter(new Message(me.getId(), currentRoom.getId(), content));
                         SoundManager.getInstance().play(SoundManager.MESSAGE_SENT);
+                        notifyNewMessage("📄 " + fileName);
                         forceRefreshMessages();
                     } catch (SQLException e) {
                         showInputError("Failed to send file message.");
@@ -1397,6 +1535,91 @@ public class ChatController {
         if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".log")) return "📄";
         if (name.endsWith(".java") || name.endsWith(".py") || name.endsWith(".js") || name.endsWith(".html") || name.endsWith(".css")) return "💻";
         return "📄";
+    }
+
+    /** Handle PDF/Excel upload in AI room — extract content and show analysis. */
+    private void handleAIDocumentUpload(User me) {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Upload Document for AI Analysis");
+        fc.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Supported Documents", "*.pdf", "*.xlsx", "*.xls"),
+                new FileChooser.ExtensionFilter("PDF Files", "*.pdf"),
+                new FileChooser.ExtensionFilter("Excel Files", "*.xlsx", "*.xls")
+        );
+        File file = fc.showOpenDialog(chatRootStack.getScene().getWindow());
+        if (file == null) return;
+
+        // 50 MB limit for document extraction
+        if (file.length() > 50L * 1024 * 1024) {
+            showInputError("Document too large (max 50 MB for extraction).");
+            return;
+        }
+
+        String fileName = file.getName();
+        String lowerName = fileName.toLowerCase();
+        boolean isPdf = lowerName.endsWith(".pdf");
+        boolean isExcel = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
+
+        if (!isPdf && !isExcel) {
+            showInputError("Only PDF and Excel files are supported for extraction.");
+            return;
+        }
+
+        // Show user message
+        String userMsg = (isPdf ? "\uD83D\uDCC4" : "\uD83D\uDCCA") + " Uploaded: " + fileName;
+        aiChatHistory.add(new AIChatEntry(true, userMsg));
+        renderAIChat();
+
+        // Show "extracting..." indicator
+        Label extractingLabel = new Label("\uD83D\uDD0D Extracting content from " + fileName + "...");
+        extractingLabel.getStyleClass().add("msg-ai-typing");
+        HBox extractingRow = new HBox(extractingLabel);
+        extractingRow.setAlignment(Pos.CENTER_LEFT);
+        extractingRow.setPadding(new Insets(4, 0, 4, 44));
+        messagesContainer.getChildren().add(extractingRow);
+        Platform.runLater(() -> messagesScroll.setVvalue(1.0));
+
+        // Extract on background thread
+        new Thread(() -> {
+            try {
+                String extracted = DocumentExtractor.extract(file);
+                String analysis = DocumentExtractor.analyzeText(extracted, fileName);
+
+                Platform.runLater(() -> {
+                    messagesContainer.getChildren().remove(extractingRow);
+
+                    // Show extracted content
+                    aiChatHistory.add(new AIChatEntry(false, extracted));
+                    // Show analysis
+                    aiChatHistory.add(new AIChatEntry(false, analysis));
+
+                    renderAIChat();
+                    SoundManager.getInstance().play(SoundManager.NEW_MESSAGE);
+
+                    // Now also attempt to send to AI service for deeper analysis
+                    String aiPrompt = "I uploaded a document: " + fileName
+                            + ". Here is the extracted content (first 2000 chars):\n\n"
+                            + (extracted.length() > 2000 ? extracted.substring(0, 2000) : extracted)
+                            + "\n\nPlease provide a brief summary and any key insights.";
+
+                    AIAssistantService.chat(me.getId(), aiPrompt)
+                            .thenAccept(reply -> Platform.runLater(() -> {
+                                if (!reply.startsWith("\u26A0")) {
+                                    aiChatHistory.add(new AIChatEntry(false, "\uD83E\uDD16 AI Summary:\n" + reply));
+                                    renderAIChat();
+                                }
+                            }))
+                            .exceptionally(ex -> null); // Silently ignore AI errors
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    messagesContainer.getChildren().remove(extractingRow);
+                    aiChatHistory.add(new AIChatEntry(false,
+                            "\u26A0 Failed to extract content from " + fileName + ": " + ex.getMessage()));
+                    renderAIChat();
+                });
+            }
+        }, "doc-extract").start();
     }
 
     /** Handle downloading a file attachment. */
@@ -1549,6 +1772,13 @@ public class ChatController {
             activeCall = call;
             SoundManager.getInstance().playLoop(SoundManager.OUTGOING_CALL);
             showOutgoingCallOverlay(other, call.isVideoCall());
+            // Notify callee instantly via signaling
+            JsonObject data = new JsonObject();
+            data.addProperty("state", "incoming-call");
+            data.addProperty("callId", call.getId());
+            data.addProperty("callerName", me.getFirstName() + " " + me.getLastName());
+            data.addProperty("callType", callType);
+            SignalingService.getInstance().send(other.getId(), "call-state", data);
             // Start polling for acceptance
             pollCallStatus(call.getId());
         } else {
@@ -1603,27 +1833,50 @@ public class ChatController {
 
     /** Poll call status to detect when accepted or rejected. */
     private void pollCallStatus(int callId) {
-        Timeline poller = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
+        callPollErrorCount = 0;
+        callPollInFlight = false;
+        if (outgoingCallPoller != null) outgoingCallPoller.stop();
+        outgoingCallPoller = new Timeline(new KeyFrame(Duration.seconds(2), e -> {
             if (activeCall == null || activeCall.getId() != callId) return;
-            Call c = serviceCall.getCall(callId);
-            if (c == null) return;
-
-            if (c.isActive()) {
-                activeCall = c;
-                SoundManager.getInstance().stopLoop();
-                SoundManager.getInstance().play(SoundManager.CALL_CONNECTED);
-                removeIncomingCallOverlay();
-                startActiveCall(callId);
-            } else if (c.isEnded()) {
-                SoundManager.getInstance().stopLoop();
-                activeCall = null;
-                pendingVideoCall = false;
-                removeIncomingCallOverlay();
-                showToast("Call", "Call ended.");
-            }
+            if (callPollInFlight) return; // skip if previous request still in flight
+            callPollInFlight = true;
+            new Thread(() -> {
+                try {
+                    Call c = serviceCall.getCall(callId);
+                    if (c == null) {
+                        callPollErrorCount++;
+                        if (callPollErrorCount > 10) {
+                            Platform.runLater(() -> { if (outgoingCallPoller != null) outgoingCallPoller.stop(); });
+                        }
+                        return;
+                    }
+                    callPollErrorCount = 0;
+                    if (c.isActive()) {
+                        Platform.runLater(() -> {
+                            activeCall = c;
+                            SoundManager.getInstance().stopLoop();
+                            SoundManager.getInstance().play(SoundManager.CALL_CONNECTED);
+                            removeIncomingCallOverlay();
+                            if (outgoingCallPoller != null) { outgoingCallPoller.stop(); outgoingCallPoller = null; }
+                            startActiveCall(callId);
+                        });
+                    } else if (c.isEnded()) {
+                        Platform.runLater(() -> {
+                            SoundManager.getInstance().stopLoop();
+                            activeCall = null;
+                            pendingVideoCall = false;
+                            removeIncomingCallOverlay();
+                            if (outgoingCallPoller != null) { outgoingCallPoller.stop(); outgoingCallPoller = null; }
+                            showToast("Call", "Call ended.");
+                        });
+                    }
+                } finally {
+                    callPollInFlight = false;
+                }
+            }, "outgoing-call-poll").start();
         }));
-        poller.setCycleCount(60); // poll for up to 60s
-        poller.play();
+        outgoingCallPoller.setCycleCount(30); // poll for up to 60s (2s interval)
+        outgoingCallPoller.play();
     }
 
     /** Check for incoming calls on background thread. */
@@ -1750,16 +2003,32 @@ public class ChatController {
         callTimer.setCycleCount(Animation.INDEFINITE);
         callTimer.play();
 
-        // Poll call status every 2s to detect remote hang-up instantly
-        activeCallPoller = new Timeline(new KeyFrame(Duration.seconds(2), ev -> {
+        // Stop outgoing call poller if still running
+        if (outgoingCallPoller != null) { outgoingCallPoller.stop(); outgoingCallPoller = null; }
+        callPollErrorCount = 0;
+        callPollInFlight = false;
+
+        // Poll call status every 3s to detect remote hang-up
+        activeCallPoller = new Timeline(new KeyFrame(Duration.seconds(3), ev -> {
             if (activeCall == null) return;
+            if (callPollInFlight) return; // skip if previous request still pending
+            callPollInFlight = true;
             new Thread(() -> {
-                Call c = serviceCall.getCall(activeCall.getId());
-                if (c != null && (c.isEnded() || "rejected".equals(c.getStatus()) || "missed".equals(c.getStatus()))) {
-                    Platform.runLater(() -> {
-                        cleanupActiveCall();
-                        showToast("Call", "Call ended.");
-                    });
+                try {
+                    Call c = serviceCall.getCall(activeCall.getId());
+                    if (c == null) {
+                        callPollErrorCount++;
+                        return; // don't stop — call may still be active
+                    }
+                    callPollErrorCount = 0;
+                    if (c.isEnded() || "rejected".equals(c.getStatus()) || "missed".equals(c.getStatus())) {
+                        Platform.runLater(() -> {
+                            cleanupActiveCall();
+                            showToast("Call", "Call ended.");
+                        });
+                    }
+                } finally {
+                    callPollInFlight = false;
                 }
             }, "call-status-check").start();
         }));
@@ -2187,6 +2456,14 @@ public class ChatController {
         SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
         if (activeCall != null) {
             serviceCall.endCall(activeCall.getId());
+            // Notify remote user via signaling
+            User other = currentRoom != null ? getOtherUser(currentRoom) : null;
+            if (other != null) {
+                JsonObject data = new JsonObject();
+                data.addProperty("state", "ended");
+                data.addProperty("callId", activeCall.getId());
+                SignalingService.getInstance().send(other.getId(), "call-state", data);
+            }
         }
         cleanupActiveCall();
     }
@@ -2201,10 +2478,16 @@ public class ChatController {
         activeCall = null;
         pendingVideoCall = false;
 
+        if (outgoingCallPoller != null) {
+            outgoingCallPoller.stop();
+            outgoingCallPoller = null;
+        }
         if (activeCallPoller != null) {
             activeCallPoller.stop();
             activeCallPoller = null;
         }
+        callPollInFlight = false;
+        callPollErrorCount = 0;
 
         if (callTimer != null) {
             callTimer.stop();

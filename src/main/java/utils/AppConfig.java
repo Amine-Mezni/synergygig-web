@@ -12,6 +12,8 @@ public class AppConfig {
 
     private static final Properties props = new Properties();
     private static boolean loaded = false;
+    /** The file we actually loaded from — used for save(). */
+    private static File configFile = null;
 
     static {
         load();
@@ -33,6 +35,7 @@ public class AppConfig {
                 try (FileInputStream fis = new FileInputStream(file)) {
                     props.load(fis);
                     loaded = true;
+                    configFile = file;
                     System.out.println("✅ Config loaded from " + file.getAbsolutePath());
                     return;
                 } catch (IOException e) {
@@ -46,6 +49,8 @@ public class AppConfig {
             if (is != null) {
                 props.load(is);
                 loaded = true;
+                // classpath is read-only — pick a writable location for saves
+                configFile = new File(System.getProperty("user.dir"), "config.properties");
                 System.out.println("✅ Config loaded from classpath");
                 return;
             }
@@ -54,6 +59,7 @@ public class AppConfig {
         }
 
         if (!loaded) {
+            configFile = new File(System.getProperty("user.dir"), "config.properties");
             System.out.println("ℹ No config.properties found — using localhost defaults (XAMPP mode)");
         }
     }
@@ -106,6 +112,10 @@ public class AppConfig {
         return props.getProperty("ai.base_url", "http://localhost:5000");
     }
 
+    public static String getGeminiApiKey() {
+        return props.getProperty("gemini.api_key", "");
+    }
+
     public static String getServerHost() {
         return props.getProperty("server.host", "64.23.239.27");
     }
@@ -125,5 +135,70 @@ public class AppConfig {
 
     public static String get(String key, String defaultValue) {
         return props.getProperty(key, defaultValue);
+    }
+
+    // ── Write support (for in-app settings) ──────────────────────
+
+    /** Update a property in memory. Call {@link #save()} to persist. */
+    public static void set(String key, String value) {
+        props.setProperty(key, value);
+    }
+
+    /**
+     * Persist current properties back to the config file on disk.
+     * Preserves comments and ordering by rewriting the original file
+     * line-by-line, replacing known key=value lines, and appending new keys.
+     */
+    public static void save() throws IOException {
+        if (configFile == null) {
+            throw new IOException("No config file location known — cannot save.");
+        }
+
+        // Read original lines to preserve comments / ordering
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        java.util.Set<String> writtenKeys = new java.util.HashSet<>();
+
+        if (configFile.exists()) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(configFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // Detect key=value lines (skip blanks / comments)
+                    String trimmed = line.trim();
+                    if (!trimmed.isEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
+                        String key = trimmed.substring(0, trimmed.indexOf('=')).trim();
+                        if (props.containsKey(key)) {
+                            lines.add(key + "=" + props.getProperty(key));
+                            writtenKeys.add(key);
+                        } else {
+                            lines.add(line);
+                        }
+                    } else {
+                        lines.add(line);
+                    }
+                }
+            }
+        }
+
+        // Append any new keys that weren't in the original file
+        for (String key : props.stringPropertyNames()) {
+            if (!writtenKeys.contains(key)) {
+                lines.add(key + "=" + props.getProperty(key));
+            }
+        }
+
+        try (java.io.PrintWriter writer = new java.io.PrintWriter(new java.io.FileWriter(configFile))) {
+            for (String l : lines) {
+                writer.println(l);
+            }
+        }
+        System.out.println("✅ Config saved to " + configFile.getAbsolutePath());
+    }
+
+    /** Re-load properties from disk (e.g. after external edits). */
+    public static void reload() {
+        props.clear();
+        loaded = false;
+        configFile = null;
+        load();
     }
 }

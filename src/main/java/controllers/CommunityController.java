@@ -35,6 +35,7 @@ import utils.AnimatedButton;
 import utils.BadWordsService;
 import utils.SessionManager;
 import utils.SoundManager;
+import services.ZAIService;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -68,6 +69,8 @@ public class CommunityController {
     @FXML private Button btnNewPost;
     @FXML private Button btnSubmitPost;
     @FXML private Button btnAttachPostImage;
+    @FXML private Button btnAiImprove;
+    @FXML private Button btnAiSentiment;
     @FXML private Label imageAttachLabel;
     @FXML private ScrollPane feedScroll;
     @FXML private VBox feedContainer;
@@ -1560,5 +1563,105 @@ public class CommunityController {
         int idx = json.indexOf(search);
         if (idx < 0) return null;
         return jsonStringFieldAt(json, idx);
+    }
+
+    // ==================== AI WRITING ASSISTANT ====================
+
+    @FXML
+    private void handleAiImprove() {
+        String text = postTextArea.getText();
+        if (text == null || text.trim().isEmpty()) {
+            showToast("Write something first, then AI will improve it.", true);
+            return;
+        }
+
+        btnAiImprove.setDisable(true);
+        btnAiImprove.setText("⏳ Improving...");
+
+        new Thread(() -> {
+            try {
+                ZAIService zai = new ZAIService();
+                String improved = zai.improvePost(text.trim(), "professional, engaging, and concise");
+                Platform.runLater(() -> {
+                    postTextArea.setText(improved);
+                    btnAiImprove.setDisable(false);
+                    btnAiImprove.setText("✨ AI Improve");
+                    SoundManager.getInstance().play(SoundManager.AI_COMPLETE);
+                    showToast("✨ Post improved by AI!", false);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    btnAiImprove.setDisable(false);
+                    btnAiImprove.setText("✨ AI Improve");
+                    showToast("AI improvement failed: " + ex.getMessage(), true);
+                });
+            }
+        }).start();
+    }
+
+    @FXML
+    private void handleAiSentiment() {
+        String text = postTextArea.getText();
+        if (text == null || text.trim().isEmpty()) {
+            showToast("Write something first to check its tone.", true);
+            return;
+        }
+
+        btnAiSentiment.setDisable(true);
+        btnAiSentiment.setText("⏳ Checking...");
+
+        new Thread(() -> {
+            try {
+                ZAIService zai = new ZAIService();
+                String analysis = zai.analyzeSentiment(text.trim());
+
+                // Try to parse JSON response
+                String sentiment = "unknown", tone = "unknown", summary = "";
+                boolean toxic = false;
+                try {
+                    String clean = analysis.trim();
+                    if (clean.startsWith("```")) {
+                        clean = clean.replaceAll("^```[a-z]*\\n?", "").replaceAll("\\n?```$", "").trim();
+                    }
+                    com.google.gson.JsonObject obj = com.google.gson.JsonParser.parseString(clean).getAsJsonObject();
+                    sentiment = obj.has("sentiment") ? obj.get("sentiment").getAsString() : sentiment;
+                    tone = obj.has("tone") ? obj.get("tone").getAsString() : tone;
+                    summary = obj.has("summary") ? obj.get("summary").getAsString() : "";
+                    toxic = obj.has("toxic") && obj.get("toxic").getAsBoolean();
+                } catch (Exception ignored) {
+                    summary = analysis; // fallback: show raw text
+                }
+
+                String emoji = switch (sentiment.toLowerCase()) {
+                    case "positive" -> "😊";
+                    case "negative" -> "😟";
+                    case "mixed" -> "🤔";
+                    default -> "😐";
+                };
+
+                final String msg = emoji + " Sentiment: " + sentiment +
+                        "\nTone: " + tone +
+                        (toxic ? "\n⚠️ Warning: May be perceived as toxic" : "") +
+                        (summary.isEmpty() ? "" : "\n" + summary);
+
+                Platform.runLater(() -> {
+                    btnAiSentiment.setDisable(false);
+                    btnAiSentiment.setText("🔍 Check Tone");
+                    SoundManager.getInstance().play(SoundManager.AI_COMPLETE);
+
+                    Alert info = new Alert(Alert.AlertType.INFORMATION);
+                    info.setTitle("Tone Analysis");
+                    info.setHeaderText("🔍 Post Tone Analysis");
+                    info.setContentText(msg);
+                    info.showAndWait();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    btnAiSentiment.setDisable(false);
+                    btnAiSentiment.setText("🔍 Check Tone");
+                    showToast("Tone check failed: " + ex.getMessage(), true);
+                });
+            }
+        }).start();
     }
 }

@@ -78,11 +78,21 @@
                             <HBox spacing="12">
                                 <VBox spacing="5" HBox.hgrow="ALWAYS">
                                     <Label text="Password" styleClass="auth-label"/>
-                                    <PasswordField fx:id="passwordField" promptText="••••••••" styleClass="auth-input"/>
+                                    <StackPane styleClass="auth-password-wrapper">
+                                        <PasswordField fx:id="passwordField" promptText="••••••••" styleClass="auth-input"/>
+                                        <TextField fx:id="passwordVisible" promptText="••••••••" styleClass="auth-input" visible="false" managed="false"/>
+                                        <Button fx:id="eyeToggle1" text="&#x1F441;" onAction="#togglePasswordVisibility"
+                                                styleClass="auth-eye-btn" StackPane.alignment="CENTER_RIGHT"/>
+                                    </StackPane>
                                 </VBox>
                                 <VBox spacing="5" HBox.hgrow="ALWAYS">
                                     <Label text="Confirm" styleClass="auth-label"/>
-                                    <PasswordField fx:id="confirmPasswordField" promptText="••••••••" styleClass="auth-input"/>
+                                    <StackPane styleClass="auth-password-wrapper">
+                                        <PasswordField fx:id="confirmPasswordField" promptText="••••••••" styleClass="auth-input"/>
+                                        <TextField fx:id="confirmPasswordVisible" promptText="••••••••" styleClass="auth-input" visible="false" managed="false"/>
+                                        <Button fx:id="eyeToggle2" text="&#x1F441;" onAction="#toggleConfirmPasswordVisibility"
+                                                styleClass="auth-eye-btn" StackPane.alignment="CENTER_RIGHT"/>
+                                    </StackPane>
                                 </VBox>
                             </HBox>
                         </VBox>

@@ -72,23 +72,50 @@
                     <Label fx:id="detailDates" text="" styleClass="pm-detail-meta"/>
                 </HBox>
                 <Label fx:id="detailTeam" text="" styleClass="pm-detail-meta" wrapText="true"/>
+                <Label fx:id="holidayWarning" text="" styleClass="pm-holiday-warning" wrapText="true"
+                       visible="false" managed="false"/>
             </VBox>
-            <VBox alignment="CENTER" spacing="4" minWidth="90">
+            <VBox alignment="CENTER" spacing="4" minWidth="120">
+                <Label fx:id="weatherLabel" text="" styleClass="pm-weather-label"/>
                 <Label fx:id="detailProgress" text="0%" styleClass="pm-progress-label"/>
                 <ProgressBar fx:id="detailProgressBar" progress="0" prefWidth="80" styleClass="pm-progress-bar"/>
                 <Label fx:id="detailTaskCount" text="0 tasks" styleClass="pm-detail-meta"/>
             </VBox>
         </HBox>
 
+        <!-- Motivational quote banner -->
+        <HBox fx:id="quoteBanner" alignment="CENTER_LEFT" spacing="8" styleClass="pm-quote-banner"
+              visible="false" managed="false">
+            <Label text="💡" style="-fx-font-size: 16;"/>
+            <Label fx:id="quoteLabel" text="" wrapText="true" styleClass="pm-quote-text" HBox.hgrow="ALWAYS"/>
+        </HBox>
+
         <!-- Task board header -->
         <HBox alignment="CENTER_LEFT" spacing="12">
             <Label text="Tasks" styleClass="pm-section-title"/>
             <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="btnTeamView" text="👥 Team" styleClass="pm-btn-ghost"
+                    onAction="#toggleTeamView"/>
+            <Button fx:id="btnFunFact" text="🎲 Fun Fact" styleClass="pm-btn-ghost"
+                    onAction="#fetchFunFact"/>
+            <Button fx:id="btnDailyTip" text="💡 Daily Tip" styleClass="pm-btn-ghost"
+                    onAction="#fetchDailyTip"/>
             <Button fx:id="btnAiPlan" text="🤖 Plan with AI" styleClass="pm-btn-secondary"
                     onAction="#aiPlanTasks" managed="false" visible="false"/>
+            <Button fx:id="btnSprintPlan" text="📋 Sprint Plan" styleClass="pm-btn-ghost"
+                    onAction="#showSprintPlanner" managed="false" visible="false"/>
+            <Button fx:id="btnMeetingNotes" text="📝 Meeting Notes" styleClass="pm-btn-ghost"
+                    onAction="#showMeetingNotes" managed="false" visible="false"/>
+            <Button fx:id="btnDecisionHelper" text="⚖ Decide" styleClass="pm-btn-ghost"
+                    onAction="#showDecisionHelper" managed="false" visible="false"/>
             <Button fx:id="btnAddTask" text="+ Add Task" styleClass="pm-btn-primary"
                     onAction="#showNewTaskDialog" managed="false" visible="false"/>
         </HBox>
+
+        <!-- Team View (hidden by default) -->
+        <VBox fx:id="teamView" spacing="12" visible="false" managed="false" VBox.vgrow="ALWAYS">
+            <padding><Insets top="0" right="0" bottom="0" left="0"/></padding>
+        </VBox>
 
         <!-- Kanban columns -->
         <HBox fx:id="kanbanBoard" spacing="12" VBox.vgrow="ALWAYS" styleClass="pm-kanban-board">

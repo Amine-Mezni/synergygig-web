@@ -40,9 +40,16 @@ public class SignupController {
     @FXML private TextField emailField;
     @FXML private PasswordField passwordField;
     @FXML private PasswordField confirmPasswordField;
+    @FXML private TextField passwordVisible;
+    @FXML private TextField confirmPasswordVisible;
+    @FXML private Button eyeToggle1;
+    @FXML private Button eyeToggle2;
     @FXML private ComboBox<String> roleComboBox;
     @FXML private StackPane rootStack;
     @FXML private StackPane cardGlow;
+
+    private boolean passwordShown = false;
+    private boolean confirmPasswordShown = false;
 
     private final ServiceUser serviceUser = new ServiceUser();
     private SparkleCanvas sparkleCanvas;
@@ -61,6 +68,10 @@ public class SignupController {
         // Spotlight border on the form card
         SpotlightBorder.install(cardGlow);
 
+        // Sync password fields for eye toggles
+        passwordVisible.textProperty().bindBidirectional(passwordField.textProperty());
+        confirmPasswordVisible.textProperty().bindBidirectional(confirmPasswordField.textProperty());
+
         // Swipe right → light theme, swipe left → dark theme
         ThemeSwipeHelper.install(rootStack);
 
@@ -75,6 +86,46 @@ public class SignupController {
                     utils.ResizeHelper.addResizeListener((Stage) newScene.getWindow());
             }
         });
+    }
+
+    @FXML
+    private void togglePasswordVisibility() {
+        passwordShown = !passwordShown;
+        if (passwordShown) {
+            passwordVisible.setVisible(true);
+            passwordVisible.setManaged(true);
+            passwordField.setVisible(false);
+            passwordField.setManaged(false);
+            eyeToggle1.setText("\uD83D\uDE48");
+            passwordVisible.requestFocus();
+        } else {
+            passwordField.setVisible(true);
+            passwordField.setManaged(true);
+            passwordVisible.setVisible(false);
+            passwordVisible.setManaged(false);
+            eyeToggle1.setText("\uD83D\uDC41");
+            passwordField.requestFocus();
+        }
+    }
+
+    @FXML
+    private void toggleConfirmPasswordVisibility() {
+        confirmPasswordShown = !confirmPasswordShown;
+        if (confirmPasswordShown) {
+            confirmPasswordVisible.setVisible(true);
+            confirmPasswordVisible.setManaged(true);
+            confirmPasswordField.setVisible(false);
+            confirmPasswordField.setManaged(false);
+            eyeToggle2.setText("\uD83D\uDE48");
+            confirmPasswordVisible.requestFocus();
+        } else {
+            confirmPasswordField.setVisible(true);
+            confirmPasswordField.setManaged(true);
+            confirmPasswordVisible.setVisible(false);
+            confirmPasswordVisible.setManaged(false);
+            eyeToggle2.setText("\uD83D\uDC41");
+            confirmPasswordField.requestFocus();
+        }
     }
 
     @FXML

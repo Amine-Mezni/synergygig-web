@@ -216,6 +216,22 @@ public class ServiceNotification {
                 interviewId, "INTERVIEW");
     }
 
+    public void notifyContractReady(int userId, String applicantName, String offerTitle, int contractId) {
+        create(userId, "CONTRACT",
+                "Contract Ready: " + offerTitle,
+                "Hi " + applicantName + ", your contract for \"" + offerTitle + "\" has been created. "
+                + "Please check your email for the signed contract PDF with blockchain verification. "
+                + "Review and confirm through the platform.",
+                contractId, "CONTRACT");
+    }
+
+    public void notifyContractVerified(int hrUserId, String applicantName, String offerTitle, int contractId) {
+        create(hrUserId, "CONTRACT",
+                "Contract Verified: " + offerTitle,
+                "The QR code for " + applicantName + "'s contract on \"" + offerTitle + "\" has been verified successfully.",
+                contractId, "CONTRACT");
+    }
+
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  PARSERS
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

@@ -285,6 +285,30 @@ public class ServiceUser implements IService<User> {
     }
 
     /**
+     * Update a user's department assignment. Pass null to unassign.
+     */
+    public void updateDepartmentId(int userId, Integer departmentId) throws SQLException {
+        if (useApi) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("department_id", departmentId);
+            ApiClient.put("/users/" + userId, body);
+            System.out.println("✅ Department updated via API for user id=" + userId);
+            return;
+        }
+        String req = "UPDATE users SET department_id=? WHERE id=?";
+        PreparedStatement ps = connection.prepareStatement(req);
+        if (departmentId != null) {
+            ps.setInt(1, departmentId);
+        } else {
+            ps.setNull(1, java.sql.Types.INTEGER);
+        }
+        ps.setInt(2, userId);
+        ps.executeUpdate();
+        ps.close();
+        System.out.println("✅ Department updated for user id=" + userId + " → " + departmentId);
+    }
+
+    /**
      * Toggle user active status (freeze / unfreeze).
      */
     public void toggleActive(int userId, boolean active) throws SQLException {

@@ -51,7 +51,7 @@ public class InterviewCalendarPopup {
         currentMonth = YearMonth.now();
 
         Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle(null);
+        dialog.setTitle("Interview Calendar");
         dialog.setHeaderText(null);
 
         StackPane root = buildUI();
@@ -62,9 +62,9 @@ public class InterviewCalendarPopup {
         DialogHelper.hideCloseButton(pane);
         pane.getStyleClass().add("interview-calendar-dialog");
         pane.setMaxWidth(820);
-        pane.setMaxHeight(640);
+        pane.setMaxHeight(700);
         pane.setPrefWidth(800);
-        pane.setPrefHeight(620);
+        pane.setPrefHeight(680);
 
         loadData();
         renderMonth();
@@ -348,7 +348,7 @@ public class InterviewCalendarPopup {
     private void showDayDetail(LocalDate date, List<Interview> dayInterviews, javafx.scene.Node anchor) {
         // Show a small tooltip/popup with full details
         Dialog<Void> detail = new Dialog<>();
-        detail.setTitle(null);
+        detail.setTitle(date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")));
         detail.setHeaderText(null);
 
         VBox content = new VBox(10);

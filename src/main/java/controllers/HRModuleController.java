@@ -1,5 +1,9 @@
 package controllers;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import entities.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -13,13 +17,24 @@ import javafx.scene.layout.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import services.*;
 import utils.DialogHelper;
+import utils.PayrollPdfExporter;
 import utils.SessionManager;
 import utils.SoundManager;
+import services.ZAIService;
 
+import javafx.stage.FileChooser;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +60,11 @@ public class HRModuleController {
     private List<User> allUsers = new ArrayList<>();
     private Map<Integer, String> userNameMap = new HashMap<>();
 
+    // HTTP client for API calls
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5)).build();
+    private static final Gson gson = new Gson();
+
     @FXML
     public void initialize() {
         currentUser = SessionManager.getInstance().getCurrentUser();
@@ -67,6 +87,7 @@ public class HRModuleController {
         if (isHrOrAdmin) {
             tabs.add(new String[]{"💰", "Payroll"});
         }
+        tabs.add(new String[]{"🤖", "AI Insights"});
 
         for (String[] tab : tabs) {
             Button btn = new Button(tab[0] + "  " + tab[1]);
@@ -111,6 +132,7 @@ public class HRModuleController {
             case "Attendance":   showAttendance(); break;
             case "Leaves":       showLeaves(); break;
             case "Payroll":      showPayroll(); break;
+            case "AI Insights": showAIInsights(); break;
         }
     }
 
@@ -153,6 +175,20 @@ public class HRModuleController {
             statsRow.getChildren().add(new Label("Error loading stats: " + e.getMessage()));
         }
 
+        // ── API Sections ──
+        HBox apiRow = new HBox(16);
+        apiRow.setAlignment(Pos.TOP_LEFT);
+
+        // API #1 — Upcoming Public Holidays (Nager.Date)
+        VBox holidaySection = createHolidaysSection();
+        HBox.setHgrow(holidaySection, Priority.ALWAYS);
+
+        // API #2 — Team Building Activity Suggestion (Bored API)
+        VBox activitySection = createTeamBuildingSection();
+        HBox.setHgrow(activitySection, Priority.ALWAYS);
+
+        apiRow.getChildren().addAll(holidaySection, activitySection);
+
         // Recent activity sections
         VBox recentSection = new VBox(16);
 
@@ -163,7 +199,7 @@ public class HRModuleController {
 
         recentSection.getChildren().addAll(recentLeaves, recentAttendance);
 
-        view.getChildren().addAll(title, statsRow, recentSection);
+        view.getChildren().addAll(title, statsRow, apiRow, recentSection);
 
         ScrollPane scroll = new ScrollPane(view);
         scroll.setFitToWidth(true);
@@ -177,6 +213,7 @@ public class HRModuleController {
         card.setAlignment(Pos.CENTER);
         card.setPrefWidth(180);
         card.setPadding(new Insets(16));
+        card.setStyle("-fx-cursor: hand;");
 
         Label iconLbl = new Label(icon);
         iconLbl.setStyle("-fx-font-size: 28px;");
@@ -188,7 +225,36 @@ public class HRModuleController {
         nameLbl.getStyleClass().add("hr-stat-label");
 
         card.getChildren().addAll(iconLbl, valueLbl, nameLbl);
+
+        // Make card clickable to navigate to the corresponding tab
+        card.setOnMouseClicked(e -> {
+            SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+            String targetTab = mapStatToTab(label);
+            if (targetTab != null) {
+                for (javafx.scene.Node node : tabBar.getChildren()) {
+                    if (node instanceof Button) {
+                        Button btn = (Button) node;
+                        if (btn.getText().contains(targetTab)) {
+                            switchTab(btn, targetTab);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
         return card;
+    }
+
+    private String mapStatToTab(String statLabel) {
+        switch (statLabel) {
+            case "Total Employees":  return "Departments";
+            case "Departments":      return "Departments";
+            case "Present Today":    return "Attendance";
+            case "Pending Leaves":   return "Leaves";
+            case "Pending Payroll":  return "Payroll";
+            default:                 return null;
+        }
     }
 
     private VBox createRecentLeavesSection() {
@@ -284,6 +350,164 @@ public class HRModuleController {
         return section;
     }
 
+    // ── API: Nager.Date Public Holidays ──
+
+    private VBox createHolidaysSection() {
+        VBox section = new VBox(10);
+        section.getStyleClass().add("hr-section-card");
+        section.setPadding(new Insets(16));
+        section.setMinWidth(320);
+
+        Label titleLbl = new Label("\uD83C\uDDF9\uD83C\uDDF3 Upcoming Public Holidays");
+        titleLbl.getStyleClass().add("hr-section-title");
+
+        VBox listBox = new VBox(6);
+        Label loading = new Label("Loading holidays...");
+        loading.getStyleClass().add("hr-api-loading");
+        listBox.getChildren().add(loading);
+
+        section.getChildren().addAll(titleLbl, listBox);
+
+        // Fetch holidays async
+        int year = LocalDate.now().getYear();
+        String url = "https://date.nager.at/api/v3/PublicHolidays/" + year + "/TN";
+
+        httpClient.sendAsync(
+                HttpRequest.newBuilder().uri(URI.create(url)).GET()
+                        .timeout(Duration.ofSeconds(8)).build(),
+                HttpResponse.BodyHandlers.ofString()
+        ).thenAccept(resp -> {
+            if (resp.statusCode() == 200) {
+                JsonArray holidays = gson.fromJson(resp.body(), JsonArray.class);
+                Platform.runLater(() -> {
+                    listBox.getChildren().clear();
+                    LocalDate today = LocalDate.now();
+                    int shown = 0;
+                    for (JsonElement el : holidays) {
+                        JsonObject h = el.getAsJsonObject();
+                        LocalDate hDate = LocalDate.parse(h.get("date").getAsString());
+                        if (hDate.isBefore(today)) continue;
+                        if (shown >= 5) break;
+
+                        String name = h.get("localName").getAsString();
+                        String intlName = h.get("name").getAsString();
+                        long daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, hDate);
+
+                        HBox row = new HBox(10);
+                        row.setAlignment(Pos.CENTER_LEFT);
+                        row.getStyleClass().add("hr-holiday-row");
+                        row.setPadding(new Insets(8, 12, 8, 12));
+
+                        Label dateLabel = new Label(hDate.format(DateTimeFormatter.ofPattern("MMM dd")));
+                        dateLabel.getStyleClass().add("hr-holiday-date");
+                        dateLabel.setMinWidth(60);
+
+                        VBox nameBox = new VBox(1);
+                        Label nameLbl = new Label(intlName);
+                        nameLbl.getStyleClass().add("hr-holiday-name");
+                        Label localLbl = new Label(name);
+                        localLbl.getStyleClass().add("hr-holiday-local");
+                        nameBox.getChildren().addAll(nameLbl, localLbl);
+                        HBox.setHgrow(nameBox, Priority.ALWAYS);
+
+                        Label daysLbl = new Label(daysUntil == 0 ? "\uD83C\uDF89 Today!"
+                                : daysUntil == 1 ? "Tomorrow" : daysUntil + " days");
+                        daysLbl.getStyleClass().add(daysUntil <= 7 ? "hr-holiday-soon" : "hr-holiday-days");
+
+                        row.getChildren().addAll(dateLabel, nameBox, daysLbl);
+                        listBox.getChildren().add(row);
+                        shown++;
+                    }
+                    if (shown == 0) {
+                        listBox.getChildren().add(new Label("No upcoming holidays found for this year."));
+                    }
+                });
+            }
+        }).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                listBox.getChildren().clear();
+                listBox.getChildren().add(new Label("\u26A0 Could not load holidays"));
+            });
+            return null;
+        });
+
+        return section;
+    }
+
+    // ── API: Bored API — Team Building Activities ──
+
+    private VBox createTeamBuildingSection() {
+        VBox section = new VBox(10);
+        section.getStyleClass().add("hr-section-card");
+        section.setPadding(new Insets(16));
+        section.setMinWidth(320);
+
+        Label titleLbl = new Label("\uD83E\uDDD1\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1 Team Building Suggestion");
+        titleLbl.getStyleClass().add("hr-section-title");
+
+        VBox contentBox = new VBox(8);
+        contentBox.setAlignment(Pos.CENTER_LEFT);
+
+        Label activityLabel = new Label("Loading...");
+        activityLabel.getStyleClass().add("hr-activity-text");
+        activityLabel.setWrapText(true);
+
+        Label typeLabel = new Label("");
+        typeLabel.getStyleClass().add("hr-activity-type");
+
+        Label participantsLabel = new Label("");
+        participantsLabel.getStyleClass().add("hr-activity-detail");
+
+        Button refreshBtn = new Button("\uD83C\uDFB2 New Suggestion");
+        refreshBtn.getStyleClass().add("hr-primary-btn");
+        refreshBtn.setOnAction(e -> {
+            SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+            fetchTeamActivity(activityLabel, typeLabel, participantsLabel);
+        });
+
+        contentBox.getChildren().addAll(activityLabel, typeLabel, participantsLabel, refreshBtn);
+        section.getChildren().addAll(titleLbl, contentBox);
+
+        // Initial fetch
+        fetchTeamActivity(activityLabel, typeLabel, participantsLabel);
+
+        return section;
+    }
+
+    private void fetchTeamActivity(Label activityLabel, Label typeLabel, Label participantsLabel) {
+        activityLabel.setText("Finding activity...");
+        typeLabel.setText("");
+        participantsLabel.setText("");
+
+        httpClient.sendAsync(
+                HttpRequest.newBuilder()
+                        .uri(URI.create("https://bored-api.appbrewery.com/random"))
+                        .GET().timeout(Duration.ofSeconds(8)).build(),
+                HttpResponse.BodyHandlers.ofString()
+        ).thenAccept(resp -> {
+            if (resp.statusCode() == 200) {
+                JsonObject obj = gson.fromJson(resp.body(), JsonObject.class);
+                String activity = obj.has("activity") ? obj.get("activity").getAsString() : "No suggestion";
+                String type = obj.has("type") ? obj.get("type").getAsString() : "";
+                int participants = obj.has("participants") ? obj.get("participants").getAsInt() : 0;
+
+                Platform.runLater(() -> {
+                    activityLabel.setText("\uD83C\uDFAF " + activity);
+                    typeLabel.setText("\uD83C\uDFF7 Type: " + capitalize(type));
+                    participantsLabel.setText("\uD83D\uDC65 Participants: " + (participants > 0 ? participants : "Any"));
+                });
+            }
+        }).exceptionally(ex -> {
+            Platform.runLater(() -> activityLabel.setText("\u26A0 Could not fetch activity"));
+            return null;
+        });
+    }
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return s.substring(0, 1).toUpperCase() + s.substring(1);
+    }
+
     // ==================== DEPARTMENTS TAB ====================
 
     private void showDepartments() {
@@ -331,6 +555,10 @@ public class HRModuleController {
             }
 
             for (Department dept : depts) {
+                VBox deptSection = new VBox(0);
+                deptSection.getStyleClass().add("hr-dept-section");
+
+                // ── Department header card ──
                 HBox card = new HBox(16);
                 card.getStyleClass().add("hr-dept-card");
                 card.setPadding(new Insets(16));
@@ -378,6 +606,13 @@ public class HRModuleController {
                     confirmDelete("department", dept.getName(), () -> {
                         try {
                             serviceDepartment.supprimer(dept.getId());
+                            // Unassign employees from deleted department
+                            for (User u : allUsers) {
+                                if (u.getDepartmentId() != null && u.getDepartmentId() == dept.getId()) {
+                                    serviceUser.updateDepartmentId(u.getId(), null);
+                                    u.setDepartmentId(null);
+                                }
+                            }
                             refreshDepartmentList(container);
                         } catch (SQLException ex) {
                             showError("Failed to delete department: " + ex.getMessage());
@@ -385,12 +620,150 @@ public class HRModuleController {
                     });
                 });
 
-                actions.getChildren().addAll(editBtn, deleteBtn);
+                Button teamBtn = new Button("👥 Manage Team");
+                teamBtn.getStyleClass().add("hr-action-btn");
+
+                actions.getChildren().addAll(editBtn, teamBtn, deleteBtn);
                 card.getChildren().addAll(info, actions);
-                container.getChildren().add(card);
+
+                // ── Team panel (toggle) ──
+                VBox teamPanel = buildTeamPanel(dept, container);
+                teamPanel.setVisible(false);
+                teamPanel.setManaged(false);
+
+                teamBtn.setOnAction(e -> {
+                    SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+                    boolean show = !teamPanel.isVisible();
+                    teamPanel.setVisible(show);
+                    teamPanel.setManaged(show);
+                    teamBtn.setText(show ? "▲ Hide Team" : "👥 Manage Team");
+                });
+
+                deptSection.getChildren().addAll(card, teamPanel);
+                container.getChildren().add(deptSection);
             }
         } catch (SQLException e) {
             container.getChildren().add(new Label("Error loading departments: " + e.getMessage()));
+        }
+    }
+
+    /** Roles eligible for team assignment (excludes admin/hr/gig) */
+    private boolean isTeamEligible(User u) {
+        String role = u.getRole();
+        return "EMPLOYEE".equals(role) || "PROJECT_OWNER".equals(role);
+    }
+
+    private VBox buildTeamPanel(Department dept, VBox parentContainer) {
+        VBox panel = new VBox(10);
+        panel.getStyleClass().add("hr-team-panel");
+        panel.setPadding(new Insets(12, 16, 16, 16));
+
+        // Assigned employees
+        Label assignedTitle = new Label("✅ Assigned Members");
+        assignedTitle.getStyleClass().add("hr-team-section-title");
+
+        VBox assignedList = new VBox(4);
+        assignedList.setId("assigned-" + dept.getId());
+
+        // Unassigned employees
+        Label unassignedTitle = new Label("➕ Unassigned Employees");
+        unassignedTitle.getStyleClass().add("hr-team-section-title");
+
+        VBox unassignedList = new VBox(4);
+        unassignedList.setId("unassigned-" + dept.getId());
+
+        panel.getChildren().addAll(assignedTitle, assignedList, unassignedTitle, unassignedList);
+
+        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer);
+        return panel;
+    }
+
+    private void refreshTeamPanel(Department dept, VBox assignedList, VBox unassignedList, VBox parentContainer) {
+        assignedList.getChildren().clear();
+        unassignedList.getChildren().clear();
+
+        List<User> assigned = allUsers.stream()
+                .filter(this::isTeamEligible)
+                .filter(u -> u.getDepartmentId() != null && u.getDepartmentId() == dept.getId())
+                .collect(Collectors.toList());
+
+        List<User> unassigned = allUsers.stream()
+                .filter(this::isTeamEligible)
+                .filter(u -> u.getDepartmentId() == null)
+                .collect(Collectors.toList());
+
+        if (assigned.isEmpty()) {
+            Label empty = new Label("No members assigned yet.");
+            empty.getStyleClass().add("hr-team-empty");
+            assignedList.getChildren().add(empty);
+        } else {
+            for (User u : assigned) {
+                HBox row = new HBox(10);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.getStyleClass().add("hr-team-row");
+                row.setPadding(new Insets(6, 10, 6, 10));
+
+                Label nameLabel = new Label(u.getFirstName() + " " + u.getLastName());
+                nameLabel.getStyleClass().add("hr-team-name");
+                HBox.setHgrow(nameLabel, Priority.ALWAYS);
+                nameLabel.setMaxWidth(Double.MAX_VALUE);
+
+                Label roleLabel = new Label(u.getRole().replace("_", " "));
+                roleLabel.getStyleClass().add("hr-team-role");
+
+                Button removeBtn = new Button("✕ Remove");
+                removeBtn.getStyleClass().addAll("hr-action-btn", "hr-danger-btn");
+                removeBtn.setOnAction(e -> {
+                    SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+                    try {
+                        serviceUser.updateDepartmentId(u.getId(), null);
+                        u.setDepartmentId(null);
+                        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer);
+                    } catch (SQLException ex) {
+                        showError("Failed to remove: " + ex.getMessage());
+                    }
+                });
+
+                row.getChildren().addAll(nameLabel, roleLabel, removeBtn);
+                assignedList.getChildren().add(row);
+            }
+        }
+
+        if (unassigned.isEmpty()) {
+            Label empty = new Label("All eligible employees are assigned.");
+            empty.getStyleClass().add("hr-team-empty");
+            unassignedList.getChildren().add(empty);
+        } else {
+            for (User u : unassigned) {
+                HBox row = new HBox(10);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.getStyleClass().add("hr-team-row");
+                row.setPadding(new Insets(6, 10, 6, 10));
+
+                Label nameLabel = new Label(u.getFirstName() + " " + u.getLastName());
+                nameLabel.getStyleClass().add("hr-team-name");
+                HBox.setHgrow(nameLabel, Priority.ALWAYS);
+                nameLabel.setMaxWidth(Double.MAX_VALUE);
+
+                Label roleLabel = new Label(u.getRole().replace("_", " "));
+                roleLabel.getStyleClass().add("hr-team-role");
+
+                Button addBtn = new Button("+ Assign");
+                addBtn.getStyleClass().addAll("hr-action-btn", "hr-success-btn");
+                addBtn.setOnAction(e -> {
+                    SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+                    try {
+                        serviceUser.updateDepartmentId(u.getId(), dept.getId());
+                        u.setDepartmentId(dept.getId());
+                        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer);
+                    } catch (SQLException ex) {
+                        showError("Failed to assign: " + ex.getMessage());
+                    }
+                });
+
+                row.getChildren().addAll(nameLabel, roleLabel, addBtn);
+                unassignedList.getChildren().add(row);
+            }
         }
     }
 
@@ -981,6 +1354,13 @@ public class HRModuleController {
             showGeneratePayrollDialog();
         });
 
+        Button exportAllBtn = new Button("📄 Export All PDF");
+        exportAllBtn.getStyleClass().add("hr-primary-btn");
+        exportAllBtn.setOnAction(e -> {
+            SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+            exportAllPayrollPdf();
+        });
+
         Button addBtn = new Button("+ Add Entry");
         addBtn.getStyleClass().add("hr-primary-btn");
         addBtn.setOnAction(e -> {
@@ -988,47 +1368,100 @@ public class HRModuleController {
             showPayrollDialog(null);
         });
 
-        header.getChildren().addAll(title, spacer, generateBtn, addBtn);
+        header.getChildren().addAll(title, spacer, generateBtn, exportAllBtn, addBtn);
 
+        // ── Filter & Column Toggle Row ──
+        HBox filterRow = new HBox(12);
+        filterRow.setAlignment(Pos.CENTER_LEFT);
+        filterRow.getStyleClass().add("hr-filter-row");
+        filterRow.setPadding(new Insets(8, 0, 4, 0));
+
+        TextField nameFilter = new TextField();
+        nameFilter.setPromptText("🔍 Search employee...");
+        nameFilter.getStyleClass().add("hr-filter-search");
+        nameFilter.setPrefWidth(200);
+
+        ComboBox<String> statusFilter = new ComboBox<>();
+        statusFilter.getItems().addAll("All", "PENDING", "PAID");
+        statusFilter.setValue("All");
+        statusFilter.getStyleClass().add("hr-filter-combo");
+        statusFilter.setPromptText("Status");
+
+        Region filterSpacer = new Region();
+        HBox.setHgrow(filterSpacer, Priority.ALWAYS);
+
+        // Column toggle
+        String[] colNames = {"Employee", "Month", "Base", "Bonus", "Deductions", "Net", "Hours", "Status", "Actions"};
+        boolean[] colVis = {true, true, true, true, true, true, true, true, true};
+        MenuButton colToggle = new MenuButton("⚙ Columns");
+        colToggle.getStyleClass().add("hr-column-toggle");
         VBox payrollList = new VBox(8);
 
-        view.getChildren().addAll(header, payrollList);
+        for (int i = 0; i < colNames.length; i++) {
+            CheckMenuItem item = new CheckMenuItem(colNames[i]);
+            item.setSelected(true);
+            final int idx = i;
+            item.selectedProperty().addListener((obs, ov, nv) -> {
+                colVis[idx] = nv;
+                refreshPayrollList(payrollList, nameFilter.getText(), statusFilter.getValue(), colVis);
+            });
+            colToggle.getItems().add(item);
+        }
+
+        filterRow.getChildren().addAll(nameFilter, statusFilter, filterSpacer, colToggle);
+
+        // Listeners for filters
+        nameFilter.textProperty().addListener((obs, ov, nv) ->
+                refreshPayrollList(payrollList, nv, statusFilter.getValue(), colVis));
+        statusFilter.valueProperty().addListener((obs, ov, nv) ->
+                refreshPayrollList(payrollList, nameFilter.getText(), nv, colVis));
+
+        view.getChildren().addAll(header, filterRow, payrollList);
 
         ScrollPane scroll = new ScrollPane(view);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("hr-scroll");
         contentArea.getChildren().setAll(scroll);
 
-        refreshPayrollList(payrollList);
+        refreshPayrollList(payrollList, "", "All", colVis);
     }
 
-    private void refreshPayrollList(VBox container) {
+    private void refreshPayrollList(VBox container, String nameFilter, String statusFilter, boolean[] colVis) {
         container.getChildren().clear();
         try {
             List<Payroll> payrolls = servicePayroll.recuperer();
 
+            // Apply filters
+            if (nameFilter != null && !nameFilter.isEmpty()) {
+                String q = nameFilter.toLowerCase();
+                payrolls = payrolls.stream()
+                        .filter(p -> getUserName(p.getUserId()).toLowerCase().contains(q))
+                        .collect(Collectors.toList());
+            }
+            if (statusFilter != null && !"All".equals(statusFilter)) {
+                payrolls = payrolls.stream()
+                        .filter(p -> statusFilter.equals(p.getStatus()))
+                        .collect(Collectors.toList());
+            }
+
             if (payrolls.isEmpty()) {
-                Label empty = new Label("No payroll records yet.");
+                Label empty = new Label("No payroll records found.");
                 empty.getStyleClass().add("hr-empty-label");
                 container.getChildren().add(empty);
                 return;
             }
 
+            // Column widths (parallel to colVis array)
+            double[] widths = {130, 80, 70, 60, 75, 70, 50, 70, 130};
+
             // Header
             HBox headerRow = new HBox(10);
             headerRow.getStyleClass().add("hr-table-header");
             headerRow.setPadding(new Insets(8, 12, 8, 12));
-            headerRow.getChildren().addAll(
-                    createColLabel("Employee", 130),
-                    createColLabel("Month", 80),
-                    createColLabel("Base", 70),
-                    createColLabel("Bonus", 60),
-                    createColLabel("Deductions", 75),
-                    createColLabel("Net", 70),
-                    createColLabel("Hours", 50),
-                    createColLabel("Status", 70),
-                    createColLabel("Actions", 100)
-            );
+            String[] colNames = {"Employee", "Month", "Base", "Bonus", "Deductions", "Net", "Hours", "Status", "Actions"};
+            for (int i = 0; i < colNames.length; i++) {
+                if (colVis[i]) headerRow.getChildren().add(createColLabel(colNames[i], widths[i]));
+            }
             container.getChildren().add(headerRow);
 
             for (Payroll p : payrolls) {
@@ -1037,61 +1470,76 @@ public class HRModuleController {
                 row.getStyleClass().add("hr-list-row");
                 row.setPadding(new Insets(8, 12, 8, 12));
 
-                Label name = createColLabel(getUserName(p.getUserId()), 130);
-                Label month = createColLabel(p.getMonth() != null ? p.getMonth().toString() : "—", 80);
-                Label base = createColLabel(String.format("%.0f", p.getBaseSalary()), 70);
-                Label bonus = createColLabel(String.format("%.0f", p.getBonus()), 60);
-                Label ded = createColLabel(String.format("%.0f", p.getDeductions()), 75);
-                Label net = createColLabel(String.format("%.0f", p.getNetSalary()), 70);
-                net.getStyleClass().add("hr-highlight");
-                Label hours = createColLabel(String.format("%.1f", p.getTotalHoursWorked()), 50);
+                // Build all cells, conditionally add
+                if (colVis[0]) row.getChildren().add(createColLabel(getUserName(p.getUserId()), 130));
+                if (colVis[1]) row.getChildren().add(createColLabel(p.getMonth() != null ? p.getMonth().toString() : "—", 80));
+                if (colVis[2]) row.getChildren().add(createColLabel(String.format("%.0f", p.getBaseSalary()), 70));
+                if (colVis[3]) row.getChildren().add(createColLabel(String.format("%.0f", p.getBonus()), 60));
+                if (colVis[4]) row.getChildren().add(createColLabel(String.format("%.0f", p.getDeductions()), 75));
+                if (colVis[5]) {
+                    Label net = createColLabel(String.format("%.0f", p.getNetSalary()), 70);
+                    net.getStyleClass().add("hr-highlight");
+                    row.getChildren().add(net);
+                }
+                if (colVis[6]) row.getChildren().add(createColLabel(String.format("%.1f", p.getTotalHoursWorked()), 50));
+                if (colVis[7]) {
+                    Label status = new Label(p.getStatus());
+                    status.getStyleClass().addAll("hr-status-badge", "hr-status-" + p.getStatus().toLowerCase());
+                    status.setPrefWidth(70);
+                    row.getChildren().add(status);
+                }
+                if (colVis[8]) {
+                    HBox actions = new HBox(4);
+                    actions.setPrefWidth(130);
 
-                Label status = new Label(p.getStatus());
-                status.getStyleClass().addAll("hr-status-badge", "hr-status-" + p.getStatus().toLowerCase());
-                status.setPrefWidth(70);
+                    if ("PENDING".equals(p.getStatus())) {
+                        Button payBtn = new Button("💵");
+                        payBtn.getStyleClass().addAll("hr-icon-btn", "hr-success-btn");
+                        payBtn.setOnAction(e -> {
+                            SoundManager.getInstance().play(SoundManager.PAYROLL_GENERATED);
+                            p.setStatus("PAID");
+                            try {
+                                servicePayroll.modifier(p);
+                                refreshPayrollList(container, nameFilter, statusFilter, colVis);
+                            } catch (SQLException ex) {
+                                showError("Failed to mark paid: " + ex.getMessage());
+                            }
+                        });
+                        actions.getChildren().add(payBtn);
+                    }
 
-                HBox actions = new HBox(4);
-                actions.setPrefWidth(100);
-
-                if ("PENDING".equals(p.getStatus())) {
-                    Button payBtn = new Button("💵");
-                    payBtn.getStyleClass().addAll("hr-icon-btn", "hr-success-btn");
-                    payBtn.setOnAction(e -> {
-                        SoundManager.getInstance().play(SoundManager.PAYROLL_GENERATED);
-                        p.setStatus("PAID");
-                        try {
-                            servicePayroll.modifier(p);
-                            refreshPayrollList(container);
-                        } catch (SQLException ex) {
-                            showError("Failed to mark paid: " + ex.getMessage());
-                        }
+                    Button pdfBtn = new Button("📄");
+                    pdfBtn.getStyleClass().addAll("hr-icon-btn");
+                    pdfBtn.setOnAction(e -> {
+                        SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+                        exportSinglePayslipPdf(p);
                     });
-                    actions.getChildren().add(payBtn);
+
+                    Button editBtn = new Button("✏");
+                    editBtn.getStyleClass().add("hr-icon-btn");
+                    editBtn.setOnAction(e -> {
+                        SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+                        showPayrollDialog(p);
+                    });
+
+                    Button deleteBtn = new Button("🗑");
+                    deleteBtn.getStyleClass().addAll("hr-icon-btn", "hr-danger-btn");
+                    deleteBtn.setOnAction(e -> {
+                        SoundManager.getInstance().play(SoundManager.TASK_DELETED);
+                        confirmDelete("payroll record", getUserName(p.getUserId()), () -> {
+                            try {
+                                servicePayroll.supprimer(p.getId());
+                                refreshPayrollList(container, nameFilter, statusFilter, colVis);
+                            } catch (SQLException ex) {
+                                showError("Failed to delete: " + ex.getMessage());
+                            }
+                        });
+                    });
+
+                    actions.getChildren().addAll(pdfBtn, editBtn, deleteBtn);
+                    row.getChildren().add(actions);
                 }
 
-                Button editBtn = new Button("✏");
-                editBtn.getStyleClass().add("hr-icon-btn");
-                editBtn.setOnAction(e -> {
-                    SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
-                    showPayrollDialog(p);
-                });
-
-                Button deleteBtn = new Button("🗑");
-                deleteBtn.getStyleClass().addAll("hr-icon-btn", "hr-danger-btn");
-                deleteBtn.setOnAction(e -> {
-                    SoundManager.getInstance().play(SoundManager.TASK_DELETED);
-                    confirmDelete("payroll record", getUserName(p.getUserId()), () -> {
-                        try {
-                            servicePayroll.supprimer(p.getId());
-                            refreshPayrollList(container);
-                        } catch (SQLException ex) {
-                            showError("Failed to delete: " + ex.getMessage());
-                        }
-                    });
-                });
-
-                actions.getChildren().addAll(editBtn, deleteBtn);
-                row.getChildren().addAll(name, month, base, bonus, ded, net, hours, status, actions);
                 container.getChildren().add(row);
             }
         } catch (SQLException e) {
@@ -1347,6 +1795,200 @@ public class HRModuleController {
                 showPayroll();
             }
         });
+    }
+
+    // ==================== PDF EXPORT ====================
+
+    private void exportSinglePayslipPdf(Payroll p) {
+        String empName = getUserName(p.getUserId());
+        String monthStr = p.getMonth() != null
+                ? p.getMonth().toLocalDate().format(DateTimeFormatter.ofPattern("yyyy_MM"))
+                : "unknown";
+
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Save Pay Slip PDF");
+        fc.setInitialFileName("Payslip_" + empName.replace(" ", "_") + "_" + monthStr + ".pdf");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+        File file = fc.showSaveDialog(rootPane.getScene().getWindow());
+        if (file == null) return;
+
+        try {
+            PayrollPdfExporter.exportEmployeePayslip(file, p, empName);
+            showInfo("Pay slip saved to:\n" + file.getAbsolutePath());
+        } catch (IOException ex) {
+            showError("Failed to export PDF: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    private void exportAllPayrollPdf() {
+        try {
+            List<Payroll> payrolls = servicePayroll.recuperer();
+            if (payrolls.isEmpty()) {
+                showError("No payroll records to export.");
+                return;
+            }
+
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Save Full Payroll Report");
+            fc.setInitialFileName("Payroll_Report_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd")) + ".pdf");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+            File file = fc.showSaveDialog(rootPane.getScene().getWindow());
+            if (file == null) return;
+
+            PayrollPdfExporter.exportAllPayroll(file, payrolls, userNameMap);
+            showInfo("Payroll report saved (" + payrolls.size() + " records):\n" + file.getAbsolutePath());
+        } catch (SQLException ex) {
+            showError("Failed to load payroll data: " + ex.getMessage());
+        } catch (IOException ex) {
+            showError("Failed to export PDF: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    // ==================== AI INSIGHTS TAB ====================
+
+    private void showAIInsights() {
+        VBox view = new VBox(20);
+        view.getStyleClass().add("hr-view");
+        view.setPadding(new Insets(24));
+
+        Label title = new Label("🤖 AI-Powered HR Insights");
+        title.getStyleClass().add("hr-view-title");
+
+        Label subtitle = new Label("Get AI-generated analysis of attendance, leave, and payroll trends");
+        subtitle.getStyleClass().add("hr-subtitle");
+
+        // Insight result area
+        TextArea insightArea = new TextArea();
+        insightArea.setEditable(false);
+        insightArea.setWrapText(true);
+        insightArea.setPrefHeight(400);
+        insightArea.setPromptText("Click 'Generate Insights' to get AI analysis...");
+        insightArea.getStyleClass().add("hr-insight-area");
+
+        // Status label
+        Label statusLabel = new Label("");
+        statusLabel.getStyleClass().add("hr-subtitle");
+
+        Button btnGenerate = new Button("🧠 Generate Insights");
+        btnGenerate.getStyleClass().add("hr-action-btn");
+        btnGenerate.setOnAction(e -> {
+            btnGenerate.setDisable(true);
+            btnGenerate.setText("⏳ Analyzing...");
+            statusLabel.setText("Gathering HR data and sending to AI...");
+
+            new Thread(() -> {
+                try {
+                    // Gather attendance summary
+                    String attendanceSummary = buildAttendanceSummary();
+                    String leaveSummary = buildLeaveSummary();
+                    String payrollSummary = buildPayrollSummary();
+
+                    ZAIService zai = new ZAIService();
+                    String insights = zai.generateHRInsights(attendanceSummary, leaveSummary, payrollSummary);
+
+                    Platform.runLater(() -> {
+                        insightArea.setText(insights);
+                        statusLabel.setText("✅ Analysis complete");
+                        btnGenerate.setDisable(false);
+                        btnGenerate.setText("🧠 Generate Insights");
+                        SoundManager.getInstance().play(SoundManager.AI_COMPLETE);
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        insightArea.setText("Failed to generate insights: " + ex.getMessage());
+                        statusLabel.setText("❌ Analysis failed");
+                        btnGenerate.setDisable(false);
+                        btnGenerate.setText("🧠 Generate Insights");
+                    });
+                }
+            }).start();
+        });
+
+        // Meeting prep button
+        Button btnMeetingPrep = new Button("📋 Prepare HR Meeting");
+        btnMeetingPrep.getStyleClass().add("hr-action-btn");
+        btnMeetingPrep.setOnAction(e -> {
+            btnMeetingPrep.setDisable(true);
+            btnMeetingPrep.setText("⏳ Preparing...");
+
+            new Thread(() -> {
+                try {
+                    String attendanceSummary = buildAttendanceSummary();
+                    String leaveSummary = buildLeaveSummary();
+
+                    ZAIService zai = new ZAIService();
+                    String agenda = zai.prepMeeting("HR Department Review",
+                            "Attendance: " + attendanceSummary + "\nLeaves: " + leaveSummary,
+                            "HR team");
+
+                    Platform.runLater(() -> {
+                        insightArea.setText(agenda);
+                        statusLabel.setText("✅ Meeting agenda ready");
+                        btnMeetingPrep.setDisable(false);
+                        btnMeetingPrep.setText("📋 Prepare HR Meeting");
+                        SoundManager.getInstance().play(SoundManager.AI_COMPLETE);
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        insightArea.setText("Failed: " + ex.getMessage());
+                        btnMeetingPrep.setDisable(false);
+                        btnMeetingPrep.setText("📋 Prepare HR Meeting");
+                    });
+                }
+            }).start();
+        });
+
+        HBox buttons = new HBox(12, btnGenerate, btnMeetingPrep);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+
+        view.getChildren().addAll(title, subtitle, buttons, statusLabel, insightArea);
+        contentArea.getChildren().setAll(view);
+    }
+
+    private String buildAttendanceSummary() {
+        try {
+            var records = serviceAttendance.recuperer();
+            int total = records.size();
+            long presentCount = records.stream().filter(a -> "PRESENT".equalsIgnoreCase(a.getStatus())).count();
+            long absentCount = records.stream().filter(a -> "ABSENT".equalsIgnoreCase(a.getStatus())).count();
+            long lateCount = records.stream().filter(a -> "LATE".equalsIgnoreCase(a.getStatus())).count();
+            return String.format("Total records: %d | Present: %d | Absent: %d | Late: %d | Rate: %.1f%%",
+                    total, presentCount, absentCount, lateCount,
+                    total > 0 ? (presentCount * 100.0 / total) : 0);
+        } catch (SQLException e) {
+            return "Unable to load attendance data";
+        }
+    }
+
+    private String buildLeaveSummary() {
+        try {
+            var leaves = serviceLeave.recuperer();
+            int total = leaves.size();
+            long approved = leaves.stream().filter(l -> "APPROVED".equalsIgnoreCase(l.getStatus())).count();
+            long pending = leaves.stream().filter(l -> "PENDING".equalsIgnoreCase(l.getStatus())).count();
+            long rejected = leaves.stream().filter(l -> "REJECTED".equalsIgnoreCase(l.getStatus())).count();
+            Map<String, Long> byType = leaves.stream().collect(Collectors.groupingBy(
+                    l -> l.getType() != null ? l.getType() : "UNKNOWN", Collectors.counting()));
+            return String.format("Total: %d | Approved: %d | Pending: %d | Rejected: %d | By type: %s",
+                    total, approved, pending, rejected, byType);
+        } catch (SQLException e) {
+            return "Unable to load leave data";
+        }
+    }
+
+    private String buildPayrollSummary() {
+        try {
+            var payrolls = servicePayroll.recuperer();
+            int total = payrolls.size();
+            double totalNet = payrolls.stream().mapToDouble(p -> p.getNetSalary()).sum();
+            double avgNet = total > 0 ? totalNet / total : 0;
+            return String.format("Records: %d | Total net: %.2f TND | Average net: %.2f TND",
+                    total, totalNet, avgNet);
+        } catch (SQLException e) {
+            return "Unable to load payroll data";
+        }
     }
 
     // ==================== UTILITIES ====================

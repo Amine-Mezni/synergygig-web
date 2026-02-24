@@ -1,5 +1,6 @@
 package utils;
 
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
@@ -7,10 +8,12 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogEvent;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -49,12 +52,22 @@ public final class DialogHelper {
         try { dialog.initStyle(StageStyle.UNDECORATED); } catch (Exception ignored) {}
         DialogPane pane = dialog.getDialogPane();
         theme(pane);
-        // Defer title bar injection until the dialog is about to show,
-        // so any setHeaderText / setContent calls made after theme() are captured.
+        // Deferred title bar injection via scene listener
         pane.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null && pane.lookup(".dialog-title-bar") == null) {
                 injectTitleBar(dialog, pane);
             }
+        });
+        // Belt-and-suspenders: also inject via DIALOG_SHOWING event
+        dialog.addEventHandler(DialogEvent.DIALOG_SHOWING, event -> {
+            if (pane.lookup(".dialog-title-bar") == null) {
+                injectTitleBar(dialog, pane);
+            }
+            // Force CSS recalc & layout so the header panel renders
+            Platform.runLater(() -> {
+                pane.applyCss();
+                pane.layout();
+            });
         });
     }
 
@@ -188,6 +201,19 @@ public final class DialogHelper {
         pane.setGraphic(null);
         pane.setHeader(titleBar);
         pane.getStyleClass().add("dialog-with-titlebar");
+
+        // Force header panel visible — Modena :no-header pseudo-class may have hidden it
+        try {
+            pane.applyCss();
+            pane.layout();
+            Node hp = pane.lookup(".header-panel");
+            if (hp instanceof Region) {
+                hp.setVisible(true);
+                hp.setManaged(true);
+                ((Region) hp).setMaxHeight(Region.USE_PREF_SIZE);
+                ((Region) hp).setMinHeight(Region.USE_PREF_SIZE);
+            }
+        } catch (Exception ignored) { /* scene may not be attached yet */ }
     }
 
     /** Small factory for the three window-control buttons. */

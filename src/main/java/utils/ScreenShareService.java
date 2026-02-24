@@ -76,6 +76,10 @@ public class ScreenShareService {
 
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final AtomicBoolean capturing = new AtomicBoolean(false);
+    private final AtomicBoolean sendInFlight = new AtomicBoolean(false);
+    private volatile long sendStartTime = 0;
+    private volatile long lastRenderedFrameTime = 0;
+    private int droppedFrames = 0;
 
     private WebSocket webSocket;
     private Thread captureThread;
@@ -112,10 +116,17 @@ public class ScreenShareService {
     }
 
     private void loadPrefs() {
-        String res = prefs.get("screen_resolution", "RES_720P");
-        try { resolution = Resolution.valueOf(res); } catch (Exception e) { resolution = Resolution.RES_720P; }
-        fps = prefs.getInt("screen_fps", 15);
-        jpegQuality = prefs.getFloat("screen_quality", 0.6f);
+        // Force sensible defaults for relay streaming — old 1080p/30fps prefs cause total frame drop
+        String res = prefs.get("screen_resolution", "RES_480P");
+        try { resolution = Resolution.valueOf(res); } catch (Exception e) { resolution = Resolution.RES_480P; }
+        // Cap resolution at 720p max for relay
+        if (resolution == Resolution.RES_1080P) resolution = Resolution.RES_720P;
+        fps = prefs.getInt("screen_fps", 10);
+        if (fps > 15) fps = 10; // cap FPS for relay
+        jpegQuality = prefs.getFloat("screen_quality", 0.4f);
+        if (jpegQuality > 0.6f) jpegQuality = 0.4f;
+        // Save corrected values back
+        savePrefs();
     }
 
     private void savePrefs() {
@@ -155,13 +166,22 @@ public class ScreenShareService {
 
     /** Open the default webcam. Returns true if successful. */
     public boolean openWebcam() {
-        if (webcamOpen) return true;
+        if (webcamOpen && webcam != null) return true;
         try {
             com.github.sarxos.webcam.Webcam cam = com.github.sarxos.webcam.Webcam.getDefault();
             if (cam == null) {
                 System.err.println("[Video] No webcam detected");
                 return false;
             }
+            // If webcam is already open (from a previous call), reuse it
+            if (cam.isOpen()) {
+                webcam = cam;
+                webcamOpen = true;
+                System.out.println("[Video] Webcam reused (already open): " + cam.getName());
+                return true;
+            }
+            // Close first if locked by a previous instance
+            try { cam.close(); } catch (Exception ignored) {}
             // Set resolution (try VGA, fall back to largest below 1280)
             java.awt.Dimension[] sizes = cam.getViewSizes();
             java.awt.Dimension best = null;
@@ -185,9 +205,10 @@ public class ScreenShareService {
 
     /** Close the webcam. */
     public void closeWebcam() {
-        if (webcam != null && webcamOpen) {
+        if (webcam != null) {
             try {
-                ((com.github.sarxos.webcam.Webcam) webcam).close();
+                com.github.sarxos.webcam.Webcam cam = (com.github.sarxos.webcam.Webcam) webcam;
+                if (cam.isOpen()) cam.close();
             } catch (Exception ignored) {}
             webcam = null;
             webcamOpen = false;
@@ -255,9 +276,18 @@ public class ScreenShareService {
                                     if (frameCount <= 3) {
                                         System.out.println("[Video] Received frame #" + frameCount + " (" + frameData.length + " bytes)");
                                     }
+
+                                    // Throttle rendering: skip frames if FX thread can't keep up (min 30ms between renders)
+                                    long now = System.currentTimeMillis();
+                                    if (now - lastRenderedFrameTime < 30) {
+                                        ws.request(1);
+                                        return null;
+                                    }
+
                                     try {
                                         Image img = new Image(new ByteArrayInputStream(frameData));
                                         if (!img.isError() && onFrameReceived != null) {
+                                            lastRenderedFrameTime = now;
                                             Platform.runLater(() -> onFrameReceived.accept(img));
                                         } else if (img.isError()) {
                                             System.err.println("[Video] Frame decode error (" + frameData.length + " bytes)");
@@ -386,10 +416,32 @@ public class ScreenShareService {
 
     private void captureLoop() {
         long frameInterval = 1000 / fps;
+        droppedFrames = 0;
+        sendInFlight.set(false);
 
         while (capturing.get()) {
             long start = System.currentTimeMillis();
             try {
+                // Skip frame if previous send is still in flight (back-pressure)
+                if (sendInFlight.get()) {
+                    // Timeout: if send has been stuck for > 3 seconds, force-reset
+                    if (System.currentTimeMillis() - sendStartTime > 3000) {
+                        System.out.println("[Video] Send timeout — resetting back-pressure flag");
+                        sendInFlight.set(false);
+                    } else {
+                        droppedFrames++;
+                        if (droppedFrames % 50 == 0) {
+                            System.out.println("[Video] Dropped " + droppedFrames + " frames (network back-pressure)");
+                        }
+                        long elapsed2 = System.currentTimeMillis() - start;
+                        long sleep2 = frameInterval - elapsed2;
+                        if (sleep2 > 0) {
+                            try { Thread.sleep(sleep2); } catch (InterruptedException e) { break; }
+                        }
+                        continue;
+                    }
+                }
+
                 BufferedImage frame = (captureMode == CaptureMode.WEBCAM)
                         ? captureWebcam()
                         : captureScreen();
@@ -398,17 +450,27 @@ public class ScreenShareService {
                     BufferedImage scaled = scaleToResolution(frame);
 
                     // Deliver local preview on FX thread (for webcam PiP)
-                    if (captureMode == CaptureMode.WEBCAM && onLocalFrame != null) {
+                    Consumer<Image> frameCallback = onLocalFrame;
+                    if (captureMode == CaptureMode.WEBCAM && frameCallback != null) {
                         Image fxImage = SwingFXUtils.toFXImage(scaled, null);
-                        Platform.runLater(() -> onLocalFrame.accept(fxImage));
+                        Platform.runLater(() -> {
+                            if (frameCallback != null) frameCallback.accept(fxImage);
+                        });
                     }
 
                     byte[] jpeg = compressJpeg(scaled);
 
                     if (webSocket != null && capturing.get()) {
-                        // Send entire JPEG as one complete WebSocket message
-                        // (avoids fragmentation issues through proxies)
-                        webSocket.sendBinary(ByteBuffer.wrap(jpeg), true).join();
+                        // Non-blocking send with back-pressure detection
+                        sendInFlight.set(true);
+                        sendStartTime = System.currentTimeMillis();
+                        webSocket.sendBinary(ByteBuffer.wrap(jpeg), true)
+                                .whenComplete((ws, err) -> {
+                                    sendInFlight.set(false);
+                                    if (err != null && capturing.get()) {
+                                        System.err.println("[Video] Send error: " + err.getMessage());
+                                    }
+                                });
                     }
                 }
             } catch (Exception e) {
@@ -460,7 +522,7 @@ public class ScreenShareService {
         BufferedImage scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = scaled.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                           RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                           RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g.drawImage(source, 0, 0, newW, newH, null);
         g.dispose();
         return scaled;

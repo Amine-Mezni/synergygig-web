@@ -35,9 +35,16 @@ import services.ServiceChatRoom;
 import services.ServiceMessage;
 import utils.AudioCallService;
 import utils.SessionManager;
+import utils.SignalingService;
 import utils.SoundManager;
 import utils.WeatherService;
 import controllers.NotificationPanel;
+import services.ZAIService;
+import utils.DialogHelper;
+
+import com.google.gson.JsonObject;
+import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -74,10 +81,11 @@ public class DashboardController {
     @FXML private Button btnHrDashboard;
     @FXML private Button btnMessages;
     @FXML private Button btnRecruitment;
-    @FXML private Button btnHrAdmin;
     @FXML private Button btnProjects;
+    @FXML private Button btnOffers;
     @FXML private Button btnTraining;
     @FXML private Button btnCommunity;
+    @FXML private Button btnAiAssistant;
 
     // Content area
     @FXML private StackPane contentArea;
@@ -151,6 +159,9 @@ public class DashboardController {
     private ServiceMessage serviceMessage = new ServiceMessage();
     private ServiceCall serviceCall = new ServiceCall();
 
+    // Track current loaded page
+    private String currentPage = "";
+
     // Notification bell
     @FXML private StackPane notificationBellSlot;
     private NotificationPanel notificationPanel;
@@ -164,6 +175,7 @@ public class DashboardController {
     private Timeline callTimerTimeline;
     private Timeline globalCallStatusPoller;
     private long globalCallStart;
+    private volatile boolean globalCallPollInFlight = false;
 
     @FXML
     public void initialize() {
@@ -235,6 +247,9 @@ public class DashboardController {
         // Start global incoming call poller
         startIncomingCallPoller();
 
+        // Connect SignalingService for real-time notifications
+        connectSignaling(currentUser.getId());
+
         // Initialize notification bell
         notificationPanel = new NotificationPanel();
         if (notificationBellSlot != null) {
@@ -284,38 +299,43 @@ public class DashboardController {
                 // Full access to everything
                 showNode(adminGroup);
                 showNode(hrGroup);
-                showNode(btnHrAdmin);
                 showNode(btnProjects);
+                showNode(btnOffers);
                 showNode(btnRecruitment);
                 break;
 
             case "HR_MANAGER":
-                // HR dashboard + HR admin + recruitment + projects
+                // HR dashboard + recruitment + projects + offers
                 showNode(hrGroup);
-                showNode(btnHrAdmin);
                 showNode(btnProjects);
+                showNode(btnOffers);
                 showNode(btnRecruitment);
                 break;
 
             case "PROJECT_OWNER":
-                // Projects only (manages projects and reviews tasks)
+                // Projects + Offers (manages projects, posts offers)
                 showNode(btnProjects);
+                showNode(btnOffers);
                 // Hide admin-level dashboards stats
                 hideNode(statsCardsRow);
                 hideNode(platformOverviewCard);
                 break;
 
             case "EMPLOYEE":
-                // Projects only (sees assigned tasks)
+                // Projects + Offers + HR (leave requests, attendance)
+                showNode(hrGroup);
                 showNode(btnProjects);
+                showNode(btnOffers);
                 // Hide admin-level dashboard stats
                 hideNode(statsCardsRow);
                 hideNode(platformOverviewCard);
                 break;
 
             case "GIG_WORKER":
-                // Projects only (sees assigned gigs)
+                // Projects + Offers + HR (leave requests, attendance)
+                showNode(hrGroup);
                 showNode(btnProjects);
+                showNode(btnOffers);
                 // Hide admin-level dashboard stats
                 hideNode(statsCardsRow);
                 hideNode(platformOverviewCard);
@@ -384,8 +404,8 @@ public class DashboardController {
     private void setActiveButton(Button activeBtn) {
         List<Button> allButtons = Arrays.asList(
                 btnDashboard, btnManageUsers, btnHrDashboard,
-                btnMessages, btnRecruitment, btnHrAdmin, btnProjects,
-                btnTraining, btnCommunity
+                btnMessages, btnRecruitment, btnProjects,
+                btnOffers, btnTraining, btnCommunity
         );
         for (Button btn : allButtons) {
             btn.getStyleClass().remove("sidebar-btn-active");
@@ -399,8 +419,8 @@ public class DashboardController {
     private void clearActiveButtons() {
         List<Button> allButtons = Arrays.asList(
                 btnDashboard, btnManageUsers, btnHrDashboard,
-                btnMessages, btnRecruitment, btnHrAdmin, btnProjects,
-                btnTraining, btnCommunity
+                btnMessages, btnRecruitment, btnProjects,
+                btnOffers, btnTraining, btnCommunity
         );
         for (Button btn : allButtons) {
             btn.getStyleClass().remove("sidebar-btn-active");
@@ -479,8 +499,8 @@ public class DashboardController {
             btnTooltipMap.put(btnHrDashboard, "HR Dashboard");
             btnTooltipMap.put(btnMessages, "Messages");
             btnTooltipMap.put(btnRecruitment, "Interviews");
-            btnTooltipMap.put(btnHrAdmin, "HR Admin");
             btnTooltipMap.put(btnProjects, "Projects");
+            btnTooltipMap.put(btnOffers, "Offers");
             btnTooltipMap.put(btnTraining, "Training");
             btnTooltipMap.put(btnCommunity, "Community");
         }
@@ -595,9 +615,147 @@ public class DashboardController {
     }
 
     @FXML
-    private void showHrAdmin() {
-        setActiveButton(btnHrAdmin);
-        loadContent("/fxml/HRModule.fxml");
+    private void showOffers() {
+        setActiveButton(btnOffers);
+        loadContent("/fxml/OfferManagement.fxml");
+    }
+
+    @FXML
+    private void showTraining() {
+        setActiveButton(btnTraining);
+        loadContent("/fxml/Training.fxml");
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  UNIVERSAL AI ASSISTANT
+    // ════════════════════════════════════════════════════════
+
+    @FXML
+    private void showAiAssistant() {
+        SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("AI Assistant");
+        dialog.setHeaderText("🤖 SynergyGig AI Assistant");
+        DialogHelper.theme(dialog);
+
+        VBox chatBox = new VBox(10);
+        chatBox.setPrefWidth(550);
+        chatBox.setPrefHeight(420);
+        chatBox.setStyle("-fx-padding: 10;");
+
+        // Chat history area
+        VBox messagesBox = new VBox(8);
+        messagesBox.setStyle("-fx-padding: 5;");
+
+        ScrollPane scrollPane = new ScrollPane(messagesBox);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setPrefHeight(320);
+        scrollPane.getStyleClass().add("ai-chat-scroll");
+
+        // Welcome bubble
+        Label welcome = new Label("Hi! I'm your AI assistant. Ask me anything about:\n" +
+                "  \u2022 Projects & tasks\n  \u2022 HR & payroll\n  \u2022 Training & courses\n" +
+                "  \u2022 Community posts\n  \u2022 Offers & contracts\n  \u2022 Or any general question!");
+        welcome.setWrapText(true);
+        welcome.setStyle("-fx-background-color: #2a2d35; -fx-text-fill: #e0e0e0; -fx-padding: 10; " +
+                "-fx-background-radius: 10; -fx-max-width: 420;");
+        messagesBox.getChildren().add(welcome);
+
+        // Input row
+        HBox inputRow = new HBox(8);
+        inputRow.setAlignment(Pos.CENTER_LEFT);
+        TextField inputField = new TextField();
+        inputField.setPromptText("Ask me anything...");
+        inputField.setPrefWidth(430);
+        HBox.setHgrow(inputField, Priority.ALWAYS);
+
+        Button sendBtn = new Button("Send");
+        sendBtn.getStyleClass().addAll("btn", "btn-primary");
+
+        inputRow.getChildren().addAll(inputField, sendBtn);
+
+        chatBox.getChildren().addAll(scrollPane, inputRow);
+        dialog.getDialogPane().setContent(chatBox);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().setPrefWidth(600);
+
+        // Gather context for routing
+        String userRole = SessionManager.getInstance().getCurrentUser() != null ?
+                SessionManager.getInstance().getCurrentUser().getRole() : "EMPLOYEE";
+        String userName = SessionManager.getInstance().getCurrentUser() != null ?
+                SessionManager.getInstance().getCurrentUser().getFirstName() : "User";
+
+        Runnable sendAction = () -> {
+            String question = inputField.getText();
+            if (question == null || question.trim().isEmpty()) return;
+            inputField.clear();
+
+            // User bubble
+            Label userBubble = new Label(question);
+            userBubble.setWrapText(true);
+            userBubble.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 10; " +
+                    "-fx-background-radius: 10; -fx-max-width: 380;");
+            HBox userRow = new HBox(userBubble);
+            userRow.setAlignment(Pos.CENTER_RIGHT);
+            messagesBox.getChildren().add(userRow);
+
+            // Thinking indicator
+            Label thinking = new Label("⏳ Thinking...");
+            thinking.setStyle("-fx-text-fill: #888; -fx-padding: 5;");
+            messagesBox.getChildren().add(thinking);
+            scrollPane.setVvalue(1.0);
+
+            sendBtn.setDisable(true);
+            inputField.setDisable(true);
+
+            final String q = question;
+            new Thread(() -> {
+                try {
+                    ZAIService zai = new ZAIService();
+                    String systemPrompt = "You are the SynergyGig AI Assistant. " +
+                            "You help " + userName + " (" + userRole + ") with questions about: " +
+                            "HR (attendance, leave, payroll), Projects (tasks, sprints, kanban), " +
+                            "Training (courses, enrollments, certificates), Community (posts, messages), " +
+                            "Offers & Contracts (job offers, applications, contracts). " +
+                            "Be concise, helpful, and professional. If asked about specific data, " +
+                            "explain where to find it in the platform.";
+                    String response = zai.chat(systemPrompt, q);
+
+                    Platform.runLater(() -> {
+                        messagesBox.getChildren().remove(thinking);
+                        Label aiBubble = new Label(response);
+                        aiBubble.setWrapText(true);
+                        aiBubble.setStyle("-fx-background-color: #2a2d35; -fx-text-fill: #e0e0e0; " +
+                                "-fx-padding: 10; -fx-background-radius: 10; -fx-max-width: 420;");
+                        messagesBox.getChildren().add(aiBubble);
+                        scrollPane.setVvalue(1.0);
+                        sendBtn.setDisable(false);
+                        inputField.setDisable(false);
+                        inputField.requestFocus();
+                        SoundManager.getInstance().play(SoundManager.AI_COMPLETE);
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        messagesBox.getChildren().remove(thinking);
+                        Label errBubble = new Label("Sorry, I couldn't process that: " + e.getMessage());
+                        errBubble.setWrapText(true);
+                        errBubble.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; " +
+                                "-fx-padding: 10; -fx-background-radius: 10; -fx-max-width: 420;");
+                        messagesBox.getChildren().add(errBubble);
+                        sendBtn.setDisable(false);
+                        inputField.setDisable(false);
+                    });
+                }
+            }).start();
+        };
+
+        sendBtn.setOnAction(e -> sendAction.run());
+        inputField.setOnAction(e -> sendAction.run());
+
+        dialog.showAndWait();
     }
 
     @FXML
@@ -626,6 +784,7 @@ public class DashboardController {
 
     private void loadContent(String fxmlPath) {
         try {
+            currentPage = fxmlPath;
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
             Parent content = loader.load();
             contentArea.getChildren().setAll(content);
@@ -739,6 +898,99 @@ public class DashboardController {
     //  GLOBAL INCOMING CALL NOTIFICATION (top-right toast)
     // ════════════════════════════════════════════════════════
 
+    // ════════════════════════════════════════════════════════
+    //  SIGNALING SERVICE — real-time call & message notifications
+    // ════════════════════════════════════════════════════════
+
+    private void connectSignaling(int userId) {
+        SignalingService sig = SignalingService.getInstance();
+        sig.connect(userId);
+
+        // Instant incoming call notification via signaling
+        sig.onMessage("call-state", msg -> {
+            try {
+                JsonObject data = msg.getAsJsonObject("data");
+                String state = data.has("state") ? data.get("state").getAsString() : "";
+                if ("incoming-call".equals(state)) {
+                    int callId = data.get("callId").getAsInt();
+                    String callerName = data.has("callerName") ? data.get("callerName").getAsString() : "Unknown";
+                    // Skip if Chat page is active — ChatController handles incoming calls with video support
+                    if ("/fxml/Chat.fxml".equals(currentPage)) return;
+                    if (pendingIncomingCall == null && globalActiveCall == null) {
+                        Call incoming = serviceCall.getCall(callId);
+                        if (incoming != null && "pending".equals(incoming.getStatus())) {
+                            pendingIncomingCall = incoming;
+                            SoundManager.getInstance().playLoop(SoundManager.INCOMING_CALL);
+                            showGlobalIncomingCallToast(incoming);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[Signaling] call-state handler error: " + e.getMessage());
+            }
+        });
+
+        // Real-time message notification
+        sig.onMessage("new-message", msg -> {
+            try {
+                JsonObject data = msg.getAsJsonObject("data");
+                String senderName = data.has("senderName") ? data.get("senderName").getAsString() : "Someone";
+                String preview = data.has("preview") ? data.get("preview").getAsString() : "New message";
+                SoundManager.getInstance().play(SoundManager.NEW_MESSAGE);
+                showMessageToast(senderName, preview);
+            } catch (Exception e) {
+                System.err.println("[Signaling] new-message handler error: " + e.getMessage());
+            }
+        });
+    }
+
+    /** Show a brief toast notification for an incoming chat message. */
+    private void showMessageToast(String senderName, String preview) {
+        VBox toast = new VBox(4);
+        toast.getStyleClass().add("incoming-call-toast"); // reuse call-toast styling
+        toast.setAlignment(Pos.TOP_LEFT);
+        toast.setMaxWidth(280);
+        toast.setMaxHeight(80);
+        toast.setPadding(new Insets(10, 14, 10, 14));
+
+        Label icon = new Label("\uD83D\uDD14"); // 🔔
+        icon.setStyle("-fx-font-size: 16;");
+
+        Label nameLbl = new Label(senderName);
+        nameLbl.setStyle("-fx-font-weight: bold; -fx-font-size: 13;");
+
+        Label previewLbl = new Label(preview);
+        previewLbl.setStyle("-fx-font-size: 12; -fx-opacity: 0.85;");
+        previewLbl.setWrapText(true);
+        previewLbl.setMaxWidth(240);
+
+        HBox header = new HBox(6, icon, nameLbl);
+        header.setAlignment(Pos.CENTER_LEFT);
+        toast.getChildren().addAll(header, previewLbl);
+
+        StackPane.setAlignment(toast, Pos.TOP_RIGHT);
+        StackPane.setMargin(toast, new Insets(12, 12, 0, 0));
+
+        contentArea.getChildren().add(toast);
+
+        // Fade in
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(250), toast);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.play();
+
+        // Auto-remove after 4 seconds
+        PauseTransition hold = new PauseTransition(Duration.seconds(4));
+        hold.setOnFinished(e -> {
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), toast);
+            fadeOut.setFromValue(1);
+            fadeOut.setToValue(0);
+            fadeOut.setOnFinished(ev -> contentArea.getChildren().remove(toast));
+            fadeOut.play();
+        });
+        hold.play();
+    }
+
     private void startIncomingCallPoller() {
         incomingCallPoller = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "global-call-poller");
@@ -753,6 +1005,9 @@ public class DashboardController {
 
                 // Don't poll if we already have a call active or toast showing
                 if (globalActiveCall != null || pendingIncomingCall != null) return;
+
+                // Skip if Chat page is active — ChatController handles incoming calls with video support
+                if ("/fxml/Chat.fxml".equals(currentPage)) return;
 
                 Call incoming = serviceCall.getIncomingCall(user.getId());
                 if (incoming != null) {
@@ -941,12 +1196,19 @@ public class DashboardController {
         callTimerTimeline.play();
 
         // Poll call status to detect remote hang-up
-        globalCallStatusPoller = new Timeline(new KeyFrame(Duration.seconds(2), ev -> {
+        globalCallPollInFlight = false;
+        globalCallStatusPoller = new Timeline(new KeyFrame(Duration.seconds(3), ev -> {
             if (globalActiveCall == null) return;
+            if (globalCallPollInFlight) return; // skip if previous request still pending
+            globalCallPollInFlight = true;
             new Thread(() -> {
-                Call c = serviceCall.getCall(globalActiveCall.getId());
-                if (c != null && (c.isEnded() || "rejected".equals(c.getStatus()) || "missed".equals(c.getStatus()))) {
-                    Platform.runLater(this::endGlobalActiveCall);
+                try {
+                    Call c = serviceCall.getCall(globalActiveCall.getId());
+                    if (c != null && (c.isEnded() || "rejected".equals(c.getStatus()) || "missed".equals(c.getStatus()))) {
+                        Platform.runLater(this::endGlobalActiveCall);
+                    }
+                } finally {
+                    globalCallPollInFlight = false;
                 }
             }, "global-call-status-check").start();
         }));
@@ -959,6 +1221,7 @@ public class DashboardController {
         SoundManager.getInstance().play(SoundManager.CALL_ENDED);
         if (callTimerTimeline != null) { callTimerTimeline.stop(); callTimerTimeline = null; }
         if (globalCallStatusPoller != null) { globalCallStatusPoller.stop(); globalCallStatusPoller = null; }
+        globalCallPollInFlight = false;
         audioCallService.stop();
         globalActiveCall = null;
         pendingIncomingCall = null;
@@ -967,5 +1230,15 @@ public class DashboardController {
         contentArea.getChildren().removeIf(n ->
                 n.getStyleClass().contains("global-call-bar") ||
                 n.getStyleClass().contains("incoming-call-toast"));
+    }
+
+    /** Disconnect SignalingService when leaving the dashboard. */
+    public void stop() {
+        stopIncomingCallPoller();
+        SignalingService.getInstance().disconnect();
+        if (globalActiveCall != null) {
+            serviceCall.endCall(globalActiveCall.getId());
+            endGlobalActiveCall();
+        }
     }
 }

@@ -1006,6 +1006,13 @@
     -fx-effect: dropshadow(gaussian, rgba(97, 48, 57, 0.15), 8, 0, 0, 3);
 }
 
+.auth-eye-btn {
+    -fx-text-fill: #9A8A8E;
+}
+.auth-eye-btn:hover {
+    -fx-text-fill: #613039;
+}
+
 .auth-btn-primary {
     -fx-background-color: linear-gradient(to bottom right, #613039, #DE95A2);
     -fx-text-fill: #FFFFFF;
@@ -1431,6 +1438,77 @@
     -fx-border-color: #613039;
 }
 
+/* ── API Keys Panel — Light Theme ── */
+
+.settings-api-field {
+    -fx-padding: 8 12 10 12;
+    -fx-background-color: rgba(245, 240, 241, 0.7);
+    -fx-background-radius: 10;
+    -fx-border-color: #E0D6D8;
+    -fx-border-radius: 10;
+}
+
+.settings-api-input {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #0D0A0B;
+    -fx-border-color: #D0C6C8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 13;
+    -fx-prompt-text-fill: #A09899;
+}
+
+.settings-api-input:focused {
+    -fx-border-color: #613039;
+    -fx-background-color: #FAF5F6;
+}
+
+.settings-api-desc {
+    -fx-text-fill: #8A7C7F;
+    -fx-font-size: 11;
+    -fx-padding: 0 0 0 2;
+}
+
+.settings-api-toggle-btn {
+    -fx-background-color: rgba(97, 48, 57, 0.08);
+    -fx-text-fill: #613039;
+    -fx-border-color: #E0D6D8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+    -fx-font-size: 14;
+    -fx-cursor: hand;
+    -fx-padding: 0;
+}
+
+.settings-api-toggle-btn:hover {
+    -fx-background-color: rgba(97, 48, 57, 0.2);
+    -fx-border-color: #613039;
+}
+
+.settings-api-save-btn {
+    -fx-background-color: #613039;
+    -fx-text-fill: white;
+    -fx-font-weight: 700;
+    -fx-padding: 8 24;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.settings-api-save-btn:hover {
+    -fx-background-color: #7A3D48;
+}
+
+.settings-api-status {
+    -fx-font-size: 12;
+    -fx-padding: 4 0 0 0;
+}
+
 /* ═══════════════════════════════════════════
    FILE MESSAGE CARDS — Light Theme
    ═══════════════════════════════════════════ */
@@ -1734,6 +1812,13 @@
    INTERVIEW CALENDAR POPUP (light)
    ════════════════════════════════════════════ */
 
+.interview-calendar-dialog {
+    -fx-background-color: #FFFFFF;
+}
+.interview-calendar-dialog > .content {
+    -fx-background-color: #FFFFFF;
+    -fx-padding: 0;
+}
 .interview-calendar-root {
     -fx-background-color: #FFFFFF;
 }
@@ -2215,3 +2300,446 @@
     -fx-background-color: #FFFFFF;
     -fx-border-color: #E0E0E8;
 }
+
+/* Team Panel (light) */
+.hr-team-panel {
+    -fx-background-color: #F5F5FA;
+    -fx-border-color: #E0E0E8;
+}
+
+.hr-team-section-title {
+    -fx-text-fill: #6B6B78;
+}
+
+.hr-team-row {
+    -fx-background-color: #FFFFFF;
+}
+
+.hr-team-row:hover {
+    -fx-background-color: #F0F0F6;
+}
+
+.hr-team-name {
+    -fx-text-fill: #1C1C2E;
+}
+
+.hr-team-role {
+    -fx-text-fill: #6B6BCC;
+    -fx-background-color: rgba(107,107,204,0.10);
+}
+
+.hr-team-empty {
+    -fx-text-fill: #8B8BA0;
+}
+
+/* ── HR API: Public Holidays (Nager.Date) ── */
+.hr-api-loading {
+    -fx-text-fill: #8B8BA0;
+}
+.hr-holiday-row {
+    -fx-background-color: rgba(0,0,0,0.03);
+    -fx-background-radius: 8;
+}
+.hr-holiday-row:hover {
+    -fx-background-color: rgba(0,0,0,0.06);
+}
+.hr-holiday-date {
+    -fx-text-fill: #5B5BCC;
+}
+.hr-holiday-name {
+    -fx-text-fill: #1C1C2E;
+}
+.hr-holiday-local {
+    -fx-text-fill: #8B8BA0;
+}
+.hr-holiday-days {
+    -fx-text-fill: #8B8BA0;
+}
+.hr-holiday-soon {
+    -fx-text-fill: #E68A00;
+}
+
+/* ── HR API: Team Building (Bored API) ── */
+.hr-activity-text {
+    -fx-text-fill: #1C1C2E;
+}
+.hr-activity-type {
+    -fx-text-fill: #5B5BCC;
+    -fx-background-color: rgba(91,91,204,0.10);
+}
+.hr-activity-detail {
+    -fx-text-fill: #6B6B78;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TRAINING MODULE (light theme overrides)
+   ═══════════════════════════════════════════════════════════════ */
+
+.tr-module-root { -fx-background-color: #F5F5FA; }
+
+.tr-top-bar {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent transparent #E0E0E8 transparent;
+}
+.tr-header-title { -fx-text-fill: #1C1C2E; }
+.tr-header-role  { -fx-text-fill: #5B5BCC; }
+
+.tr-tab-btn { -fx-text-fill: #6B6B78; }
+.tr-tab-btn:hover {
+    -fx-text-fill: #3A3A50; -fx-background-color: rgba(91,91,204,0.06);
+}
+.tr-tab-active {
+    -fx-text-fill: #5B5BCC !important;
+    -fx-border-color: transparent transparent #5B5BCC transparent !important;
+}
+.tr-content-area { -fx-background-color: #F5F5FA; }
+
+.tr-scroll { -fx-background-color: transparent; -fx-background: transparent; }
+.tr-scroll .viewport { -fx-background-color: transparent; }
+
+.tr-view { -fx-background-color: transparent; }
+.tr-view-title { -fx-text-fill: #1C1C2E; }
+
+.tr-stat-card {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E0E0E8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 6, 0, 0, 2);
+}
+.tr-stat-card:hover {
+    -fx-border-color: #5B5BCC;
+    -fx-effect: dropshadow(gaussian, rgba(91,91,204,0.12), 10, 0, 0, 2);
+}
+.tr-stat-value { -fx-text-fill: #1C1C2E; }
+.tr-stat-label { -fx-text-fill: #6B6B78; }
+
+.tr-section-card {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E0E0E8;
+}
+.tr-section-title { -fx-text-fill: #1C1C2E; }
+.tr-section-subtitle { -fx-text-fill: #6B6B78; }
+
+.tr-course-card {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E0E0E8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 6, 0, 0, 2);
+}
+.tr-course-card:hover {
+    -fx-border-color: #5B5BCC;
+    -fx-effect: dropshadow(gaussian, rgba(91,91,204,0.12), 10, 0, 0, 3);
+}
+.tr-card-title { -fx-text-fill: #1C1C2E; }
+.tr-card-desc { -fx-text-fill: #6B6B78; }
+.tr-card-info { -fx-text-fill: #8B8BA0; }
+
+.tr-learning-card {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E0E0E8;
+}
+.tr-learning-card:hover { -fx-border-color: #C0C0D0; }
+
+.tr-cert-card {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E6A817;
+    -fx-effect: dropshadow(gaussian, rgba(230,168,23,0.08), 6, 0, 0, 2);
+}
+.tr-cert-card:hover { -fx-effect: dropshadow(gaussian, rgba(230,168,23,0.15), 10, 0, 0, 3); }
+.tr-cert-course { -fx-text-fill: #1C1C2E; }
+.tr-cert-number { -fx-text-fill: #8B8BA0; }
+.tr-cert-date   { -fx-text-fill: #6B6B78; }
+
+.tr-manage-row {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E0E0E8;
+}
+.tr-manage-row:hover { -fx-border-color: #C0C0D0; }
+
+.tr-badge-technical   { -fx-text-fill: #2563EB; -fx-background-color: rgba(37,99,235,0.08); }
+.tr-badge-soft-skills { -fx-text-fill: #DB2777; -fx-background-color: rgba(219,39,119,0.08); }
+.tr-badge-compliance  { -fx-text-fill: #D97706; -fx-background-color: rgba(217,119,6,0.08); }
+.tr-badge-onboarding  { -fx-text-fill: #059669; -fx-background-color: rgba(5,150,105,0.08); }
+.tr-badge-leadership  { -fx-text-fill: #7C3AED; -fx-background-color: rgba(124,58,237,0.08); }
+.tr-badge-beginner     { -fx-text-fill: #059669; -fx-background-color: rgba(5,150,105,0.08); }
+.tr-badge-intermediate { -fx-text-fill: #D97706; -fx-background-color: rgba(217,119,6,0.08); }
+.tr-badge-advanced     { -fx-text-fill: #DC2626; -fx-background-color: rgba(220,38,38,0.08); }
+.tr-badge-enrolled     { -fx-text-fill: #2563EB; -fx-background-color: rgba(37,99,235,0.08); }
+.tr-badge-in-progress  { -fx-text-fill: #D97706; -fx-background-color: rgba(217,119,6,0.08); }
+.tr-badge-completed    { -fx-text-fill: #059669; -fx-background-color: rgba(5,150,105,0.08); }
+.tr-badge-dropped      { -fx-text-fill: #6B6B78; -fx-background-color: rgba(107,107,120,0.08); }
+.tr-badge-active       { -fx-text-fill: #059669; -fx-background-color: rgba(5,150,105,0.08); }
+.tr-badge-draft        { -fx-text-fill: #6B6B78; -fx-background-color: rgba(107,107,120,0.08); }
+.tr-badge-archived     { -fx-text-fill: #9CA3AF; -fx-background-color: rgba(156,163,175,0.08); }
+
+.tr-progress-bar { -fx-accent: #5B5BCC; }
+.tr-progress-bar .bar { -fx-background-color: #5B5BCC; }
+.tr-progress-bar .track { -fx-background-color: #E0E0E8; }
+.tr-progress-pct { -fx-text-fill: #1C1C2E; }
+
+.tr-action-btn {
+    -fx-background-color: #EDEDFA; -fx-text-fill: #5B5BCC;
+}
+.tr-action-btn:hover { -fx-background-color: #DDDDF0; }
+.tr-enroll-btn {
+    -fx-background-color: #2563EB; -fx-text-fill: white;
+}
+.tr-enroll-btn:hover { -fx-background-color: #1D4ED8; }
+.tr-mega-btn {
+    -fx-background-color: #D32F2F; -fx-text-fill: white;
+}
+.tr-mega-btn:hover { -fx-background-color: #B71C1C; }
+.tr-drop-btn {
+    -fx-text-fill: #DC2626; -fx-border-color: #DC2626;
+}
+.tr-drop-btn:hover { -fx-background-color: rgba(220,38,38,0.06); }
+.tr-icon-btn {
+    -fx-background-color: #EDEDFA; -fx-text-fill: #5B5BCC;
+}
+.tr-icon-btn:hover { -fx-background-color: #DDDDF0; }
+.tr-icon-btn-danger { -fx-text-fill: #DC2626; }
+.tr-icon-btn-danger:hover { -fx-background-color: rgba(220,38,38,0.06); }
+
+.tr-search-field {
+    -fx-background-color: #FFFFFF; -fx-text-fill: #1C1C2E;
+    -fx-prompt-text-fill: #9CA3AF; -fx-border-color: #E0E0E8;
+}
+.tr-search-field:focused { -fx-border-color: #5B5BCC; }
+.tr-filter-combo {
+    -fx-background-color: #FFFFFF; -fx-border-color: #E0E0E8;
+}
+
+.tr-list-row { -fx-background-color: #FFFFFF; }
+.tr-list-row:hover { -fx-background-color: #F5F5FA; }
+.tr-list-name { -fx-text-fill: #1C1C2E; }
+.tr-list-pct { -fx-text-fill: #6B6B78; }
+
+.tr-enrolled-label { -fx-text-fill: #059669; }
+.tr-empty-text { -fx-text-fill: #8B8BA0; }
+.tr-no-results { -fx-text-fill: #8B8BA0; }
+
+.tr-holiday-date { -fx-text-fill: #5B5BCC; }
+.tr-holiday-name { -fx-text-fill: #1C1C2E; }
+.tr-holiday-days { -fx-text-fill: #8B8BA0; }
+.tr-holiday-soon { -fx-text-fill: #D97706; }
+
+.tr-activity-text { -fx-text-fill: #1C1C2E; }
+.tr-activity-type {
+    -fx-text-fill: #5B5BCC; -fx-background-color: rgba(91,91,204,0.10);
+}
+.tr-activity-detail { -fx-text-fill: #6B6B78; }
+
+/* ═══════ PM TEAM / CONTRIBUTORS — Light Overrides ═══════ */
+
+.pm-team-search {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #1C1C2E;
+    -fx-prompt-text-fill: #9CA3AF;
+    -fx-border-color: #E0E0E8;
+}
+.pm-team-search:focused { -fx-border-color: #8B5CF6; }
+
+.pm-team-role-filter {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E0E0E8;
+}
+
+.pm-team-count { -fx-text-fill: #6B6B78; }
+
+.pm-team-header-row {
+    -fx-background-color: #F0F0F6;
+}
+
+.pm-team-col-header { -fx-text-fill: #6B6B78; }
+
+.pm-team-data-row {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent transparent #E8E8EE transparent;
+}
+.pm-team-data-row:hover { -fx-background-color: #F5F5FA; }
+
+.pm-team-name { -fx-text-fill: #1C1C2E; }
+.pm-team-email { -fx-text-fill: #6B6B78; }
+.pm-team-dept { -fx-text-fill: #6B6B78; }
+.pm-team-empty { -fx-text-fill: #9CA3AF; }
+
+.pm-team-role-developer  { -fx-background-color: rgba(99,102,241,0.12); -fx-text-fill: #4F46E5; }
+.pm-team-role-designer   { -fx-background-color: rgba(236,72,153,0.12); -fx-text-fill: #DB2777; }
+.pm-team-role-lead       { -fx-background-color: rgba(217,119,6,0.12);  -fx-text-fill: #D97706; }
+.pm-team-role-manager    { -fx-background-color: rgba(5,150,105,0.12);  -fx-text-fill: #059669; }
+.pm-team-role-tester     { -fx-background-color: rgba(13,148,136,0.12); -fx-text-fill: #0D9488; }
+.pm-team-role-analyst    { -fx-background-color: rgba(8,145,178,0.12);  -fx-text-fill: #0891B2; }
+.pm-team-role-default    { -fx-background-color: rgba(107,107,120,0.10); -fx-text-fill: #6B6B78; }
+
+/* ═══════ HR FILTER & COLUMN TOGGLE — Light Overrides ═══════ */
+
+.hr-filter-search {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #1C1C2E;
+    -fx-prompt-text-fill: #9CA3AF;
+    -fx-border-color: #E0E0E8;
+}
+.hr-filter-search:focused { -fx-border-color: #6B6BCC; }
+
+.hr-filter-combo {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E0E0E8;
+}
+
+.hr-column-toggle {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #4B5563;
+    -fx-border-color: #E0E0E8;
+}
+.hr-column-toggle:hover { -fx-background-color: #F0F0F6; }
+
+/* ═══════ TR FILTER & COLUMN TOGGLE — Light Overrides ═══════ */
+
+.tr-filter-search {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #1C1C2E;
+    -fx-prompt-text-fill: #9CA3AF;
+    -fx-border-color: #E0E0E8;
+}
+.tr-filter-search:focused { -fx-border-color: #5B5BCC; }
+
+.tr-column-toggle {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #4B5563;
+    -fx-border-color: #E0E0E8;
+}
+.tr-column-toggle:hover { -fx-background-color: #F0F0F6; }
+
+/* ═══════ TR TRIVIA QUIZ — Light Overrides ═══════ */
+
+.tr-trivia-category { -fx-text-fill: #6B6B78; }
+.tr-trivia-diff-easy { -fx-background-color: rgba(34,197,94,0.12); -fx-text-fill: #16A34A; }
+.tr-trivia-diff-medium { -fx-background-color: rgba(234,179,8,0.12); -fx-text-fill: #CA8A04; }
+.tr-trivia-diff-hard { -fx-background-color: rgba(239,68,68,0.12); -fx-text-fill: #DC2626; }
+.tr-trivia-question { -fx-text-fill: #1C1C2E; }
+
+.tr-trivia-answer-btn {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #3A3A4E;
+    -fx-border-color: #E0E0E8;
+}
+.tr-trivia-answer-btn:hover {
+    -fx-background-color: #F5F5FA;
+    -fx-border-color: #5B5BCC;
+}
+.tr-trivia-correct {
+    -fx-background-color: rgba(34,197,94,0.12) !important;
+    -fx-border-color: #16A34A !important;
+    -fx-text-fill: #16A34A !important;
+}
+.tr-trivia-wrong {
+    -fx-background-color: rgba(239,68,68,0.12) !important;
+    -fx-border-color: #DC2626 !important;
+    -fx-text-fill: #DC2626 !important;
+}
+.tr-trivia-feedback-correct { -fx-text-fill: #16A34A; }
+.tr-trivia-feedback-wrong { -fx-text-fill: #DC2626; }
+
+/* ═══════ TR RECOMMENDED READING — Light Overrides ═══════ */
+
+.tr-book-title { -fx-text-fill: #1C1C2E; }
+.tr-book-author { -fx-text-fill: #5B5BCC; }
+.tr-book-subject {
+    -fx-text-fill: #7C3AED;
+    -fx-background-color: rgba(124,58,237,0.10);
+}
+.tr-book-year { -fx-text-fill: #6B6B78; }
+.tr-book-editions { -fx-text-fill: #6B6B78; }
+
+/* ═══════════════════════════════════════════════════════════
+   OFFER & CONTRACT MODULE — Light Theme
+   ═══════════════════════════════════════════════════════════ */
+
+.oc-module-root { -fx-background-color: #F5F5FA; }
+.oc-top-bar { -fx-background-color: white; -fx-border-color: transparent transparent #E0E0E8 transparent; }
+.oc-header-title { -fx-text-fill: #1A1A2E; }
+.oc-header-role { -fx-text-fill: #5B5BDB; -fx-background-color: rgba(91,91,219,0.1); }
+.oc-tab-bar { -fx-background-color: white; }
+.oc-tab-btn { -fx-text-fill: #6B6B80; }
+.oc-tab-btn:hover { -fx-text-fill: #5B5BDB; -fx-background-color: rgba(91,91,219,0.05); }
+.oc-tab-active { -fx-text-fill: #5B5BDB !important; -fx-border-color: transparent transparent #5B5BDB transparent; }
+
+.oc-content-area { -fx-background-color: #F5F5FA; }
+.oc-section-title { -fx-text-fill: #1A1A2E; }
+.oc-subtitle { -fx-text-fill: #6B6B80; }
+
+.oc-search-field { -fx-background-color: white; -fx-text-fill: #1A1A2E; -fx-prompt-text-fill: #A0A0B0; -fx-border-color: #D0D0DC; }
+.oc-combo { -fx-background-color: white; -fx-border-color: #D0D0DC; }
+.oc-combo .list-cell { -fx-text-fill: #1A1A2E; }
+.oc-filter-chip { -fx-background-color: white; -fx-text-fill: #6B6B80; -fx-border-color: #D0D0DC; }
+.oc-filter-chip:hover { -fx-background-color: #F0F0FA; -fx-text-fill: #5B5BDB; }
+.oc-filter-active { -fx-background-color: rgba(91,91,219,0.1) !important; -fx-text-fill: #5B5BDB !important; -fx-border-color: #5B5BDB !important; }
+
+.oc-offer-card { -fx-background-color: white; -fx-border-color: #E0E0E8; }
+.oc-offer-card:hover { -fx-border-color: #5B5BDB; -fx-effect: dropshadow(gaussian, rgba(91,91,219,0.15), 10, 0, 0, 2); }
+.oc-card-title { -fx-text-fill: #1A1A2E; }
+.oc-card-desc { -fx-text-fill: #6B6B80; }
+.oc-card-amount { -fx-text-fill: #16A34A; }
+.oc-card-meta { -fx-text-fill: #888898; }
+.oc-card-skills { -fx-text-fill: #7C3AED; }
+
+.oc-badge-freelance { -fx-background-color: rgba(91,91,219,0.1); -fx-text-fill: #5B5BDB; }
+.oc-badge-full-time { -fx-background-color: rgba(22,163,74,0.1); -fx-text-fill: #16A34A; }
+.oc-badge-part-time { -fx-background-color: rgba(217,119,6,0.1); -fx-text-fill: #D97706; }
+.oc-badge-internship { -fx-background-color: rgba(124,58,237,0.1); -fx-text-fill: #7C3AED; }
+.oc-badge-contract { -fx-background-color: rgba(37,99,235,0.1); -fx-text-fill: #2563EB; }
+
+.oc-status-draft { -fx-background-color: rgba(107,107,128,0.1); -fx-text-fill: #6B6B80; }
+.oc-status-open { -fx-background-color: rgba(22,163,74,0.1); -fx-text-fill: #16A34A; }
+.oc-status-closed { -fx-background-color: rgba(220,38,38,0.1); -fx-text-fill: #DC2626; }
+.oc-status-cancelled { -fx-background-color: rgba(107,107,128,0.1); -fx-text-fill: #6B6B80; }
+.oc-status-pending { -fx-background-color: rgba(217,119,6,0.1); -fx-text-fill: #D97706; }
+.oc-status-reviewed { -fx-background-color: rgba(37,99,235,0.1); -fx-text-fill: #2563EB; }
+.oc-status-shortlisted { -fx-background-color: rgba(124,58,237,0.1); -fx-text-fill: #7C3AED; }
+.oc-status-accepted { -fx-background-color: rgba(22,163,74,0.1); -fx-text-fill: #16A34A; }
+.oc-status-rejected { -fx-background-color: rgba(220,38,38,0.1); -fx-text-fill: #DC2626; }
+.oc-status-withdrawn { -fx-background-color: rgba(107,107,128,0.1); -fx-text-fill: #6B6B80; }
+.oc-status-active { -fx-background-color: rgba(22,163,74,0.1); -fx-text-fill: #16A34A; }
+.oc-status-completed { -fx-background-color: rgba(37,99,235,0.1); -fx-text-fill: #2563EB; }
+.oc-status-terminated { -fx-background-color: rgba(220,38,38,0.1); -fx-text-fill: #DC2626; }
+.oc-status-disputed { -fx-background-color: rgba(217,119,6,0.1); -fx-text-fill: #D97706; }
+.oc-status-pending-signature { -fx-background-color: rgba(217,119,6,0.1); -fx-text-fill: #D97706; }
+
+.oc-list-row { -fx-background-color: white; -fx-border-color: #E0E0E8; }
+.oc-list-row:hover { -fx-border-color: #5B5BDB; -fx-background-color: #FAFAFF; }
+.oc-row-title { -fx-text-fill: #1A1A2E; }
+.oc-row-meta { -fx-text-fill: #888898; }
+.oc-empty-label { -fx-text-fill: #A0A0B0; }
+
+.oc-score-high { -fx-text-fill: #16A34A; -fx-background-color: rgba(22,163,74,0.08); }
+.oc-score-medium { -fx-text-fill: #D97706; -fx-background-color: rgba(217,119,6,0.08); }
+.oc-score-low { -fx-text-fill: #DC2626; -fx-background-color: rgba(220,38,38,0.08); }
+.oc-score-label { -fx-text-fill: #888898; }
+
+.oc-btn-primary { -fx-background-color: #5B5BDB; }
+.oc-btn-primary:hover { -fx-background-color: #6B6BEB; }
+.oc-btn-secondary { -fx-background-color: white; -fx-text-fill: #5B5BDB; -fx-border-color: #D0D0DC; }
+.oc-btn-secondary:hover { -fx-background-color: #F5F5FA; }
+.oc-btn-danger { -fx-background-color: rgba(220,38,38,0.08); -fx-text-fill: #DC2626; }
+.oc-btn-danger:hover { -fx-background-color: rgba(220,38,38,0.15); }
+
+.oc-table { -fx-background-color: white; -fx-border-color: #E0E0E8; }
+.oc-table .column-header { -fx-background-color: #F5F5FA; }
+.oc-table .column-header .label { -fx-text-fill: #5B5BDB; }
+.oc-table .table-row-cell { -fx-background-color: white; -fx-border-color: #F0F0F5; }
+.oc-table .table-row-cell:hover { -fx-background-color: #FAFAFF; }
+.oc-table .table-row-cell:selected { -fx-background-color: rgba(91,91,219,0.08); }
+.oc-table .table-cell { -fx-text-fill: #1A1A2E; }
+
+.oc-ai-tools-panel { -fx-background-color: white; -fx-border-color: #E0E0E8; }
+.oc-ai-tools-title { -fx-text-fill: #5B5BDB; }
+.oc-ai-btn { -fx-background-color: #F5F5FA; -fx-text-fill: #1A1A2E; -fx-border-color: #E0E0E8; }
+.oc-ai-btn:hover { -fx-background-color: #ECECFA; -fx-border-color: #5B5BDB; }
+.oc-ai-status { -fx-text-fill: #D97706; }
+
+.oc-ai-chat-panel { -fx-background-color: #FAFAFF; -fx-border-color: #E0E0E8; }
+.oc-chat-user { -fx-background-color: #5B5BDB; -fx-text-fill: white; }
+.oc-chat-ai { -fx-background-color: white; -fx-text-fill: #1A1A2E; -fx-border-color: #E0E0E8; }
+.oc-chat-system { -fx-background-color: rgba(91,91,219,0.06); -fx-text-fill: #5B5BDB; }
+.oc-ai-input { -fx-background-color: white; -fx-text-fill: #1A1A2E; -fx-prompt-text-fill: #A0A0B0; -fx-border-color: #D0D0DC; }
+
+/* AI Assistant — Light Theme */
+.sidebar-ai-btn { -fx-border-color: rgba(91,91,219,0.2); }
+.sidebar-ai-btn:hover { -fx-background-color: rgba(91,91,219,0.08); -fx-border-color: #5B5BDB; }
+.ai-chat-scroll { -fx-background: #FAFAFF; }
+.ai-chat-scroll .scroll-bar:vertical .thumb { -fx-background-color: #C0C0CC; }
+.hr-insight-area { -fx-background-color: white; -fx-text-fill: #1A1A2E; -fx-border-color: #D0D0DC; -fx-control-inner-background: white; }
+.tr-ai-result { -fx-background-color: white; -fx-text-fill: #1A1A2E; -fx-border-color: #D0D0DC; -fx-control-inner-background: white; }
+.pm-ai-result { -fx-background-color: white; -fx-text-fill: #1A1A2E; -fx-border-color: #D0D0DC; -fx-control-inner-background: white; }

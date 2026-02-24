@@ -35,6 +35,10 @@
                 <Button fx:id="btnAttachPostImage" text="📷 Image" onAction="#handleAttachPostImage"
                         styleClass="community-react-btn" style="-fx-font-size: 12;"/>
                 <Label fx:id="imageAttachLabel" text="" styleClass="community-time-label" managed="false" visible="false"/>
+                <Button fx:id="btnAiImprove" text="✨ AI Improve" onAction="#handleAiImprove"
+                        styleClass="community-react-btn" style="-fx-font-size: 12;"/>
+                <Button fx:id="btnAiSentiment" text="🔍 Check Tone" onAction="#handleAiSentiment"
+                        styleClass="community-react-btn" style="-fx-font-size: 12;"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button text="Cancel" onAction="#handleCancelPost" styleClass="btn-secondary"/>
                 <Button fx:id="btnSubmitPost" text="Post" onAction="#handleSubmitPost" styleClass="btn-primary"/>

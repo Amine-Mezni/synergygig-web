@@ -55,7 +55,7 @@ public class WeatherPopup {
      */
     public void show(javafx.scene.Node ownerNode) {
         Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle(null);
+        dialog.setTitle("Weather");
         dialog.setHeaderText(null);
 
         // Build the popup content

@@ -23,6 +23,10 @@
         <Button fx:id="btnNotifications" text="🔔  Notifications"
                 onAction="#showNotifications"
                 styleClass="settings-nav-btn" maxWidth="1.7976931348623157E308"/>
+
+        <Button fx:id="btnApiKeys" text="🔑  API Keys"
+                onAction="#showApiKeys"
+                styleClass="settings-nav-btn" maxWidth="1.7976931348623157E308"/>
     </VBox>
 
     <!-- ═══ Right Content ═══ -->
@@ -150,6 +154,33 @@
                     </VBox>
                 </content>
             </ScrollPane>
+        </VBox>
+
+        <!-- ── API Keys Panel (Admin only) ── -->
+        <VBox fx:id="apiKeysPanel" spacing="14" visible="false" managed="false">
+
+            <Label text="API Key Management" styleClass="settings-panel-title"/>
+            <Separator styleClass="settings-separator"/>
+            <Label text="Update your AI provider keys. Changes are saved to config.properties and take effect immediately."
+                   styleClass="settings-api-desc" wrapText="true"/>
+
+            <ScrollPane fitToWidth="true" styleClass="settings-sound-scroll"
+                        hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+                <content>
+                    <VBox fx:id="apiFieldsContainer" spacing="14">
+                        <padding><Insets top="4" right="4" bottom="4" left="0"/></padding>
+                    </VBox>
+                </content>
+            </ScrollPane>
+
+            <!-- Save button + status -->
+            <Separator styleClass="settings-separator"/>
+            <HBox spacing="12" alignment="CENTER_LEFT">
+                <Button fx:id="btnSaveApiKeys" text="💾  Save Keys"
+                        onAction="#handleSaveApiKeys"
+                        styleClass="settings-btn,settings-api-save-btn"/>
+                <Label fx:id="lblApiKeyStatus" text="" styleClass="settings-api-status"/>
+            </HBox>
         </VBox>
 
     </StackPane>

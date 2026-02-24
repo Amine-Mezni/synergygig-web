@@ -31,6 +31,7 @@ import services.ServiceUser;
 import utils.EmailService;
 import utils.FaceRecognitionUtil;
 import utils.SessionManager;
+import utils.CreepyButton;
 import utils.SparkleCanvas;
 import utils.SpotlightBorder;
 import utils.ThemeSwipeHelper;
@@ -44,10 +45,15 @@ public class LoginController {
 
     @FXML private TextField emailField;
     @FXML private PasswordField passwordField;
+    @FXML private TextField passwordVisible;
+    @FXML private Button eyeToggle;
     @FXML private StackPane rootStack;
     @FXML private StackPane cardGlow;
+    @FXML private Button signInBtn;
     @FXML private ImageView captchaImage;
     @FXML private TextField captchaField;
+
+    private boolean passwordShown = false;
 
     private final ServiceUser serviceUser = new ServiceUser();
     private SparkleCanvas sparkleCanvas;
@@ -62,6 +68,12 @@ public class LoginController {
 
         // Spotlight border on the form card
         SpotlightBorder.install(cardGlow);
+
+        // Sync password fields for eye toggle
+        passwordVisible.textProperty().bindBidirectional(passwordField.textProperty());
+
+        // Creepy Button — sign-in button follows cursor with magnetic lag
+        CreepyButton.install(signInBtn);
 
         // Swipe right → light theme, swipe left → dark theme
         ThemeSwipeHelper.install(rootStack);
@@ -80,6 +92,28 @@ public class LoginController {
                     utils.ResizeHelper.addResizeListener((Stage) newScene.getWindow());
             }
         });
+    }
+
+    @FXML
+    private void togglePasswordVisibility() {
+        passwordShown = !passwordShown;
+        if (passwordShown) {
+            passwordVisible.setVisible(true);
+            passwordVisible.setManaged(true);
+            passwordField.setVisible(false);
+            passwordField.setManaged(false);
+            eyeToggle.setText("\uD83D\uDE48");   // 🙈 hidden
+            passwordVisible.requestFocus();
+            passwordVisible.positionCaret(passwordVisible.getText().length());
+        } else {
+            passwordField.setVisible(true);
+            passwordField.setManaged(true);
+            passwordVisible.setVisible(false);
+            passwordVisible.setManaged(false);
+            eyeToggle.setText("\uD83D\uDC41");   // 👁 eye
+            passwordField.requestFocus();
+            passwordField.positionCaret(passwordField.getText().length());
+        }
     }
 
     @FXML

@@ -134,17 +134,6 @@
                                 </graphic>
                             </Button>
 
-                            <Button fx:id="btnHrAdmin" onAction="#showHrAdmin"
-                                    styleClass="sidebar-menu-btn" maxWidth="Infinity" alignment="CENTER_LEFT"
-                                    managed="false" visible="false">
-                                <graphic>
-                                    <HBox spacing="10" alignment="CENTER_LEFT">
-                                        <Label text="◈" styleClass="sidebar-menu-icon" minWidth="20" alignment="CENTER"/>
-                                        <Label text="HR Admin" styleClass="sidebar-menu-text"/>
-                                    </HBox>
-                                </graphic>
-                            </Button>
-
                             <Button fx:id="btnProjects" onAction="#showProjects"
                                     styleClass="sidebar-menu-btn" maxWidth="Infinity" alignment="CENTER_LEFT"
                                     managed="false" visible="false">
@@ -156,7 +145,18 @@
                                 </graphic>
                             </Button>
 
-                            <Button fx:id="btnTraining" onAction="#showPlaceholder"
+                            <Button fx:id="btnOffers" onAction="#showOffers"
+                                    styleClass="sidebar-menu-btn" maxWidth="Infinity" alignment="CENTER_LEFT"
+                                    managed="false" visible="false">
+                                <graphic>
+                                    <HBox spacing="10" alignment="CENTER_LEFT">
+                                        <Label text="📋" styleClass="sidebar-menu-icon" minWidth="20" alignment="CENTER"/>
+                                        <Label text="Offers" styleClass="sidebar-menu-text"/>
+                                    </HBox>
+                                </graphic>
+                            </Button>
+
+                            <Button fx:id="btnTraining" onAction="#showTraining"
                                     styleClass="sidebar-menu-btn" maxWidth="Infinity" alignment="CENTER_LEFT">
                                 <graphic>
                                     <HBox spacing="10" alignment="CENTER_LEFT">
@@ -172,6 +172,22 @@
                                     <HBox spacing="10" alignment="CENTER_LEFT">
                                         <Label text="🌐" styleClass="sidebar-menu-icon" minWidth="20" alignment="CENTER"/>
                                         <Label text="Community" styleClass="sidebar-menu-text"/>
+                                    </HBox>
+                                </graphic>
+                            </Button>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ─── Group: AI ─── -->
+                    <VBox styleClass="sidebar-group" spacing="2">
+                        <Label text="AI" styleClass="sidebar-group-label"/>
+                        <VBox spacing="1">
+                            <Button fx:id="btnAiAssistant" onAction="#showAiAssistant"
+                                    styleClass="sidebar-menu-btn,sidebar-ai-btn" maxWidth="Infinity" alignment="CENTER_LEFT">
+                                <graphic>
+                                    <HBox spacing="10" alignment="CENTER_LEFT">
+                                        <Label text="🤖" styleClass="sidebar-menu-icon" minWidth="20" alignment="CENTER"/>
+                                        <Label text="AI Assistant" styleClass="sidebar-menu-text"/>
                                     </HBox>
                                 </graphic>
                             </Button>
