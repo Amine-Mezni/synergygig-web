@@ -7,25 +7,97 @@
     <div class="container text-center">
         <span class="offers-badge">SynergyGig Marketplace</span>
         <h1>Offres disponibles</h1>
-        <p>Découvrez les gigs publiés par nos clients et trouvez votre prochaine mission.</p>
+        <p>Découvrez les gigs publiés par nos clients et trouvez votre prochaine mission avec une expérience moderne, claire et intelligente.</p>
     </div>
 </section>
 
 <section class="offers-list-section">
     <div class="container">
+
+        <div class="offers-toolbar-card mb-5">
+            <div class="row align-items-center g-4">
+                <div class="col-lg-8">
+                    <form method="get" action="{{ path('app_front_offers') }}" class="offers-filter-form">
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                <input
+                                    type="text"
+                                    name="q"
+                                    class="form-control offers-filter-input"
+                                    placeholder="Rechercher une offre, une mission, une compétence..."
+                                    value="{{ currentSearch|default('') }}"
+                                >
+                            </div>
+
+                            <div class="col-md-3">
+                                <select name="type" class="form-select offers-filter-input">
+                                    <option value="">Tous les types</option>
+                                    <option value="GIG" {{ currentType is defined and currentType == 'GIG' ? 'selected' : '' }}>Gig</option>
+                                    <option value="INTERNAL" {{ currentType is defined and currentType == 'INTERNAL' ? 'selected' : '' }}>Internal</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <select name="sort" class="form-select offers-filter-input">
+                                    <option value="recent" {{ currentSort is defined and currentSort == 'recent' ? 'selected' : '' }}>Plus récentes</option>
+                                    <option value="oldest" {{ currentSort is defined and currentSort == 'oldest' ? 'selected' : '' }}>Plus anciennes</option>
+                                    <option value="budget_asc" {{ currentSort is defined and currentSort == 'budget_asc' ? 'selected' : '' }}>Budget croissant</option>
+                                    <option value="budget_desc" {{ currentSort is defined and currentSort == 'budget_desc' ? 'selected' : '' }}>Budget décroissant</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="offers-filter-actions mt-3">
+                            <button type="submit" class="offers-filter-btn">
+                                <i class="bi bi-search me-2"></i>
+                                Rechercher
+                            </button>
+
+                            <a href="{{ path('app_front_offers') }}" class="offers-reset-btn">
+                                Réinitialiser
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="offers-results-box">
+                        <span class="offers-results-label">Résultats trouvés</span>
+                        <strong>{{ offersCount|default(offers|length) }}</strong>
+                        <p class="mb-0">Offres publiées correspondant à vos critères actuels.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="offers-top-tags mb-4">
+            <span class="top-tag">Web Development</span>
+            <span class="top-tag">Frontend Development</span>
+            <span class="top-tag">Backend Development</span>
+            <span class="top-tag">UI/UX Design</span>
+            <span class="top-tag">Graphic Design</span>
+            <span class="top-tag">SEO / Analytics</span>
+        </div>
+
         <div class="row gy-4">
             {% for offer in offers %}
                 <div class="col-lg-4 col-md-6">
                     <article class="offer-card h-100 d-flex flex-column">
                         <div class="offer-card-image">
-                        {% if loop.index <= 2 %}
-    <div class="offer-featured-badge">Featured</div>
-{% endif %}
+                            {% if loop.index <= 2 %}
+                                <div class="offer-featured-badge">Featured</div>
+                            {% endif %}
+
+                            {% if offer.id in appliedOfferIds %}
+                                <div class="offer-applied-badge">Déjà postulé</div>
+                            {% endif %}
+
                             {% if offer.imageUrl %}
                                 <img src="{{ asset('uploads/offers/' ~ offer.imageUrl) }}" alt="{{ offer.title }}">
                             {% else %}
                                 <img src="{{ asset('front/img/blog/blog-1.jpg') }}" alt="{{ offer.title }}">
                             {% endif %}
+
                             <div class="offer-type-badge">{{ offer.type }}</div>
                         </div>
 
@@ -37,15 +109,21 @@
 
                             <h3 class="offer-card-title">{{ offer.title }}</h3>
 
+                            <div class="offer-mini-badges">
+                                <span class="offer-mini-badge badge-skill">Web / Digital</span>
+                                <span class="offer-mini-badge badge-ai">AI Scored</span>
+                            </div>
+
                             <p class="offer-card-description">
                                 {{ offer.description|length > 140 ? offer.description|slice(0, 140) ~ '...' : offer.description }}
                             </p>
-<div class="mt-auto pt-3">
-    <a href="{{ path('app_front_offer_show', {'id': offer.id}) }}" class="offer-apply-btn">
-        <span>Voir l’offre</span>
-        <i class="bi bi-arrow-right"></i>
-    </a>
-</div>
+
+                            <div class="offer-card-footer mt-auto pt-3">
+                                <a href="{{ path('app_front_offer_show', {'id': offer.id}) }}" class="offer-apply-btn">
+                                    <span>Voir l’offre</span>
+                                    <i class="bi bi-arrow-right"></i>
+                                </a>
+                            </div>
                         </div>
                     </article>
                 </div>
@@ -53,7 +131,10 @@
                 <div class="col-12">
                     <div class="offers-empty text-center">
                         <h3>Aucune offre publiée pour le moment</h3>
-                        <p>Revenez bientôt pour découvrir les nouvelles opportunités.</p>
+                        <p>Aucun résultat ne correspond à vos critères. Essayez avec une autre recherche ou un autre filtre.</p>
+                        <a href="{{ path('app_front_offers') }}" class="offers-reset-btn mt-3 d-inline-flex">
+                            Réinitialiser les filtres
+                        </a>
                     </div>
                 </div>
             {% endfor %}
@@ -65,7 +146,7 @@
 {% block stylesheets %}
 {{ parent() }}
 <style>
-   .offers-hero {
+.offers-hero {
     padding: 150px 0 70px;
     background:
         radial-gradient(circle at top left, rgba(255, 0, 76, 0.15), transparent 28%),
@@ -94,13 +175,134 @@
 
 .offers-hero p {
     color: rgba(255, 255, 255, 0.75);
-    max-width: 700px;
+    max-width: 760px;
     margin: 0 auto;
 }
 
 .offers-list-section {
     padding: 70px 0 90px;
     background: linear-gradient(180deg, #09090d 0%, #0d0d12 100%);
+}
+
+.offers-toolbar-card {
+    padding: 26px;
+    border-radius: 26px;
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+}
+
+.offers-filter-form {
+    width: 100%;
+}
+
+.offers-filter-input {
+    background: linear-gradient(145deg, rgba(20,20,28,0.96), rgba(12,12,18,0.96)) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    color: #fff !important;
+    border-radius: 16px !important;
+    min-height: 54px;
+    box-shadow: none !important;
+}
+
+.offers-filter-input::placeholder {
+    color: rgba(255,255,255,0.45);
+}
+
+.offers-filter-input:focus {
+    border-color: rgba(255, 0, 76, 0.60) !important;
+    box-shadow: 0 0 0 0.2rem rgba(255, 0, 76, 0.12) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.form-select option,
+select option {
+    background: #ffffff;
+    color: #111111;
+}
+
+.offers-filter-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.offers-filter-btn,
+.offers-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 170px;
+    padding: 13px 22px;
+    border-radius: 14px;
+    text-decoration: none;
+    font-weight: 700;
+    border: none;
+    transition: all 0.25s ease;
+}
+
+.offers-filter-btn {
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(255, 0, 76, 0.22);
+}
+
+.offers-filter-btn:hover,
+.offers-reset-btn:hover {
+    transform: translateY(-2px);
+    color: #fff;
+}
+
+.offers-reset-btn {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.10);
+}
+
+.offers-results-box {
+    height: 100%;
+    padding: 22px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.offers-results-label {
+    color: rgba(255,255,255,0.64);
+    margin-bottom: 8px;
+    font-size: 0.92rem;
+}
+
+.offers-results-box strong {
+    color: #fff;
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 8px;
+}
+
+.offers-results-box p {
+    color: rgba(255,255,255,0.72);
+    line-height: 1.7;
+}
+
+.offers-top-tags {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.top-tag {
+    padding: 9px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.78);
+    font-size: 0.84rem;
+    font-weight: 600;
 }
 
 .offer-card {
@@ -170,6 +372,20 @@
     font-weight: 700;
 }
 
+.offer-applied-badge {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 3;
+    background: rgba(25, 135, 84, 0.20);
+    color: #7ef0aa;
+    border: 1px solid rgba(25, 135, 84, 0.35);
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 .offer-type-badge {
     position: absolute;
     top: 16px;
@@ -206,7 +422,33 @@
     font-size: 1.35rem;
     font-weight: 700;
     line-height: 1.4;
+    margin-bottom: 12px;
+}
+
+.offer-mini-badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
     margin-bottom: 14px;
+}
+
+.offer-mini-badge {
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge-skill {
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.78);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.badge-ai {
+    background: rgba(139, 92, 246, 0.16);
+    color: #d7b8ff;
+    border: 1px solid rgba(139, 92, 246, 0.30);
 }
 
 .offer-card-description {
@@ -265,6 +507,10 @@
 
     .offer-card-image {
         height: 220px;
+    }
+
+    .offers-toolbar-card {
+        padding: 20px;
     }
 }
 </style>

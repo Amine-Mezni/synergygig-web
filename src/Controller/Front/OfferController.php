@@ -17,7 +17,7 @@ use App\Service\ApplicationMatchService;
 
 class OfferController extends AbstractController
 {
-    #[Route('/offers', name: 'app_front_offers')]
+  #[Route('/offers', name: 'app_front_offers')]
 public function index(
     OffersRepository $offersRepository,
     ApplicationsRepository $applicationsRepository,
