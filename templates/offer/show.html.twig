@@ -1,0 +1,804 @@
+{% extends 'front/base_front.html.twig' %}
+
+{% block title %}{{ offer.title }}{% endblock %}
+{% block body_class %}offer-detail-page{% endblock %}
+
+{% block body %}
+<section class="offer-detail-section">
+    <div class="container">
+
+        <div class="offer-detail-breadcrumb">
+            <a href="{{ path('app_front_offers') }}">Offres</a>
+            <span>/</span>
+            <span>{{ offer.title }}</span>
+        </div>
+
+        <div class="row g-5 align-items-start">
+            <div class="col-lg-7">
+                <div class="offer-detail-main-card">
+                    <div class="offer-detail-image-wrap">
+                        {% if offer.imageUrl %}
+                            <img src="{{ asset('uploads/offers/' ~ offer.imageUrl) }}" alt="{{ offer.title }}">
+                        {% else %}
+                            <img src="{{ asset('front/img/blog/blog-1.jpg') }}" alt="{{ offer.title }}">
+                        {% endif %}
+
+                        <div class="offer-detail-type">{{ offer.type }}</div>
+                    </div>
+
+                    <div class="offer-detail-content">
+                        <div class="offer-detail-meta">
+                            <span><i class="bi bi-patch-check-fill"></i> Offre publiée</span>
+                            <span><i class="bi bi-cash-stack"></i> {{ offer.amount ?? '---' }} $</span>
+                        </div>
+
+                        <h1>{{ offer.title }}</h1>
+
+                        <p class="offer-detail-description">
+                            {{ offer.description }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="offer-detail-side-card">
+                    <div class="offer-side-price-box">
+                        <span class="side-price-label">Budget</span>
+                        <div class="side-price-value">{{ offer.amount ?? '---' }} $</div>
+                    </div>
+
+                    <ul class="offer-side-list">
+                        <li><i class="bi bi-check-circle-fill"></i> Offre validée par l’administration</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Détail complet de la mission</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Expérience premium SynergyGig</li>
+                    </ul>
+
+                    {% if existingApplication %}
+                        <div class="front-application-status-box">
+                            <span class="front-status-label">Statut de votre candidature</span>
+
+                            {% if existingApplication.status == 'PENDING' %}
+                                <div class="front-status-badge pending">En attente</div>
+                                <p class="front-status-text">
+                                    Votre candidature a bien été envoyée. Elle est en cours d’examen par l’administration.
+                                </p>
+                            {% elseif existingApplication.status == 'ACCEPTED' %}
+                                <div class="front-status-badge accepted">Acceptée</div>
+                                <p class="front-status-text">
+                                    Félicitations, votre candidature a été acceptée par l’administration.
+                                </p>
+                            {% elseif existingApplication.status == 'REJECTED' %}
+                                <div class="front-status-badge rejected">Refusée</div>
+                                <p class="front-status-text">
+                                    Cette candidature n’a pas été retenue. Vous pouvez consulter d’autres opportunités.
+                                </p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    <div class="offer-ai-panel">
+<div class="offer-ai-header">
+    <span class="offer-ai-badge pulse">AI Insight</span>
+
+    <div class="offer-ai-score-box">
+        <div class="offer-ai-score-circle"
+     style="background: conic-gradient(#ff003c {{ aiInsight.score }}%, rgba(255,255,255,0.08) 0);">
+    <span>{{ aiInsight.score }}%</span>
+</div>
+
+        <div class="offer-ai-label
+            {% if aiInsight.score >= 70 %}good
+            {% elseif aiInsight.score >= 50 %}medium
+            {% else %}low{% endif %}
+        ">
+            {% if aiInsight.score >= 85 %}
+                Très favorable
+            {% elseif aiInsight.score >= 70 %}
+                Bon match
+            {% elseif aiInsight.score >= 50 %}
+                Moyen
+            {% else %}
+                Faible compatibilité
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+    <div class="offer-ai-confidence">
+    <div class="offer-ai-bar">
+        <div class="offer-ai-fill" style="width: {{ aiInsight.score }}%"></div>
+    </div>
+</div>
+    <div class="offer-ai-grid">
+        <div class="offer-ai-item">
+            <span>Catégorie</span>
+            <strong>{{ aiInsight.category }}</strong>
+        </div>
+        <div class="offer-ai-item">
+            <span>Niveau</span>
+            <strong>{{ aiInsight.experience_level }}</strong>
+        </div>
+        <div class="offer-ai-item">
+            <span>Urgence</span>
+            <strong>{{ aiInsight.urgency }}</strong>
+        </div>
+        <div class="offer-ai-item">
+            <span>Risque</span>
+            <strong>{{ aiInsight.risk }}</strong>
+        </div>
+    </div>
+
+    {% if aiInsight.strengths is not empty %}
+        <div class="offer-ai-list-block">
+            <h4>Points forts détectés</h4>
+            <ul>
+                {% for item in aiInsight.strengths %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+{% if aiInsight.warnings is not empty %}
+    <div class="offer-ai-list-block warning">
+        <h4>Points à clarifier</h4>
+        <ul>
+            {% for item in aiInsight.warnings %}
+                <li>{{ item }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+</div>
+
+{% if matchData %}
+    <div class="offer-match-panel">
+        <div class="offer-match-header">
+            <span class="offer-match-badge">AI Match</span>
+            <div class="offer-match-score">{{ matchData.score }}%</div>
+        </div>
+
+        <p class="offer-match-summary">
+            {{ matchData.summary }}
+        </p>
+
+        <div class="offer-match-label
+            {% if matchData.score >= 70 %}good
+            {% elseif matchData.score >= 50 %}medium
+            {% else %}low{% endif %}
+        ">
+            {{ matchData.label }}
+        </div>
+
+        <div class="offer-match-bar">
+            <div class="offer-match-fill" style="width: {{ matchData.score }}%"></div>
+        </div>
+
+        {% if matchData.matched_skills is not empty %}
+            <div class="offer-match-list">
+                <h4>Compétences correspondantes</h4>
+                <div class="offer-skill-tags">
+                    {% for item in matchData.matched_skills %}
+                        <span class="offer-skill-tag matched">
+                            {{ item.name }} — {{ item.level }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if matchData.missing_skills is not empty %}
+            <div class="offer-match-list">
+                <h4>Compétences à renforcer</h4>
+                <div class="offer-skill-tags">
+                    {% for item in matchData.missing_skills %}
+                        <span class="offer-skill-tag missing">
+                            {{ item }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
+<div class="offer-side-actions">
+                        {% if alreadyApplied %}
+                            <button class="detail-apply-btn applied-btn" disabled>
+                                Déjà postulé
+                            </button>
+                        {% else %}
+                            <a href="{{ path('app_front_offer_apply', {'id': offer.id}) }}" class="detail-apply-btn">
+                                Postuler maintenant
+                            </a>
+                        {% endif %}
+
+                        <a href="{{ path('app_front_offers') }}" class="detail-back-btn">
+                            Retour aux offres
+                        </a>
+                    </div>
+                </div>
+
+                <div class="offer-extra-box mt-4">
+                    <h3>À propos de cette opportunité</h3>
+                    <p>
+                        Cette offre a été publiée sur SynergyGig pour permettre une mise en relation claire,
+                        rapide et professionnelle. La postulation complète sera connectée au module utilisateur.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+.offer-detail-section {
+    padding: 150px 0 90px;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top left, rgba(255, 0, 76, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(255, 80, 80, 0.10), transparent 30%),
+        linear-gradient(135deg, #050505 0%, #0b0b12 50%, #16070d 100%);
+}
+
+.offer-detail-breadcrumb {
+    margin-bottom: 24px;
+    color: rgba(255,255,255,0.62);
+    font-size: 0.95rem;
+}
+
+.offer-detail-breadcrumb a {
+    color: #ff4d6d;
+    text-decoration: none;
+}
+
+.offer-detail-breadcrumb span {
+    margin: 0 6px;
+}
+
+.offer-detail-main-card,
+.offer-detail-side-card,
+.offer-extra-box {
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255, 0, 76, 0.10);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+}
+
+.offer-detail-image-wrap {
+    position: relative;
+    height: 420px;
+    overflow: hidden;
+}
+
+.offer-detail-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.offer-detail-image-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0.08));
+}
+
+.offer-detail-type {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 2;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.offer-detail-content {
+    padding: 30px;
+}
+
+.offer-detail-meta {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+    color: rgba(255,255,255,0.72);
+}
+
+.offer-detail-meta i {
+    color: #ff335c;
+    margin-right: 6px;
+}
+
+.offer-detail-content h1 {
+    color: #fff;
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 18px;
+}
+
+.offer-detail-description {
+    color: rgba(255,255,255,0.80);
+    line-height: 1.9;
+    font-size: 1rem;
+    margin-bottom: 0;
+}
+
+.offer-detail-side-card {
+    padding: 28px;
+    position: sticky;
+    top: 120px;
+}
+
+.offer-side-price-box {
+    padding: 22px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 24px;
+}
+
+.side-price-label {
+    display: block;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 8px;
+}
+
+.side-price-value {
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.offer-side-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 28px 0;
+}
+
+.offer-side-list li {
+    color: rgba(255,255,255,0.82);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.offer-side-list i {
+    color: #ff3b5c;
+}
+
+.front-application-status-box {
+    padding: 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 24px;
+}
+
+.front-status-label {
+    display: block;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+.front-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+
+.front-status-badge.pending {
+    background: rgba(255, 193, 7, 0.16);
+    color: #ffd45c;
+    border: 1px solid rgba(255, 193, 7, 0.30);
+}
+
+.front-status-badge.accepted {
+    background: rgba(25, 135, 84, 0.18);
+    color: #59d98e;
+    border: 1px solid rgba(25, 135, 84, 0.30);
+}
+
+.front-status-badge.rejected {
+    background: rgba(220, 53, 69, 0.18);
+    color: #ff6f7d;
+    border: 1px solid rgba(220, 53, 69, 0.30);
+}
+
+.front-status-text {
+    color: rgba(255,255,255,0.76);
+    line-height: 1.8;
+    margin-bottom: 0;
+}
+
+.offer-side-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.detail-apply-btn,
+.detail-back-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px 22px;
+    border-radius: 16px;
+    text-decoration: none;
+    font-weight: 700;
+    transition: all 0.25s ease;
+}
+
+.detail-apply-btn {
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    box-shadow: 0 10px 25px rgba(255, 0, 76, 0.25);
+}
+
+.detail-apply-btn:hover {
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.detail-back-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #fff;
+}
+
+.detail-back-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.10);
+}
+
+.offer-extra-box {
+    padding: 24px;
+}
+
+.offer-extra-box h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 14px;
+}
+
+.offer-extra-box p {
+    color: rgba(255,255,255,0.75);
+    line-height: 1.8;
+    margin-bottom: 0;
+}
+
+.applied-btn {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.6) !important;
+    cursor: not-allowed;
+    box-shadow: none !important;
+}
+
+@media (max-width: 991px) {
+    .offer-detail-image-wrap {
+        height: 320px;
+    }
+
+    .offer-detail-side-card {
+        position: static;
+    }
+}
+
+@media (max-width: 768px) {
+    .offer-detail-section {
+        padding: 130px 0 70px;
+    }
+
+    .offer-detail-content h1 {
+        font-size: 1.7rem;
+    }
+
+    .offer-detail-image-wrap {
+        height: 260px;
+    }
+}
+.offer-ai-panel {
+    padding: 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 24px;
+}
+
+.offer-ai-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.offer-ai-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+}
+
+.offer-ai-score {
+    color: #fff;
+    font-size: 1.3rem;
+    font-weight: 800;
+}
+
+.offer-ai-summary {
+    color: rgba(255,255,255,0.76);
+    line-height: 1.8;
+    margin-bottom: 16px;
+}
+
+.offer-ai-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.offer-ai-item {
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.offer-ai-item span {
+    display: block;
+    color: rgba(255,255,255,0.62);
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+
+.offer-ai-item strong {
+    color: #fff;
+    font-size: 0.96rem;
+    font-weight: 700;
+}
+
+.offer-ai-list-block {
+    margin-top: 14px;
+}
+
+.offer-ai-list-block h4 {
+    color: #fff;
+    font-size: 0.96rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.offer-ai-list-block ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.offer-ai-list-block li {
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 8px;
+    line-height: 1.7;
+}
+
+.offer-ai-list-block.warning h4 {
+    color: #ffd45c;
+}
+
+@media (max-width: 575px) {
+    .offer-ai-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.offer-ai-score-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.offer-ai-score-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.95rem;
+    box-shadow: 0 0 20px rgba(255,0,76,0.35);
+    position: relative;
+}
+
+.offer-ai-score-circle::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: #0b0b12;
+    border-radius: 50%;
+    z-index: 0;
+}
+
+.offer-ai-score-circle span {
+    position: relative;
+    z-index: 1;
+}
+.offer-ai-label {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.7);
+    font-weight: 600;
+}
+.pulse {
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255,0,76,0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255,0,76,0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255,0,76,0);
+    }
+}
+.offer-ai-confidence {
+    margin-bottom: 16px;
+}
+
+.offer-ai-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+}
+
+.offer-ai-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    border-radius: 999px;
+}
+.offer-ai-label.good {
+    color: #59d98e;
+}
+
+.offer-ai-label.medium {
+    color: #ffd45c;
+}
+
+.offer-ai-label.low {
+    color: #ff6f7d;
+}
+.offer-match-panel {
+    padding: 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 24px;
+}
+
+.offer-match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.offer-match-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    background: linear-gradient(90deg, #8b5cf6, #ec4899);
+    color: #fff;
+}
+
+.offer-match-score {
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.offer-match-summary {
+    color: rgba(255,255,255,0.76);
+    line-height: 1.8;
+    margin-bottom: 12px;
+}
+
+.offer-match-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.offer-match-label.good {
+    color: #59d98e;
+}
+
+.offer-match-label.medium {
+    color: #ffd45c;
+}
+
+.offer-match-label.low {
+    color: #ff6f7d;
+}
+
+.offer-match-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.offer-match-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6, #ec4899);
+    border-radius: 999px;
+}
+
+.offer-match-list h4 {
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.offer-skill-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.offer-skill-tag {
+    display: inline-flex;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.offer-skill-tag.matched {
+    background: rgba(25, 135, 84, 0.16);
+    color: #59d98e;
+    border: 1px solid rgba(25, 135, 84, 0.30);
+}
+
+.offer-skill-tag.missing {
+    background: rgba(220, 53, 69, 0.16);
+    color: #ff7d88;
+    border: 1px solid rgba(220, 53, 69, 0.30);
+}
+</style>
+{% endblock %}

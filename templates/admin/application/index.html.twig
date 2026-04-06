@@ -1,0 +1,98 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Candidatures{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid pt-4 px-4">
+    <div class="p-4 offers-panel">
+        <div class="offers-panel-logo-bg"></div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+            <h4 class="offers-title mb-0">Liste des candidatures</h4>
+
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ path('app_admin_applications') }}"
+                   class="btn-offer {{ currentStatus is empty ? 'btn-publish' : 'btn-edit' }}">
+                    Toutes
+                </a>
+
+                <a href="{{ path('app_admin_applications', {'status': 'PENDING'}) }}"
+                   class="btn-offer {{ currentStatus == 'PENDING' ? 'btn-publish' : 'btn-edit' }}">
+                    En attente
+                </a>
+
+                <a href="{{ path('app_admin_applications', {'status': 'ACCEPTED'}) }}"
+                   class="btn-offer {{ currentStatus == 'ACCEPTED' ? 'btn-publish' : 'btn-edit' }}">
+                    Acceptées
+                </a>
+
+                <a href="{{ path('app_admin_applications', {'status': 'REJECTED'}) }}"
+                   class="btn-offer {{ currentStatus == 'REJECTED' ? 'btn-publish' : 'btn-edit' }}">
+                    Refusées
+                </a>
+            </div>
+        </div>
+
+        <div class="table-responsive table-offers-wrap">
+            <table class="table table-offers text-start align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Offre</th>
+                        <th>Statut</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in applications %}
+                        <tr>
+                            <td>{{ app.id }}</td>
+
+                            <td>
+                                {{ app.offer_id ? app.offer_id.title : 'Offre introuvable' }}
+                            </td>
+
+                            <td>
+                                {% if app.status == 'ACCEPTED' %}
+                                    <span class="offer-status published">Acceptée</span>
+                                {% elseif app.status == 'REJECTED' %}
+                                    <span class="offer-status cancelled">Refusée</span>
+                                {% else %}
+                                    <span class="offer-status draft">En attente</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ app.applied_at ? app.applied_at|date('d/m/Y H:i') : '-' }}
+                            </td>
+
+                            <td>
+                                <div class="action-buttons">
+                                    {% if app.status == 'PENDING' %}
+                                        <a href="{{ path('app_admin_application_accept', {'id': app.id}) }}" class="btn-offer btn-publish">
+                                            Accepter
+                                        </a>
+
+                                        <a href="{{ path('app_admin_application_reject', {'id': app.id}) }}" class="btn-offer btn-cancel">
+                                            Refuser
+                                        </a>
+                                    {% elseif app.status == 'ACCEPTED' %}
+                                        <span class="btn-offer btn-publish btn-disabled">Acceptée</span>
+                                    {% elseif app.status == 'REJECTED' %}
+                                        <span class="btn-offer btn-cancel btn-disabled">Refusée</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">Aucune candidature trouvée.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

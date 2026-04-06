@@ -1,0 +1,501 @@
+{% extends 'front/base_front.html.twig' %}
+
+{% block title %}Mes candidatures{% endblock %}
+{% block body_class %}my-applications-page{% endblock %}
+
+{% block body %}
+<section class="my-applications-section">
+    <div class="container">
+        <div class="my-applications-header">
+            <div>
+                <h1>Mes candidatures</h1>
+                <p>
+                    {{ totalCount }} candidature(s) au total —
+                    {{ pendingCount }} en attente,
+                    {{ acceptedCount }} acceptée(s),
+                    {{ rejectedCount }} refusée(s)
+                </p>
+            </div>
+        </div>
+        <div class="row g-3 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="my-stat-card">
+            <span>Total</span>
+            <strong>{{ totalCount }}</strong>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="my-stat-card">
+            <span>En attente</span>
+            <strong>{{ pendingCount }}</strong>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="my-stat-card">
+            <span>Acceptées</span>
+            <strong>{{ acceptedCount }}</strong>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="my-stat-card">
+            <span>Refusées</span>
+            <strong>{{ rejectedCount }}</strong>
+        </div>
+    </div>
+</div>
+
+       <form method="get" action="{{ path('app_front_my_applications') }}" class="my-search-box">
+    <div class="row g-3 align-items-end">
+        <div class="col-lg-5">
+            <label class="my-field-label">Recherche</label>
+            <input
+                type="text"
+                name="q"
+                class="my-search-input"
+                placeholder="Titre, description, type..."
+                value="{{ currentKeyword }}"
+            >
+        </div>
+
+        <div class="col-lg-4">
+            <label class="my-field-label">Statut</label>
+            <select name="status" class="my-search-input">
+                <option value="">Tous les statuts</option>
+                <option value="PENDING" {{ currentStatus == 'PENDING' ? 'selected' : '' }}>En attente</option>
+                <option value="ACCEPTED" {{ currentStatus == 'ACCEPTED' ? 'selected' : '' }}>Acceptée</option>
+                <option value="REJECTED" {{ currentStatus == 'REJECTED' ? 'selected' : '' }}>Refusée</option>
+            </select>
+        </div>
+
+        <div class="col-lg-3">
+            <button type="submit" class="my-search-btn w-100">
+                Rechercher
+            </button>
+        </div>
+    </div>
+</form>
+
+        <div class="my-filter-tabs">
+            <a href="{{ path('app_front_my_applications') }}"
+               class="my-filter-tab {{ currentStatus is empty ? 'active' : '' }}">
+                Toutes ({{ totalCount }})
+            </a>
+
+            <a href="{{ path('app_front_my_applications', {'status': 'PENDING', 'q': currentKeyword}) }}"
+               class="my-filter-tab {{ currentStatus == 'PENDING' ? 'active' : '' }}">
+                En attente ({{ pendingCount }})
+            </a>
+
+            <a href="{{ path('app_front_my_applications', {'status': 'ACCEPTED', 'q': currentKeyword}) }}"
+               class="my-filter-tab {{ currentStatus == 'ACCEPTED' ? 'active' : '' }}">
+                Acceptées ({{ acceptedCount }})
+            </a>
+
+            <a href="{{ path('app_front_my_applications', {'status': 'REJECTED', 'q': currentKeyword}) }}"
+               class="my-filter-tab {{ currentStatus == 'REJECTED' ? 'active' : '' }}">
+                Refusées ({{ rejectedCount }})
+            </a>
+        </div>
+
+        <div class="row g-4">
+            {% for app in applications %}
+                <div class="col-lg-4 col-md-6">
+                    <div class="my-application-card">
+                        <div class="my-application-image">
+                            {% if app.offer_id.imageUrl %}
+                                <img src="{{ asset('uploads/offers/' ~ app.offer_id.imageUrl) }}" alt="{{ app.offer_id.title }}">
+                            {% else %}
+                                <img src="{{ asset('front/img/blog/blog-1.jpg') }}" alt="{{ app.offer_id.title }}">
+                            {% endif %}
+
+                            <div class="my-application-type">
+                                {{ app.offer_id.type }}
+                            </div>
+                        </div>
+
+                        <div class="my-application-body">
+                    <h3>{{ app.offer_id.title }}</h3>
+
+<div class="my-application-meta">
+    <span>
+        <i class="bi bi-briefcase-fill"></i>
+        {{ app.offer_id.type }}
+    </span>
+
+    <span>
+        <i class="bi bi-calendar"></i>
+        {{ app.applied_at|date('d/m/Y') }}
+    </span>
+
+    <span>
+        <i class="bi bi-cash-stack"></i>
+        {{ app.offer_id.amount ?? '---' }} $
+    </span>
+</div>
+
+{% if app.status == 'PENDING' %}
+    <div class="my-status-badge pending">En attente</div>
+{% elseif app.status == 'ACCEPTED' %}
+    <div class="my-status-badge accepted">Acceptée</div>
+{% elseif app.status == 'REJECTED' %}
+    <div class="my-status-badge rejected">Refusée</div>
+{% endif %}
+
+                            <a href="{{ path('app_front_offer_show', {'id': app.offer_id.id}) }}"
+                               class="my-application-btn">
+                                Voir l’offre
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="col-12">
+                    <div class="my-empty-box">
+                        <h3>Aucun résultat trouvé</h3>
+                        <p>Aucune candidature ne correspond aux filtres actuels.</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+.my-applications-section {
+    padding: 150px 0 90px;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top left, rgba(255, 0, 76, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(255, 80, 80, 0.10), transparent 30%),
+        linear-gradient(135deg, #050505 0%, #0b0b12 50%, #16070d 100%);
+}
+
+.my-applications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.my-applications-header h1 {
+    color: #fff;
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.my-applications-header p {
+    color: rgba(255,255,255,0.72);
+    margin-bottom: 0;
+}
+
+.my-search-box {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.my-search-input {
+    width: 100%;
+    min-height: 50px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    padding: 0 16px;
+    outline: none;
+}
+
+.my-search-input::placeholder {
+    color: rgba(255,255,255,0.50);
+}
+
+.my-search-btn {
+    min-height: 50px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    font-weight: 700;
+}
+
+.my-filter-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.my-filter-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    border-radius: 999px;
+    text-decoration: none;
+    color: rgba(255,255,255,0.80);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-weight: 600;
+    transition: 0.25s ease;
+}
+
+.my-filter-tab.active {
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    border-color: transparent;
+}
+
+.my-application-card {
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255, 0, 76, 0.10);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.my-application-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(255, 0, 76, 0.25);
+    box-shadow: 0 24px 55px rgba(0,0,0,0.38);
+}
+.my-application-image {
+    position: relative;
+    height: 240px;
+    overflow: hidden;
+}
+.my-application-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.42), rgba(0,0,0,0.08));
+}
+
+
+.my-application-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.my-application-type {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 2;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.my-application-body {
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.my-application-body h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.my-application-date {
+    color: rgba(255,255,255,0.72);
+    font-size: 0.95rem;
+}
+
+.my-status-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.82rem;
+}
+
+.my-status-badge.pending {
+    background: rgba(255, 193, 7, 0.16);
+    color: #ffd45c;
+    border: 1px solid rgba(255, 193, 7, 0.30);
+}
+
+.my-status-badge.accepted {
+    background: rgba(25, 135, 84, 0.18);
+    color: #59d98e;
+    border: 1px solid rgba(25, 135, 84, 0.30);
+}
+
+.my-status-badge.rejected {
+    background: rgba(220, 53, 69, 0.18);
+    color: #ff6f7d;
+    border: 1px solid rgba(220, 53, 69, 0.30);
+}
+
+.my-application-btn {
+    margin-top: auto;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 18px;
+    border-radius: 14px;
+    text-decoration: none;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    transition: 0.25s ease;
+}
+
+.my-application-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.10);
+}
+
+.my-empty-box {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 40px 20px;
+    text-align: center;
+    color: #fff;
+}
+
+@media (max-width: 991px) {
+    .my-applications-section {
+        padding: 130px 0 70px;
+    }
+}
+.my-search-input {
+    width: 100%;
+    min-height: 52px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: linear-gradient(145deg, rgba(20,20,28,0.96), rgba(12,12,18,0.96));
+    color: #ffffff;
+    padding: 0 16px;
+    outline: none;
+    transition: all 0.25s ease;
+}
+
+.my-search-input:focus {
+    border-color: rgba(255, 0, 76, 0.55);
+    box-shadow: 0 0 0 4px rgba(255, 0, 76, 0.12);
+}
+
+.my-search-input::placeholder {
+    color: rgba(255,255,255,0.48);
+}
+
+/* Très important pour le select */
+select.my-search-input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, #ffffff 50%),
+        linear-gradient(135deg, #ffffff 50%, transparent 50%);
+    background-position:
+        calc(100% - 22px) calc(50% - 3px),
+        calc(100% - 16px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 42px;
+}
+
+/* Couleurs des options */
+select.my-search-input option {
+    background: #16070d;
+    color: #ffffff;
+}
+
+/* Option au survol/selection selon navigateur */
+select.my-search-input option:checked,
+select.my-search-input option:hover {
+    background: #ff003c;
+    color: #ffffff;
+}
+.my-search-btn {
+    min-height: 52px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    box-shadow: 0 10px 24px rgba(255, 0, 76, 0.18);
+    transition: all 0.25s ease;
+}
+
+.my-search-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(255, 0, 76, 0.25);
+}
+.my-field-label {
+    display: block;
+    margin-bottom: 8px;
+    color: rgba(255,255,255,0.70);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+.my-stat-card {
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: 0 18px 45px rgba(0,0,0,0.25);
+    height: 100%;
+}
+
+.my-stat-card span {
+    display: block;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 8px;
+    font-size: 0.92rem;
+}
+
+.my-stat-card strong {
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.my-application-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    color: rgba(255,255,255,0.72);
+    font-size: 0.92rem;
+}
+
+.my-application-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.my-application-meta i {
+    color: #ff4d6d;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Gestion des offres{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid pt-4 px-4">
+    <div class="p-4 offers-panel">
+        <div class="offers-panel-logo-bg"></div>
+
+        <h4 class="offers-title">Liste des offres</h4>
+
+        <div class="table-responsive table-offers-wrap">
+            <table class="table table-offers text-start align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Titre</th>
+                        <th>Statut</th>
+                        <th>Budget</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for offer in offers %}
+                        <tr>
+                            <td>{{ offer.id }}</td>
+
+                            <td>
+                                <span class="offer-title-text">{{ offer.title }}</span>
+                            </td>
+
+                            <td>
+                                {% if offer.status == 'PUBLISHED' %}
+                                    <span class="offer-status published">Published</span>
+                                {% elseif offer.status == 'CANCELLED' %}
+                                    <span class="offer-status cancelled">Cancelled</span>
+                                {% elseif offer.status == 'DRAFT' %}
+                                    <span class="offer-status draft">Draft</span>
+                                {% elseif offer.status == 'IN_PROGRESS' %}
+                                    <span class="offer-status progress">In Progress</span>
+                                {% else %}
+                                    <span class="offer-status default">{{ offer.status }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <span class="offer-amount">
+                                    {{ offer.amount is not null ? offer.amount : '---' }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="action-buttons">
+                                    {% if offer.status != 'PUBLISHED' %}
+                                        <a href="{{ path('app_admin_offer_publish', {'id': offer.id}) }}" class="btn-offer btn-publish">
+                                            Publier
+                                        </a>
+                                    {% else %}
+                                        <span class="btn-offer btn-publish btn-disabled">Publié</span>
+                                    {% endif %}
+
+                                    <a href="{{ path('app_admin_offer_edit', {'id': offer.id}) }}" class="btn-offer btn-edit">
+                                        Modifier
+                                    </a>
+
+                                    {% if offer.status != 'CANCELLED' %}
+                                        <a href="{{ path('app_admin_offer_cancel', {'id': offer.id}) }}" class="btn-offer btn-cancel">
+                                            Cancel
+                                        </a>
+                                    {% else %}
+                                        <span class="btn-offer btn-cancel btn-disabled">Cancelled</span>
+                                    {% endif %}
+                                </div>
+
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">Aucune offre trouvée.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

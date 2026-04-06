@@ -1,0 +1,271 @@
+{% extends 'front/base_front.html.twig' %}
+
+{% block title %}Offres disponibles{% endblock %}
+
+{% block body %}
+<section class="offers-hero">
+    <div class="container text-center">
+        <span class="offers-badge">SynergyGig Marketplace</span>
+        <h1>Offres disponibles</h1>
+        <p>Découvrez les gigs publiés par nos clients et trouvez votre prochaine mission.</p>
+    </div>
+</section>
+
+<section class="offers-list-section">
+    <div class="container">
+        <div class="row gy-4">
+            {% for offer in offers %}
+                <div class="col-lg-4 col-md-6">
+                    <article class="offer-card h-100 d-flex flex-column">
+                        <div class="offer-card-image">
+                        {% if loop.index <= 2 %}
+    <div class="offer-featured-badge">Featured</div>
+{% endif %}
+                            {% if offer.imageUrl %}
+                                <img src="{{ asset('uploads/offers/' ~ offer.imageUrl) }}" alt="{{ offer.title }}">
+                            {% else %}
+                                <img src="{{ asset('front/img/blog/blog-1.jpg') }}" alt="{{ offer.title }}">
+                            {% endif %}
+                            <div class="offer-type-badge">{{ offer.type }}</div>
+                        </div>
+
+                        <div class="offer-card-body d-flex flex-column">
+                            <div class="offer-meta">
+                                <span><i class="bi bi-cash-stack"></i> {{ offer.amount ?? '---' }} $</span>
+                                <span><i class="bi bi-patch-check"></i> Publiée</span>
+                            </div>
+
+                            <h3 class="offer-card-title">{{ offer.title }}</h3>
+
+                            <p class="offer-card-description">
+                                {{ offer.description|length > 140 ? offer.description|slice(0, 140) ~ '...' : offer.description }}
+                            </p>
+<div class="mt-auto pt-3">
+    <a href="{{ path('app_front_offer_show', {'id': offer.id}) }}" class="offer-apply-btn">
+        <span>Voir l’offre</span>
+        <i class="bi bi-arrow-right"></i>
+    </a>
+</div>
+                        </div>
+                    </article>
+                </div>
+            {% else %}
+                <div class="col-12">
+                    <div class="offers-empty text-center">
+                        <h3>Aucune offre publiée pour le moment</h3>
+                        <p>Revenez bientôt pour découvrir les nouvelles opportunités.</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+   .offers-hero {
+    padding: 150px 0 70px;
+    background:
+        radial-gradient(circle at top left, rgba(255, 0, 76, 0.15), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(255, 50, 50, 0.12), transparent 30%),
+        linear-gradient(135deg, #050505 0%, #090910 45%, #18070d 100%);
+    text-align: center;
+}
+
+.offers-badge {
+    display: inline-block;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(255, 0, 76, 0.12);
+    border: 1px solid rgba(255, 0, 76, 0.28);
+    color: #ff4d6d;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+.offers-hero h1 {
+    color: #fff;
+    font-size: 2.8rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.offers-hero p {
+    color: rgba(255, 255, 255, 0.75);
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.offers-list-section {
+    padding: 70px 0 90px;
+    background: linear-gradient(180deg, #09090d 0%, #0d0d12 100%);
+}
+
+.offer-card {
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255, 0, 76, 0.10);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.35);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.offer-card:hover {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: 0 22px 50px rgba(0,0,0,0.42);
+}
+
+.offer-card-image {
+    position: relative;
+    height: 240px;
+    overflow: hidden;
+    background: #111;
+}
+
+.offer-card-image::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,0,76,0.08), rgba(0,0,0,0.15));
+    z-index: 1;
+    pointer-events: none;
+}
+
+.offer-card-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.08));
+    z-index: 2;
+    pointer-events: none;
+}
+
+.offer-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 0;
+    transition: transform 0.4s ease;
+}
+
+.offer-card:hover .offer-card-image img {
+    transform: scale(1.05);
+}
+
+.offer-featured-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 3;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.offer-type-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 3;
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.offer-card-body {
+    padding: 24px;
+}
+
+.offer-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    color: rgba(255,255,255,0.68);
+    font-size: 0.92rem;
+}
+
+.offer-meta i {
+    color: #ff335c;
+    margin-right: 6px;
+}
+
+.offer-card-title {
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 14px;
+}
+
+.offer-card-description {
+    color: rgba(255,255,255,0.72);
+    line-height: 1.7;
+    margin-bottom: 0;
+}
+
+.offer-apply-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 22px;
+    border-radius: 14px;
+    background: transparent;
+    border: 1px solid rgba(255, 0, 76, 0.30);
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 700;
+    transition: all 0.25s ease;
+}
+
+.offer-apply-btn i {
+    transition: transform 0.25s ease;
+}
+
+.offer-apply-btn:hover {
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(255, 0, 76, 0.22);
+}
+
+.offer-apply-btn:hover i {
+    transform: translateX(4px);
+}
+
+.offers-empty {
+    padding: 60px 30px;
+    border-radius: 24px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .offers-hero {
+        padding: 130px 0 55px;
+    }
+
+    .offers-hero h1 {
+        font-size: 2.1rem;
+    }
+
+    .offer-card-image {
+        height: 220px;
+    }
+}
+</style>
+{% endblock %}

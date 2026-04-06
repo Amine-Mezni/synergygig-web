@@ -1,0 +1,811 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Dashboard Admin{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid pt-4 px-4">
+
+    <div class="dashboard-hero-card mb-4">
+        <div class="dashboard-hero-glow"></div>
+
+        <div class="row align-items-center g-4">
+            <div class="col-lg-8">
+                <span class="dashboard-badge">SynergyGig Admin</span>
+                <h2 class="dashboard-hero-title">Pilotage intelligent de la plateforme</h2>
+                <p class="dashboard-hero-text mb-0">
+                    Gérez les offres, analysez les candidatures et prenez des décisions métier plus rapidement
+                    avec une vue d’ensemble moderne, claire et professionnelle.
+                </p>
+
+                <div class="dashboard-hero-actions mt-4">
+                    <a href="{{ path('app_admin_offers') }}" class="dashboard-quick-btn quick-primary">
+                        <i class="fa fa-briefcase me-2"></i> Gérer les offres
+                    </a>
+                    <a href="{{ path('app_admin_applications') }}" class="dashboard-quick-btn quick-secondary">
+                        <i class="fa fa-user-check me-2"></i> Voir les candidatures
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="dashboard-hero-mini-stats">
+                    <div class="mini-stat-box">
+                        <span>Total activité</span>
+                        <strong>{{ totalActivity }}</strong>
+                    </div>
+                    <div class="mini-stat-box">
+                        <span>Flux prioritaire</span>
+                        <strong>{{ pendingApplications }}</strong>
+                    </div>
+                    <div class="mini-stat-box">
+                        <span>Offres actives</span>
+                        <strong>{{ publishedOffers + inProgressOffers }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="dashboard-stat-card stat-red">
+                <div class="stat-top">
+                    <div class="stat-icon-wrap">
+                        <i class="fa fa-bullhorn"></i>
+                    </div>
+                    <span class="stat-chip">Publiées</span>
+                </div>
+                <h2>{{ publishedOffers }}</h2>
+                <p>Offres visibles côté front et disponibles à la consultation.</p>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="dashboard-stat-card stat-purple">
+                <div class="stat-top">
+                    <div class="stat-icon-wrap">
+                        <i class="fa fa-edit"></i>
+                    </div>
+                    <span class="stat-chip">Brouillons</span>
+                </div>
+                <h2>{{ draftOffers }}</h2>
+                <p>Offres enregistrées mais pas encore publiées sur la plateforme.</p>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="dashboard-stat-card stat-orange">
+                <div class="stat-top">
+                    <div class="stat-icon-wrap">
+                        <i class="fa fa-hourglass-half"></i>
+                    </div>
+                    <span class="stat-chip">En attente</span>
+                </div>
+                <h2>{{ pendingApplications }}</h2>
+                <p>Candidatures à analyser en priorité par l’administration.</p>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="dashboard-stat-card stat-green">
+                <div class="stat-top">
+                    <div class="stat-icon-wrap">
+                        <i class="fa fa-check-circle"></i>
+                    </div>
+                    <span class="stat-chip">Validées</span>
+                </div>
+                <h2>{{ acceptedApplications }}</h2>
+                <p>Candidatures retenues et validées dans le workflow métier.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Résumé métier</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="panel-content">
+                    <p>
+                        Le back-office SynergyGig centralise tout le cycle de vie métier :
+                        création d’offres, publication, suivi d’avancement, validation et gestion des candidatures.
+                    </p>
+
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span class="summary-label">Offres publiées</span>
+                            <strong>{{ publishedOffers }}</strong>
+                        </div>
+
+                        <div class="summary-item">
+                            <span class="summary-label">Brouillons</span>
+                            <strong>{{ draftOffers }}</strong>
+                        </div>
+
+                        <div class="summary-item">
+                            <span class="summary-label">En cours</span>
+                            <strong>{{ inProgressOffers }}</strong>
+                        </div>
+
+                        <div class="summary-item">
+                            <span class="summary-label">Complétées</span>
+                            <strong>{{ completedOffers }}</strong>
+                        </div>
+
+                        <div class="summary-item">
+                            <span class="summary-label">Annulées</span>
+                            <strong>{{ cancelledOffers }}</strong>
+                        </div>
+
+                        <div class="summary-item">
+                            <span class="summary-label">Refusées</span>
+                            <strong>{{ rejectedApplications }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Actions suggérées</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="panel-content">
+                    <ul class="dashboard-action-list">
+                        <li>
+                            <i class="fa fa-angle-right"></i>
+                            Vérifier les candidatures en attente pour accélérer la prise de décision.
+                        </li>
+                        <li>
+                            <i class="fa fa-angle-right"></i>
+                            Publier les brouillons prêts à être visibles sur le front-office.
+                        </li>
+                        <li>
+                            <i class="fa fa-angle-right"></i>
+                            Revoir les offres annulées ou complétées pour garder une base propre.
+                        </li>
+                    </ul>
+
+                    <div class="dashboard-cta-box">
+                        <span>Conseil métier</span>
+                        <p class="mb-0">
+                            Une bonne cadence de traitement améliore l’expérience plateforme et la lisibilité opérationnelle.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Dernières offres</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="activity-list">
+                    {% for offer in recentOffers %}
+                        <div class="activity-item">
+                            <div class="activity-icon">
+                                <i class="fa fa-briefcase"></i>
+                            </div>
+                            <div class="activity-content">
+                                <strong>{{ offer.title }}</strong>
+                                <span>
+                                    {{ offer.status }} •
+                                    {{ offer.createdAt ? offer.createdAt|date('d/m/Y H:i') : '-' }}
+                                </span>
+                            </div>
+                            <div class="activity-value">
+                                {{ offer.amount is not null ? offer.amount ~ ' $' : '---' }}
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="empty-state-text mb-0">Aucune offre récente disponible.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Dernières candidatures</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="activity-list">
+                    {% for app in recentApplications %}
+                        <div class="activity-item">
+                            <div class="activity-icon">
+                                <i class="fa fa-user-check"></i>
+                            </div>
+                            <div class="activity-content">
+                                <strong>{{ app.offer_id ? app.offer_id.title : 'Offre introuvable' }}</strong>
+                                <span>
+                                    {{ app.status }} •
+                                    {{ app.applied_at ? app.applied_at|date('d/m/Y H:i') : '-' }}
+                                </span>
+                            </div>
+                            <div class="activity-status
+                                {% if app.status == 'ACCEPTED' %}accepted
+                                {% elseif app.status == 'REJECTED' %}rejected
+                                {% else %}pending{% endif %}
+                            ">
+                                {{ app.status }}
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="empty-state-text mb-0">Aucune candidature récente disponible.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Flux offres</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="ratio-list">
+                    <div class="ratio-item">
+                        <span>Publiées</span>
+                        <strong>{{ publishedOffers }}</strong>
+                    </div>
+                    <div class="ratio-bar"><div class="ratio-fill red" style="width: {{ totalOffersActivity > 0 ? (publishedOffers / totalOffersActivity * 100) : 0 }}%"></div></div>
+
+                    <div class="ratio-item">
+                        <span>Brouillons</span>
+                        <strong>{{ draftOffers }}</strong>
+                    </div>
+                    <div class="ratio-bar"><div class="ratio-fill purple" style="width: {{ totalOffersActivity > 0 ? (draftOffers / totalOffersActivity * 100) : 0 }}%"></div></div>
+
+                    <div class="ratio-item">
+                        <span>En cours</span>
+                        <strong>{{ inProgressOffers }}</strong>
+                    </div>
+                    <div class="ratio-bar"><div class="ratio-fill blue" style="width: {{ totalOffersActivity > 0 ? (inProgressOffers / totalOffersActivity * 100) : 0 }}%"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Flux candidatures</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="ratio-list">
+                    <div class="ratio-item">
+                        <span>En attente</span>
+                        <strong>{{ pendingApplications }}</strong>
+                    </div>
+                    <div class="ratio-bar"><div class="ratio-fill orange" style="width: {{ totalApplicationsActivity > 0 ? (pendingApplications / totalApplicationsActivity * 100) : 0 }}%"></div></div>
+
+                    <div class="ratio-item">
+                        <span>Acceptées</span>
+                        <strong>{{ acceptedApplications }}</strong>
+                    </div>
+                    <div class="ratio-bar"><div class="ratio-fill green" style="width: {{ totalApplicationsActivity > 0 ? (acceptedApplications / totalApplicationsActivity * 100) : 0 }}%"></div></div>
+
+                    <div class="ratio-item">
+                        <span>Refusées</span>
+                        <strong>{{ rejectedApplications }}</strong>
+                    </div>
+                    <div class="ratio-bar"><div class="ratio-fill pink" style="width: {{ totalApplicationsActivity > 0 ? (rejectedApplications / totalApplicationsActivity * 100) : 0 }}%"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="dashboard-panel-card h-100">
+                <div class="panel-header">
+                    <h4>Raccourcis admin</h4>
+                    <span class="panel-dot"></span>
+                </div>
+
+                <div class="quick-links-grid">
+                    <a href="{{ path('app_admin_offers') }}" class="quick-link-card">
+                        <i class="fa fa-briefcase"></i>
+                        <span>Offres</span>
+                    </a>
+
+                    <a href="{{ path('app_admin_applications') }}" class="quick-link-card">
+                        <i class="fa fa-user-check"></i>
+                        <span>Candidatures</span>
+                    </a>
+
+                    <a href="{{ path('app_project_owner_offer_new') }}" class="quick-link-card">
+                        <i class="fa fa-plus-circle"></i>
+                        <span>Nouvelle offre</span>
+                    </a>
+
+                    <a href="{{ path('app_front_offers') }}" class="quick-link-card">
+                        <i class="fa fa-globe"></i>
+                        <span>Front-office</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<style>
+.dashboard-hero-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    padding: 34px;
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.24);
+    color: #fff;
+}
+
+.dashboard-hero-glow {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, rgba(255, 0, 76, 0.14), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(255, 80, 80, 0.10), transparent 34%);
+    pointer-events: none;
+}
+
+.dashboard-badge {
+    position: relative;
+    z-index: 2;
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(255, 0, 76, 0.12);
+    border: 1px solid rgba(255, 0, 76, 0.25);
+    color: #ff4d6d;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.dashboard-hero-title {
+    position: relative;
+    z-index: 2;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 14px;
+}
+
+.dashboard-hero-text {
+    position: relative;
+    z-index: 2;
+    color: rgba(255,255,255,0.76);
+    line-height: 1.8;
+    max-width: 760px;
+}
+
+.dashboard-hero-actions {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.dashboard-quick-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 180px;
+    padding: 13px 20px;
+    border-radius: 16px;
+    text-decoration: none;
+    font-weight: 700;
+    transition: all 0.25s ease;
+}
+
+.quick-primary {
+    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(255, 0, 76, 0.25);
+}
+
+.quick-primary:hover,
+.quick-secondary:hover {
+    transform: translateY(-2px);
+    color: #fff;
+}
+
+.quick-secondary {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: #fff;
+}
+
+.dashboard-hero-mini-stats {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    gap: 14px;
+}
+
+.mini-stat-box {
+    padding: 18px 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: center;
+}
+
+.mini-stat-box span {
+    display: block;
+    color: rgba(255,255,255,0.66);
+    font-size: 0.92rem;
+    margin-bottom: 6px;
+}
+
+.mini-stat-box strong {
+    color: #fff;
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+
+.dashboard-stat-card {
+    height: 100%;
+    padding: 24px;
+    border-radius: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    color: #fff;
+}
+
+.dashboard-stat-card:hover,
+.dashboard-panel-card:hover,
+.quick-link-card:hover {
+    transform: translateY(-4px);
+}
+
+.stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.stat-icon-wrap {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.stat-icon-wrap i {
+    font-size: 1.35rem;
+    color: #fff;
+}
+
+.stat-chip {
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.78);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.dashboard-stat-card h2 {
+    font-size: 2.3rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.dashboard-stat-card p {
+    color: rgba(255,255,255,0.72);
+    line-height: 1.7;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+.stat-red { border-left: 4px solid #ff003c; }
+.stat-purple { border-left: 4px solid #8b5cf6; }
+.stat-orange { border-left: 4px solid #ffc107; }
+.stat-green { border-left: 4px solid #198754; }
+
+.dashboard-panel-card {
+    padding: 26px;
+    border-radius: 24px;
+    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+    color: #fff;
+    transition: transform 0.25s ease;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.panel-header h4 {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0;
+}
+
+.panel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff003c;
+    box-shadow: 0 0 16px rgba(255, 0, 76, 0.6);
+}
+
+.panel-content p {
+    color: rgba(255,255,255,0.76);
+    line-height: 1.8;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.summary-item {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.summary-label {
+    display: block;
+    color: rgba(255,255,255,0.66);
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+}
+
+.summary-item strong {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.dashboard-action-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
+}
+
+.dashboard-action-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: rgba(255,255,255,0.78);
+    margin-bottom: 14px;
+    line-height: 1.7;
+}
+
+.dashboard-action-list i {
+    color: #ff4d6d;
+    margin-top: 3px;
+}
+
+.dashboard-cta-box {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(255, 0, 76, 0.08);
+    border: 1px solid rgba(255, 0, 76, 0.16);
+}
+
+.dashboard-cta-box span {
+    display: inline-block;
+    color: #ff4d6d;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.dashboard-cta-box p {
+    color: rgba(255,255,255,0.78);
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.activity-item {
+    display: grid;
+    grid-template-columns: 54px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.activity-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.activity-icon i {
+    color: #ff4d6d;
+    font-size: 1.15rem;
+}
+
+.activity-content strong {
+    display: block;
+    color: #fff;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.activity-content span {
+    color: rgba(255,255,255,0.66);
+    font-size: 0.88rem;
+}
+
+.activity-value {
+    color: #fff;
+    font-weight: 800;
+    font-size: 1rem;
+}
+
+.activity-status {
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.activity-status.pending {
+    background: rgba(255, 193, 7, 0.16);
+    color: #ffd45c;
+    border: 1px solid rgba(255, 193, 7, 0.30);
+}
+
+.activity-status.accepted {
+    background: rgba(25, 135, 84, 0.18);
+    color: #59d98e;
+    border: 1px solid rgba(25, 135, 84, 0.30);
+}
+
+.activity-status.rejected {
+    background: rgba(220, 53, 69, 0.18);
+    color: #ff6f7d;
+    border: 1px solid rgba(220, 53, 69, 0.30);
+}
+
+.ratio-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ratio-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: rgba(255,255,255,0.84);
+    font-weight: 600;
+}
+
+.ratio-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.ratio-fill {
+    height: 100%;
+    border-radius: 999px;
+}
+
+.ratio-fill.red { background: linear-gradient(90deg, #ff003c, #ff4d4d); }
+.ratio-fill.purple { background: linear-gradient(90deg, #8b5cf6, #c084fc); }
+.ratio-fill.blue { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.ratio-fill.orange { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.ratio-fill.green { background: linear-gradient(90deg, #10b981, #34d399); }
+.ratio-fill.pink { background: linear-gradient(90deg, #ec4899, #f472b6); }
+
+.quick-links-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.quick-link-card {
+    padding: 20px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    text-decoration: none;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+    transition: all 0.25s ease;
+}
+
+.quick-link-card i {
+    font-size: 1.3rem;
+    color: #ff4d6d;
+}
+
+.quick-link-card span {
+    font-weight: 700;
+    color: #fff;
+}
+
+.empty-state-text {
+    color: rgba(255,255,255,0.66);
+}
+
+@media (max-width: 991px) {
+    .activity-item {
+        grid-template-columns: 54px 1fr;
+    }
+
+    .activity-value,
+    .activity-status {
+        grid-column: 2;
+        justify-self: start;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero-card {
+        padding: 22px;
+        border-radius: 22px;
+    }
+
+    .dashboard-hero-title {
+        font-size: 1.7rem;
+    }
+
+    .summary-grid,
+    .quick-links-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Modifier l'offre{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid pt-4 px-4">
+    <div class="p-4 offers-panel offer-edit-panel">
+        <div class="offers-panel-logo-bg"></div>
+
+        <h4 class="offers-title">Modifier l'offre</h4>
+
+  
+
+        <div class="offer-form-wrapper">
+            {{ form_start(form, {'attr': {'enctype': 'multipart/form-data'}}) }}
+
+            {{ form_errors(form) }}
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="premium-field">
+                        {{ form_label(form.title) }}
+                        {{ form_widget(form.title, {'attr': {'class': 'form-control premium-input'}}) }}
+                        {{ form_errors(form.title) }}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="premium-field">
+                        {{ form_label(form.type) }}
+                        {{ form_widget(form.type, {'attr': {'class': 'form-select premium-input'}}) }}
+                        {{ form_errors(form.type) }}
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="premium-field">
+                        {{ form_label(form.description) }}
+                        {{ form_widget(form.description, {'attr': {'class': 'form-control premium-input premium-textarea', 'rows': 6}}) }}
+                        {{ form_errors(form.description) }}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="premium-field">
+                        {{ form_label(form.status) }}
+                        {{ form_widget(form.status, {'attr': {'class': 'form-select premium-input'}}) }}
+                        {{ form_errors(form.status) }}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="premium-field">
+                        {{ form_label(form.amount) }}
+                        {{ form_widget(form.amount, {'attr': {'class': 'form-control premium-input'}}) }}
+                        {{ form_errors(form.amount) }}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="premium-field">
+                        {{ form_label(form.imageFile) }}
+                        {{ form_widget(form.imageFile, {'attr': {'class': 'form-control premium-file-input'}}) }}
+                        {{ form_errors(form.imageFile) }}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="premium-field">
+                        <label class="form-label premium-label">Image actuelle</label>
+
+                        {% if offer.imageUrl %}
+                            <div class="current-offer-image-box">
+                                <img src="{{ asset('uploads/offers/' ~ offer.imageUrl) }}" alt="{{ offer.title }}">
+                            </div>
+                        {% else %}
+                            <div class="current-offer-image-box no-image">
+                                Aucune image actuelle
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-3 flex-wrap">
+                <button class="btn-offer btn-edit px-4">
+                    Enregistrer
+                </button>
+
+                <a href="{{ path('app_admin_offers') }}" class="btn-offer btn-cancel px-4">
+                    Retour
+                </a>
+            </div>
+
+            {{ form_end(form) }}
+        </div>
+    </div>
+</div>
+
+<style>
+
+
+.premium-field .form-label,
+.premium-label {
+    color: #fff;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.premium-input,
+.premium-textarea,
+.premium-file-input,
+.form-select {
+    background: linear-gradient(145deg, rgba(20,20,28,0.96), rgba(12,12,18,0.96)) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 0, 76, 0.22) !important;
+    border-radius: 16px !important;
+    min-height: 54px;
+    box-shadow: none !important;
+}
+
+.premium-textarea {
+    min-height: 180px;
+    padding-top: 14px;
+}
+
+.premium-input:focus,
+.premium-textarea:focus,
+.premium-file-input:focus,
+.form-select:focus {
+    border-color: rgba(255, 0, 76, 0.55) !important;
+    box-shadow: 0 0 0 4px rgba(255, 0, 76, 0.10) !important;
+}
+
+.form-select option,
+select option {
+    background: #ffffff;
+    color: #111111;
+}
+
+.current-offer-image-box {
+    min-height: 54px;
+    padding: 12px;
+    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(20,20,28,0.96), rgba(12,12,18,0.96));
+    border: 1px solid rgba(255, 0, 76, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.current-offer-image-box img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+.current-offer-image-box.no-image {
+    color: rgba(255,255,255,0.65);
+    font-weight: 600;
+}
+
+.invalid-feedback,
+.form-error-message,
+ul li {
+    color: #ff9aa8;
+}
+
+.btn-offer.btn-edit {
+    background: linear-gradient(90deg, #b3002d, #ff003c);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+}
+
+.btn-offer.btn-cancel {
+    background: linear-gradient(145deg, rgba(30,30,36,0.96), rgba(18,18,24,0.96));
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    font-weight: 700;
+}
+</style>
+{% endblock %}

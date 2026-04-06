@@ -1,0 +1,752 @@
+/********** Template CSS **********/
+:root {
+    --primary: #EB1616;
+    --secondary: #191C24;
+    --light: #6C7293;
+    --dark: #000000;
+}
+
+.back-to-top {
+    position: fixed;
+    display: none;
+    right: 45px;
+    bottom: 45px;
+    z-index: 99;
+}
+
+
+/*** Spinner ***/
+#spinner {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .5s ease-out, visibility 0s linear .5s;
+    z-index: 99999;
+}
+
+#spinner.show {
+    transition: opacity .5s ease-out, visibility 0s linear 0s;
+    visibility: visible;
+    opacity: 1;
+}
+
+
+/*** Button ***/
+.btn {
+    transition: .5s;
+}
+
+.btn-square {
+    width: 38px;
+    height: 38px;
+}
+
+.btn-sm-square {
+    width: 32px;
+    height: 32px;
+}
+
+.btn-lg-square {
+    width: 48px;
+    height: 48px;
+}
+
+.btn-square,
+.btn-sm-square,
+.btn-lg-square {
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: normal;
+    border-radius: 50px;
+}
+
+
+/*** Layout ***/
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 250px;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--secondary);
+    transition: 0.5s;
+    z-index: 999;
+}
+
+.content {
+    margin-left: 250px;
+    min-height: 100vh;
+    background: var(--dark);
+    transition: 0.5s;
+}
+
+@media (min-width: 992px) {
+    .sidebar {
+        margin-left: 0;
+    }
+
+    .sidebar.open {
+        margin-left: -250px;
+    }
+
+    .content {
+        width: calc(100% - 250px);
+    }
+
+    .content.open {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .sidebar {
+        margin-left: -250px;
+    }
+
+    .sidebar.open {
+        margin-left: 0;
+    }
+
+    .content {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+
+/*** Navbar ***/
+.sidebar .navbar .navbar-nav .nav-link {
+    padding: 7px 20px;
+    color: var(--light);
+    font-weight: 500;
+    border-left: 3px solid var(--secondary);
+    border-radius: 0 30px 30px 0;
+    outline: none;
+}
+
+.sidebar .navbar .navbar-nav .nav-link:hover,
+.sidebar .navbar .navbar-nav .nav-link.active {
+    color: var(--primary);
+    background: var(--dark);
+    border-color: var(--primary);
+}
+
+.sidebar .navbar .navbar-nav .nav-link i {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dark);
+    border-radius: 40px;
+}
+
+.sidebar .navbar .navbar-nav .nav-link:hover i,
+.sidebar .navbar .navbar-nav .nav-link.active i {
+    background: var(--secondary);
+}
+
+.sidebar .navbar .dropdown-toggle::after {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    border: none;
+    content: "\f107";
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    transition: .5s;
+}
+
+.sidebar .navbar .dropdown-toggle[aria-expanded=true]::after {
+    transform: rotate(-180deg);
+}
+
+.sidebar .navbar .dropdown-item {
+    padding-left: 25px;
+    border-radius: 0 30px 30px 0;
+    color: var(--light);
+}
+
+.sidebar .navbar .dropdown-item:hover,
+.sidebar .navbar .dropdown-item.active {
+    background: var(--dark);
+}
+
+.content .navbar .navbar-nav .nav-link {
+    margin-left: 25px;
+    padding: 12px 0;
+    color: var(--light);
+    outline: none;
+}
+
+.content .navbar .navbar-nav .nav-link:hover,
+.content .navbar .navbar-nav .nav-link.active {
+    color: var(--primary);
+}
+
+.content .navbar .sidebar-toggler,
+.content .navbar .navbar-nav .nav-link i {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dark);
+    border-radius: 40px;
+}
+
+.content .navbar .dropdown-item {
+    color: var(--light);
+}
+
+.content .navbar .dropdown-item:hover,
+.content .navbar .dropdown-item.active {
+    background: var(--dark);
+}
+
+.content .navbar .dropdown-toggle::after {
+    margin-left: 6px;
+    vertical-align: middle;
+    border: none;
+    content: "\f107";
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    transition: .5s;
+}
+
+.content .navbar .dropdown-toggle[aria-expanded=true]::after {
+    transform: rotate(-180deg);
+}
+
+@media (max-width: 575.98px) {
+    .content .navbar .navbar-nav .nav-link {
+        margin-left: 15px;
+    }
+}
+
+
+/*** Date Picker ***/
+.bootstrap-datetimepicker-widget.bottom {
+    top: auto !important;
+}
+
+.bootstrap-datetimepicker-widget .table * {
+    border-bottom-width: 0px;
+}
+
+.bootstrap-datetimepicker-widget .table th {
+    font-weight: 500;
+}
+
+.bootstrap-datetimepicker-widget.dropdown-menu {
+    padding: 10px;
+    border-radius: 2px;
+}
+
+.bootstrap-datetimepicker-widget table td.active,
+.bootstrap-datetimepicker-widget table td.active:hover {
+    background: var(--primary);
+}
+
+.bootstrap-datetimepicker-widget table td.today::before {
+    border-bottom-color: var(--primary);
+}
+
+
+/*** Testimonial ***/
+.progress .progress-bar {
+    width: 0px;
+    transition: 2s;
+}
+
+
+/*** Testimonial ***/
+.testimonial-carousel .owl-dots {
+    margin-top: 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.testimonial-carousel .owl-dot {
+    position: relative;
+    display: inline-block;
+    margin: 0 5px;
+    width: 15px;
+    height: 15px;
+    border: 5px solid var(--primary);
+    border-radius: 15px;
+    transition: .5s;
+}
+
+.testimonial-carousel .owl-dot.active {
+    background: var(--dark);
+    border-color: var(--primary);
+}
+.admin-logo {
+    height: 40px;
+    margin-right: 10px;
+}
+
+.navbar-brand h3 {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+/* =========================
+   EDIT OFFER - PREMIUM UI
+   ========================= */
+
+.offer-edit-panel {
+    min-height: 540px;
+}
+
+.offer-form-wrapper {
+    position: relative;
+    z-index: 2;
+}
+
+.premium-field label {
+    display: block;
+    color: #ffffff;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+}
+
+.premium-input {
+    width: 100%;
+    min-height: 52px;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #ffffff !important;
+    padding: 12px 16px !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+}
+
+.premium-input:focus {
+    border-color: rgba(255, 50, 80, 0.7) !important;
+    box-shadow: 0 0 0 0.22rem rgba(255, 0, 60, 0.16) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+}
+
+.premium-input::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.premium-textarea {
+    min-height: 170px !important;
+    resize: vertical;
+}
+
+select.premium-input,
+.form-select.premium-input {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+select.premium-input option,
+.form-select.premium-input option {
+    color: #111827;
+    background: #ffffff;
+}
+
+.offer-edit-panel .form-error-message,
+.offer-edit-panel .invalid-feedback,
+.offer-edit-panel .form-error-icon,
+.offer-edit-panel ul {
+    color: #ff9aa9 !important;
+    margin-top: 6px;
+    font-size: 0.9rem;
+}
+
+/* Boutons déjà premium, petite amélioration pour edit */
+.offer-edit-panel .btn-offer {
+    min-width: 150px;
+    text-align: center;
+    justify-content: center;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Logo de fond plus visible sur la page edit */
+.offer-edit-panel .offers-panel-logo-bg::before {
+    width: 680px;
+    height: 680px;
+    opacity: 0.10;
+    animation: logoFloatEdit 6s ease-in-out infinite, logoRotateEdit 16s linear infinite;
+}
+
+.offer-edit-panel .offers-panel-logo-bg::after {
+    width: 820px;
+    height: 820px;
+    background:
+        radial-gradient(circle, rgba(255, 0, 60, 0.15) 0%, rgba(255, 0, 60, 0.06) 28%, rgba(255, 0, 60, 0.015) 48%, transparent 70%);
+}
+
+/* Animation un peu plus fluide pour edit */
+@keyframes logoRotateEdit {
+    0% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+    50% {
+        transform: translate(-50%, -51.5%) scale(1.04) rotate(2deg);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+}
+
+@keyframes logoFloatEdit {
+    0% {
+        opacity: 0.08;
+    }
+    50% {
+        opacity: 0.14;
+    }
+    100% {
+        opacity: 0.08;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .offer-edit-panel .offers-panel-logo-bg::before {
+        width: 420px;
+        height: 420px;
+    }
+
+    .offer-edit-panel .offers-panel-logo-bg::after {
+        width: 520px;
+        height: 520px;
+    }
+
+    .premium-input {
+        min-height: 48px;
+    }
+
+    .premium-textarea {
+        min-height: 140px !important;
+    }
+}
+/* =========================
+   OFFERS TABLE - PREMIUM UI
+   ========================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+body,
+.table,
+.btn,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: 'Poppins', sans-serif;
+}
+
+.offers-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,0.03) inset,
+        0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.offers-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(255, 0, 60, 0.18), transparent 30%),
+                radial-gradient(circle at 80% 30%, rgba(255, 80, 80, 0.12), transparent 28%),
+                radial-gradient(circle at 50% 90%, rgba(180, 0, 50, 0.14), transparent 25%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.offers-title {
+    position: relative;
+    z-index: 2;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.5px;
+    margin-bottom: 1.5rem;
+}
+
+.table-offers-wrap {
+    position: relative;
+    z-index: 2;
+}
+
+.table-offers {
+    color: #f8fafc;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+    background: transparent;
+}
+
+.table-offers thead tr th {
+    background: rgba(255, 255, 255, 0.04);
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    border: none !important;
+    padding: 18px 16px;
+}
+
+.table-offers tbody tr {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.table-offers tbody tr:hover {
+    transform: translateY(-2px);
+}
+
+.table-offers tbody td {
+    background: rgba(255, 255, 255, 0.03);
+    border: none !important;
+    padding: 18px 16px;
+    vertical-align: middle;
+    color: #dbe4ff;
+}
+
+.table-offers tbody tr td:first-child,
+.table-offers thead tr th:first-child {
+    border-top-left-radius: 14px;
+    border-bottom-left-radius: 14px;
+}
+
+.table-offers tbody tr td:last-child,
+.table-offers thead tr th:last-child {
+    border-top-right-radius: 14px;
+    border-bottom-right-radius: 14px;
+}
+
+/* Titre offre */
+.offer-title-text {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+/* Status badge premium */
+.offer-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 190px;
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.offer-status.published {
+    background: linear-gradient(135deg, #ff2d55, #c4002f);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(255, 0, 70, 0.28);
+}
+
+.offer-status.cancelled {
+    background: linear-gradient(135deg, #7a0a22, #3d0612);
+    color: #ffd6df;
+    box-shadow: 0 10px 24px rgba(90, 0, 30, 0.2);
+}
+
+.offer-status.draft {
+    background: linear-gradient(135deg, #ff6b6b, #d81b60);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(255, 90, 90, 0.22);
+}
+
+.offer-status.progress {
+    background: linear-gradient(135deg, #ff416c, #ff1744);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(255, 30, 70, 0.25);
+}
+
+.offer-status.default {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+}
+
+/* Boutons premium rouges différents */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-offer {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    transition: all 0.25s ease;
+    color: #fff !important;
+    text-decoration: none !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.22);
+}
+
+.btn-offer:hover {
+    transform: translateY(-2px) scale(1.02);
+    filter: brightness(1.08);
+}
+
+.btn-publish {
+    background: linear-gradient(135deg, #ff4d4d, #ff003c);
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, #d1003f, #8b0000);
+}
+
+.btn-cancel {
+    background: linear-gradient(135deg, #ff7a7a, #b3002d);
+}
+
+.btn-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    filter: grayscale(0.2);
+}
+
+/* Texte budget */
+.offer-amount {
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .offers-title {
+        font-size: 1.5rem;
+    }
+
+    .btn-offer {
+        width: 100%;
+        justify-content: center;
+        display: inline-flex;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+}
+/* =========================
+   LOGO BACKGROUND ANIMATION
+   ========================= */
+
+.offers-panel-logo-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.offers-panel-logo-bg::before {
+    content: "";
+    position: absolute;
+    width: 760px;
+    height: 760px;
+    background: url('../img/logo.png') no-repeat center center;
+    background-size: contain;
+    opacity: 0.12;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: logoFloat 6s ease-in-out infinite, logoRotate 18s linear infinite;
+    filter: drop-shadow(0 0 45px rgba(255, 0, 60, 0.28));
+}
+
+.offers-panel-logo-bg::after {
+    content: "";
+    position: absolute;
+    width: 900px;
+    height: 900px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(circle, rgba(255, 0, 60, 0.16) 0%, rgba(255, 0, 60, 0.07) 28%, rgba(255, 0, 60, 0.02) 45%, transparent 70%);
+    animation: pulseGlow 3.8s ease-in-out infinite;
+}
+@keyframes logoFloat {
+    0% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+    50% {
+        transform: translate(-50%, -52%) scale(1.04) rotate(1deg);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+}
+
+@keyframes pulseGlow {
+    0% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); }
+    100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+}
+@keyframes logoRotate {
+    0% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+    50% {
+        transform: translate(-50%, -52%) scale(1.05) rotate(3deg);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+}
+
+@keyframes logoFloat {
+    0% {
+        opacity: 0.10;
+    }
+    50% {
+        opacity: 0.16;
+    }
+    100% {
+        opacity: 0.10;
+    }
+    
+}
+.offer-applied-badge {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 3;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
