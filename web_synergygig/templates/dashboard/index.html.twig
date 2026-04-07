@@ -7,7 +7,8 @@
 {% block content %}
     <p class="text-muted" style="margin-bottom:var(--space-xl)">Overview of your workspace</p>
 
-    {# ── Top 4 Stat Cards (matching Java) ── #}
+    {# ── Top 4 Stat Cards (ADMIN/HR only) ── #}
+    {% if is_granted('ROLE_HR') %}
     <div class="bento-grid bento-grid--stats" style="margin-bottom:var(--space-xl)">
         <div class="card card--glow-blue">
             <div class="card-header">
@@ -56,6 +57,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     {# ── Weather + Account Row ── #}
     <div style="display:grid;grid-template-columns:3fr 2fr;gap:var(--space-lg);margin-bottom:var(--space-xl)">
@@ -124,7 +126,8 @@
         </div>
     </div>
 
-    {# ── Platform Overview ── #}
+    {# ── Platform Overview (ADMIN/HR only) ── #}
+    {% if is_granted('ROLE_HR') %}
     <div class="card" style="margin-bottom:var(--space-xl);padding:0;overflow:hidden">
         <div style="padding:var(--space-lg) var(--space-xl);border-bottom:1px solid var(--border-primary)">
             <div style="font-weight:600;color:var(--accent-primary)">Platform Overview</div>
@@ -189,7 +192,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 style="margin:0;font-size:1rem">Recent Employees</h3>
-                <a href="{{ path('app_user_index') }}" class="btn btn-ghost btn-sm">View All</a>
+                {% if is_granted('ROLE_ADMIN') %}<a href="{{ path('app_user_index') }}" class="btn btn-ghost btn-sm">View All</a>{% endif %}
             </div>
             {% if recent_users is not empty %}
                 <div class="table-wrapper">
@@ -219,7 +222,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 style="margin:0;font-size:1rem">Departments</h3>
-                <a href="{{ path('app_department_index') }}" class="btn btn-ghost btn-sm">View All</a>
+                {% if is_granted('ROLE_ADMIN') %}<a href="{{ path('app_department_index') }}" class="btn btn-ghost btn-sm">View All</a>{% endif %}
             </div>
             {% if recent_departments is not empty %}
                 <div class="table-wrapper">
@@ -241,9 +244,11 @@
             {% endif %}
         </div>
     </div>
+    {% endif %}{# end ROLE_HR platform overview, charts, tables #}
 {% endblock %}
 
 {% block javascripts %}
+{% if is_granted('ROLE_HR') %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -259,9 +264,9 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(document.getElementById('taskChart'), {
         type: 'doughnut',
         data: {
-            labels: ['To Do', 'In Progress', 'Submitted', 'Done'],
+            labels: ['To Do', 'In Progress', 'In Review', 'Done'],
             datasets: [{
-                data: [{{ taskChart.TODO }}, {{ taskChart.IN_PROGRESS }}, {{ taskChart.SUBMITTED }}, {{ taskChart.DONE }}],
+                data: [{{ taskChart.TODO }}, {{ taskChart.IN_PROGRESS }}, {{ taskChart.IN_REVIEW }}, {{ taskChart.DONE }}],
                 backgroundColor: ['#6366f1', '#f59e0b', '#3b82f6', '#10b981'],
                 borderWidth: 0
             }]
@@ -285,11 +290,11 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(document.getElementById('roleChart'), {
         type: 'bar',
         data: {
-            labels: ['Admin', 'HR', 'Manager', 'Employee'],
+            labels: ['Admin', 'HR Manager', 'Project Owner', 'Employee', 'Gig Worker'],
             datasets: [{
                 label: 'Users',
-                data: [{{ roleChart.ADMIN }}, {{ roleChart.HR }}, {{ roleChart.MANAGER }}, {{ roleChart.EMPLOYEE }}],
-                backgroundColor: ['#ef4444', '#8b5cf6', '#3b82f6', '#10b981'],
+                data: [{{ roleChart.ADMIN }}, {{ roleChart.HR_MANAGER }}, {{ roleChart.PROJECT_OWNER }}, {{ roleChart.EMPLOYEE }}, {{ roleChart.GIG_WORKER }}],
+                backgroundColor: ['#ef4444', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b'],
                 borderRadius: 6,
                 borderSkipped: false
             }]
@@ -332,4 +337,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+{% endif %}
 {% endblock %}

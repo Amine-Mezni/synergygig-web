@@ -3,7 +3,7 @@
 {% block page_title %}Leave #{{ leave.id }}{% endblock %}
 
 {% block header_actions %}
-    {% if is_granted('ROLE_HR') %}
+    {% if is_granted('ROLE_HR') or (leave.user and leave.user.id == app.user.id and leave.status == 'PENDING') %}
     <a href="{{ path('app_leave_edit', {id: leave.id}) }}" class="btn btn-ghost btn-sm">Edit</a>
     {% endif %}
     <a href="{{ path('app_leave_index') }}" class="btn btn-ghost btn-sm">Back</a>

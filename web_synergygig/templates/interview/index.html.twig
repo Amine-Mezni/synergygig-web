@@ -90,7 +90,9 @@
     {% else %}
     <div style="text-align:center;padding:3rem">
         <p class="text-muted">No interviews scheduled.</p>
+        {% if is_granted('ROLE_HR') %}
         <a href="{{ path('app_interview_new') }}" class="btn btn-primary" style="margin-top:1rem">+ Schedule Interview</a>
+        {% endif %}
     </div>
     {% endif %}
 </div>

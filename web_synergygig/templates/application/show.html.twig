@@ -3,7 +3,9 @@
 {% block page_title %}Application #{{ application.id }}{% endblock %}
 
 {% block header_actions %}
+    {% if application.applicant and application.applicant.id == app.user.id %}
     <a href="{{ path('app_application_edit', {id: application.id}) }}" class="btn btn-primary btn-sm">Edit</a>
+    {% endif %}
     <a href="{{ path('app_application_index') }}" class="btn btn-ghost btn-sm">Back</a>
 {% endblock %}
 
@@ -69,10 +71,12 @@
 {% endif %}
 
 {# Delete #}
+{% if is_granted('ROLE_HR') or (application.applicant and application.applicant.id == app.user.id) %}
 <div style="margin-top:2rem">
     <form method="post" action="{{ path('app_application_delete', {id: application.id}) }}" onsubmit="return confirm('Delete this application?')">
         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ application.id) }}">
         <button class="btn btn-danger btn-sm">Delete Application</button>
     </form>
 </div>
+{% endif %}
 {% endblock %}

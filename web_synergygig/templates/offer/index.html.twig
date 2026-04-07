@@ -3,7 +3,7 @@
 {% block page_title %}Job Offers{% endblock %}
 
 {% block header_actions %}
-    {% if is_granted('ROLE_HR') %}
+    {% if is_granted('ROLE_PROJECT_OWNER') %}
     <a href="{{ path('app_offer_new') }}" class="btn btn-primary btn-sm">+ New Offer</a>
     {% endif %}
 {% endblock %}
@@ -81,10 +81,10 @@
                             <summary class="btn btn-ghost btn-sm" title="Actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></summary>
                             <div class="crud-actions-dropdown">
                                 <a href="{{ path('app_offer_show', {id: o.id}) }}" class="crud-action-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View</a>
-                                {% if o.status == 'OPEN' and (appliedOfferIds is not defined or o.id not in appliedOfferIds) %}
+                                {% if o.status == 'OPEN' and (appliedOfferIds is not defined or o.id not in appliedOfferIds) and (not o.owner or o.owner.id != app.user.id) %}
                                 <a href="{{ path('app_offer_apply', {id: o.id}) }}" class="crud-action-item" style="color:var(--color-success)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Apply</a>
                                 {% endif %}
-                                {% if is_granted('ROLE_HR') %}
+                                {% if is_granted('ROLE_ADMIN') or (o.owner and o.owner.id == app.user.id) %}
                                 {% if o.status == 'DRAFT' %}
                                 <a href="{{ path('app_offer_publish', {id: o.id}) }}" class="crud-action-item" style="color:var(--color-success)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Publish</a>
                                 {% elseif o.status == 'OPEN' %}

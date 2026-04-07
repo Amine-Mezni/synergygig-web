@@ -3,7 +3,7 @@
 {% block page_title %}Contract #{{ contract.id }}{% endblock %}
 
 {% block header_actions %}
-    {% if is_granted('ROLE_HR') %}
+    {% if is_granted('ROLE_PROJECT_OWNER') %}
     <a href="{{ path('app_contract_edit', {id: contract.id}) }}" class="btn btn-primary btn-sm">Edit</a>
     {% endif %}
     <a href="{{ path('app_contract_index') }}" class="btn btn-ghost btn-sm">Back</a>
@@ -90,7 +90,7 @@
             {% endif %}
         {% endif %}
 
-        {% if contract.status not in ['ACTIVE', 'COMPLETED', 'TERMINATED'] and is_granted('ROLE_HR') %}
+        {% if contract.status not in ['ACTIVE', 'COMPLETED', 'TERMINATED'] and is_granted('ROLE_PROJECT_OWNER') %}
         <div style="margin-top:1.5rem;border-top:1px solid var(--glass-border);padding-top:1.5rem">
             <h5 style="margin-bottom:1rem;color:var(--text-primary)">Submit Counter-Proposal</h5>
             <form method="post" action="{{ path('app_contract_negotiate', {id: contract.id}) }}" novalidate>
@@ -194,7 +194,7 @@
 {% endif %}
 
 {# Delete #}
-{% if is_granted('ROLE_HR') %}
+{% if is_granted('ROLE_PROJECT_OWNER') %}
 <div style="margin-top:2rem">
     <form method="post" action="{{ path('app_contract_delete', {id: contract.id}) }}" onsubmit="return confirm('Delete this contract?')">
         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ contract.id) }}">

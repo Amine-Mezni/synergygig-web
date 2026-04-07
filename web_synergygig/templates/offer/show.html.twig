@@ -3,7 +3,7 @@
 {% block page_title %}Offer: {{ offer.title }}{% endblock %}
 
 {% block header_actions %}
-    {% if is_granted('ROLE_HR') %}
+    {% if is_granted('ROLE_ADMIN') or (offer.owner and offer.owner.id == app.user.id) %}
     <a href="{{ path('app_offer_edit', {id: offer.id}) }}" class="btn btn-primary btn-sm">Edit</a>
     {% if offer.status == 'DRAFT' %}
     <a href="{{ path('app_offer_publish', {id: offer.id}) }}" class="btn btn-sm" style="background:var(--color-success);color:#fff">Publish</a>
@@ -63,7 +63,7 @@
     </div>
 
     {# Apply / Already Applied #}
-    {% if offer.status == 'OPEN' %}
+    {% if offer.status == 'OPEN' and (not offer.owner or offer.owner.id != app.user.id) %}
     <div class="card" style="margin-bottom:1.5rem;padding:1.5rem">
         {% if alreadyApplied is defined and alreadyApplied %}
             <div style="display:flex;align-items:center;gap:.75rem">
@@ -88,7 +88,7 @@
     {% endif %}
 
     {# Delete #}
-    {% if is_granted('ROLE_HR') %}
+    {% if is_granted('ROLE_ADMIN') or (offer.owner and offer.owner.id == app.user.id) %}
     <div style="margin-top:1rem">
         <form method="post" action="{{ path('app_offer_delete', {id: offer.id}) }}" onsubmit="return confirm('Delete this offer?')">
             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ offer.id) }}">

@@ -3,7 +3,9 @@
 {% block page_title %}Task: {{ task.title }}{% endblock %}
 
 {% block header_actions %}
+    {% if is_granted('ROLE_ADMIN') or (task.project and task.project.owner and task.project.owner.id == app.user.id) %}
     <a href="{{ path('app_task_edit', {id: task.id}) }}" class="btn btn-primary btn-sm">Edit</a>
+    {% endif %}
     <a href="{{ path('app_task_index') }}" class="btn btn-ghost btn-sm">Back</a>
 {% endblock %}
 
@@ -66,7 +68,7 @@
                 </div>
             {% endif %}
         {% else %}
-            {% if task.status != 'DONE' %}
+            {% if task.status != 'DONE' and task.assignedTo and task.assignedTo.id == app.user.id %}
                 <form method="post" action="{{ path('app_task_submit', {id: task.id}) }}" enctype="multipart/form-data" novalidate>
                     <input type="hidden" name="_token" value="{{ csrf_token('submit' ~ task.id) }}">
 
@@ -122,6 +124,7 @@
             {% endif %}
         {% elseif task.submissionText %}
             {# Show review form only when there's a submission to review #}
+            {% if is_granted('ROLE_ADMIN') or (task.project and task.project.owner and task.project.owner.id == app.user.id) %}
             <form method="post" action="{{ path('app_task_review', {id: task.id}) }}" novalidate>
                 <input type="hidden" name="_token" value="{{ csrf_token('review' ~ task.id) }}">
 
@@ -155,6 +158,9 @@
 
                 <button type="submit" class="btn btn-primary">Submit Review</button>
             </form>
+            {% else %}
+                <p class="text-muted">Work submitted — awaiting review from the project owner.</p>
+            {% endif %}
         {% else %}
             <p class="text-muted">Waiting for submission before review.</p>
         {% endif %}
@@ -162,12 +168,14 @@
 </div>
 
 {# Delete #}
+{% if is_granted('ROLE_ADMIN') or (task.project and task.project.owner and task.project.owner.id == app.user.id) %}
 <div style="margin-top:2rem">
     <form method="post" action="{{ path('app_task_delete', {id: task.id}) }}" onsubmit="return confirm('Delete this task?')">
         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ task.id) }}">
         <button class="btn btn-danger btn-sm">Delete Task</button>
     </form>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block javascripts %}
