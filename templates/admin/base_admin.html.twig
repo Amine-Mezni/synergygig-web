@@ -205,7 +205,26 @@
                     <div class="nav-item dropdown">
                         <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
                           <img class="rounded-circle" src="{{ asset('admin/img/user.jpg') }}" alt="" style="width: 40px; height: 40px;">
-                            <span class="d-none d-lg-inline-flex">John Doe</span>
+                          <div class="ms-3">
+    <h6 class="mb-0">{{ app.user ? app.user.full_name : 'Invité' }}</h6>
+    <span>
+        {% if app.user %}
+            {% if app.user.role == 'ADMIN' %}
+                Admin
+            {% elseif app.user.role == 'HR' %}
+                HR
+            {% elseif app.user.role == 'EMPLOYEE' %}
+                Employee
+            {% elseif app.user.role == 'GIG_WORKER' %}
+                Gig Worker
+            {% else %}
+                {{ app.user.role }}
+            {% endif %}
+        {% else %}
+            Visiteur
+        {% endif %}
+    </span>
+</div>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end bg-secondary border-0 rounded-0 rounded-bottom m-0">
                             <a href="#" class="dropdown-item">My Profile</a>
