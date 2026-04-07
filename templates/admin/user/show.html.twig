@@ -1,0 +1,80 @@
+{% extends 'admin/base_admin.html.twig' %}
+
+{% block title %}Détail utilisateur{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid pt-4 px-4">
+    <div class="bg-secondary rounded p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="text-white mb-1">Détail utilisateur</h2>
+                <p class="text-light mb-0">Informations complètes du compte sélectionné</p>
+            </div>
+
+            <a href="{{ path('app_admin_user_list') }}" class="btn btn-outline-light rounded-pill px-4">
+                Retour
+            </a>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="bg-dark rounded p-4 h-100">
+                    <h5 class="text-white mb-4">Informations principales</h5>
+
+                    <div class="mb-3">
+                        <label class="text-light small">ID</label>
+                        <div class="text-white fw-bold">{{ userItem.id }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-light small">Nom complet</label>
+                        <div class="text-white fw-bold">{{ userItem.full_name }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-light small">Email</label>
+                        <div class="text-white fw-bold">{{ userItem.email }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-light small">Rôle</label>
+                        <div>
+                            {% if userItem.role == 'ADMIN' %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% elseif userItem.role == 'HR' %}
+                                <span class="badge bg-primary">HR</span>
+                            {% elseif userItem.role == 'EMPLOYEE' %}
+                                <span class="badge bg-secondary">Employee</span>
+                            {% elseif userItem.role == 'GIG_WORKER' %}
+                                <span class="badge bg-success">Gig Worker</span>
+                            {% else %}
+                                <span class="badge bg-dark">{{ userItem.role }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="text-light small">Date de création</label>
+                        <div class="text-white fw-bold">{{ userItem.created_at|date('d/m/Y H:i') }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="bg-dark rounded p-4 h-100">
+                    <h5 class="text-white mb-4">Actions admin</h5>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#" class="btn btn-warning rounded-pill px-4">Désactiver</a>
+                        <a href="#" class="btn btn-danger rounded-pill px-4">Supprimer</a>
+                    </div>
+
+                    <p class="text-light mt-4 mb-0">
+                        Les actions d’activation, désactivation et suppression seront branchées dans l’étape suivante.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

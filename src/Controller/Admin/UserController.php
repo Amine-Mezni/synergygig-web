@@ -22,4 +22,11 @@ public function index(EntityManagerInterface $entityManager): Response
         'users' => $users,
     ]);
 }
+#[Route('/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
+public function show(Users $user): Response
+{
+    return $this->render('admin/user/show.html.twig', [
+        'userItem' => $user,
+    ]);
+}
 }

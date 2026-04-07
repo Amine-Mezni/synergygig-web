@@ -46,9 +46,9 @@
                                 </td>
                                 <td>{{ user.created_at|date('d/m/Y H:i') }}</td>
                                 <td class="text-end">
-                                    <a href="#" class="btn btn-sm btn-primary rounded-pill px-3">
-                                        Voir
-                                    </a>
+                                   <a href="{{ path('app_admin_user_show', {'id': user.id}) }}" class="btn btn-sm btn-primary rounded-pill px-3">
+    Voir
+</a>
                                 </td>
                             </tr>
                         {% endfor %}
