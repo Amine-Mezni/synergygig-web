@@ -5,3 +5,62 @@
 {% block body %}
 <h1>Bienvenue sur SynergyGig</h1>
 {% endblock %}
+{% extends 'base.html.twig' %}
+
+{% block title %}Accueil HR Manager{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+    <div class="card shadow-sm border-0 rounded-4 p-4 p-md-5">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="fw-bold mb-3">Bienvenue sur SynergyGig</h1>
+                <p class="text-muted mb-4">
+                    Gérez vos offres, créez de nouvelles opportunités et modifiez vos brouillons facilement.
+                </p>
+
+                <div class="d-flex flex-wrap gap-3">
+                    <a href="{{ path('app_project_owner_offer_new') }}" class="btn btn-primary rounded-pill px-4 py-2">
+                        + Créer une offre
+                    </a>
+
+                    <a href="{{ path('app_project_owner_offer_list') }}" class="btn btn-outline-dark rounded-pill px-4 py-2">
+                        Voir mes offres
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4 mt-4 mt-md-0">
+                <div class="bg-light rounded-4 p-4 text-center">
+                    <h5 class="fw-bold mb-3">Aperçu rapide</h5>
+                    <div class="mb-2">
+                        <span class="fw-semibold">Total offres :</span> {{ totalOffers }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="fw-semibold">Brouillons :</span> {{ draftCount }}
+                    </div>
+                    <div>
+                        <span class="fw-semibold">Publiées :</span> {{ publishedCount }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 mt-4 p-4">
+        <h3 class="fw-bold mb-3">Actions rapides</h3>
+        <div class="d-flex flex-wrap gap-3">
+            <a href="{{ path('app_project_owner_offer_new') }}" class="btn btn-success rounded-pill px-4">
+                Créer une nouvelle offre
+            </a>
+
+            <a href="{{ path('app_project_owner_offer_list') }}" class="btn btn-warning rounded-pill px-4">
+                Modifier mes brouillons
+            </a>
+        </div>
+        <p class="text-muted mt-3 mb-0">
+            Pour modifier une offre, allez dans “Mes offres”, puis cliquez sur “Modifier” sur les offres au statut brouillon.
+        </p>
+    </div>
+</div>
+{% endblock %}
