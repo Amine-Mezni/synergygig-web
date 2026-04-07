@@ -18,6 +18,7 @@ use Knp\Component\Pager\PaginatorInterface;
 class JobApplicationController extends AbstractController
 {
     #[Route('/', name: 'app_application_index')]
+    #[IsGranted('ROLE_HR')]
     public function index(Request $request, JobApplicationRepository $repo, PaginatorInterface $paginator): Response
     {
         $qb = $repo->createQueryBuilder('a')
@@ -113,6 +114,9 @@ class JobApplicationController extends AbstractController
     #[Route('/{id}', name: 'app_application_show', requirements: ['id' => '\d+'])]
     public function show(JobApplication $application): Response
     {
+        if (!$this->isGranted('ROLE_HR') && $application->getApplicant() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only view your own applications.');
+        }
         return $this->render('application/show.html.twig', [
             'application' => $application,
         ]);
@@ -143,6 +147,9 @@ class JobApplicationController extends AbstractController
     #[Route('/{id}/edit', name: 'app_application_edit', requirements: ['id' => '\d+'])]
     public function edit(JobApplication $application, Request $request, EntityManagerInterface $em): Response
     {
+        if ($application->getApplicant() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only edit your own applications.');
+        }
         $form = $this->createForm(JobApplicationType::class, $application);
         $form->handleRequest($request);
 
@@ -161,6 +168,9 @@ class JobApplicationController extends AbstractController
     #[Route('/{id}/delete', name: 'app_application_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(JobApplication $application, Request $request, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_HR') && $application->getApplicant() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only delete your own applications.');
+        }
         if ($this->isCsrfTokenValid('delete' . $application->getId(), $request->request->get('_token'))) {
             $em->remove($application);
             $em->flush();

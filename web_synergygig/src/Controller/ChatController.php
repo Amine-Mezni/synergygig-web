@@ -81,6 +81,14 @@ class ChatController extends AbstractController
         UserRepository $userRepo
     ): Response {
         $user = $this->getUser();
+
+        // Verify user is a member of this room
+        $isMember = $memberRepo->findOneBy(['room' => $activeRoom, 'user' => $user]);
+        if (!$isMember) {
+            $this->addFlash('danger', 'You are not a member of this room.');
+            return $this->redirectToRoute('app_chat_index');
+        }
+
         $memberships = $memberRepo->findBy(['user' => $user]);
 
         $rooms = [];
@@ -143,8 +151,17 @@ class ChatController extends AbstractController
         ChatRoom $room,
         Request $request,
         EntityManagerInterface $em,
-        SluggerInterface $slugger
+        SluggerInterface $slugger,
+        ChatRoomMemberRepository $memberRepo
     ): Response {
+        // Verify user is a member of this room
+        $user = $this->getUser();
+        $membership = $memberRepo->findOneBy(['room' => $room, 'user' => $user]);
+        if (!$membership) {
+            $this->addFlash('danger', 'You are not a member of this room.');
+            return $this->redirectToRoute('app_chat_index');
+        }
+
         if (!$this->isCsrfTokenValid('chat_send', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_chat_room', ['id' => $room->getId()]);
@@ -278,6 +295,14 @@ class ChatController extends AbstractController
         ChatRoomMemberRepository $memberRepo,
         EntityManagerInterface $em
     ): Response {
+        // Only room OWNER or ADMIN can add members
+        $currentUser = $this->getUser();
+        $currentMembership = $memberRepo->findOneBy(['room' => $room, 'user' => $currentUser]);
+        if (!$this->isGranted('ROLE_ADMIN') && (!$currentMembership || $currentMembership->getRole() !== 'OWNER')) {
+            $this->addFlash('warning', 'Only the room owner can add members.');
+            return $this->redirectToRoute('app_chat_room', ['id' => $room->getId()]);
+        }
+
         $userId = (int) $request->request->get('user_id');
         $target = $userRepo->find($userId);
         if (!$target) {
@@ -337,6 +362,11 @@ class ChatController extends AbstractController
         EntityManagerInterface $em
     ): Response {
         $roomId = $message->getRoom()->getId();
+        // Only the sender or an admin can delete a message
+        if ($message->getSender()->getId() !== $this->getUser()->getId() && !$this->isGranted('ROLE_ADMIN')) {
+            $this->addFlash('warning', 'You can only delete your own messages.');
+            return $this->redirectToRoute('app_chat_room', ['id' => $roomId]);
+        }
         if ($this->isCsrfTokenValid('delete' . $message->getId(), $request->request->get('_token'))) {
             $em->remove($message);
             $em->flush();

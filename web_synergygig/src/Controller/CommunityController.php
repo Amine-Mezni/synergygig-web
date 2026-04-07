@@ -256,6 +256,9 @@ class CommunityController extends AbstractController
     #[Route('/post/{id}/edit', name: 'app_community_edit', methods: ['POST'])]
     public function editPost(Request $request, Post $post, EntityManagerInterface $em): Response
     {
+        if ($post->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
+            throw $this->createAccessDeniedException('You can only edit your own posts.');
+        }
         $content = trim($request->request->get('content', ''));
         if ($content !== '' && $this->isCsrfTokenValid('edit-post-' . $post->getId(), $request->request->get('_token'))) {
             // Content moderation
@@ -456,6 +459,9 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     #[Route('/post/{id}/delete', name: 'app_community_delete', methods: ['POST'])]
     public function delete(Request $request, Post $post, EntityManagerInterface $em): Response
     {
+        if ($post->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
+            throw $this->createAccessDeniedException('You can only delete your own posts.');
+        }
         if ($this->isCsrfTokenValid('delete-post-' . $post->getId(), $request->request->get('_token'))) {
             $em->remove($post);
             $em->flush();
@@ -582,6 +588,9 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     public function deleteComment(Request $request, int $id, CommentRepository $commentRepo, EntityManagerInterface $em): Response
     {
         $comment = $commentRepo->find($id);
+        if ($comment && $comment->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
+            throw $this->createAccessDeniedException('You can only delete your own comments.');
+        }
         if ($comment && $this->isCsrfTokenValid('delete-comment-' . $id, $request->request->get('_token'))) {
             $post = $comment->getPost();
             $post->setCommentsCount(max(0, ($post->getCommentsCount() ?? 1) - 1));

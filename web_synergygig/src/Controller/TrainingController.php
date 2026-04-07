@@ -16,11 +16,13 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Knp\Component\Pager\PaginatorInterface;
 use App\Service\N8nWebhookService;
 use App\Service\NotificationService;
 
 #[Route('/training')]
+#[IsGranted('ROLE_USER')]
 class TrainingController extends AbstractController
 {
     #[Route('/', name: 'app_training_index')]
@@ -190,6 +192,7 @@ class TrainingController extends AbstractController
     }
 
     #[Route('/new', name: 'app_training_new')]
+    #[IsGranted('ROLE_HR')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $course = new TrainingCourse();
@@ -226,6 +229,7 @@ class TrainingController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_training_edit', requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_HR')]
     public function edit(Request $request, TrainingCourse $course, EntityManagerInterface $em): Response
     {
         $form = $this->createForm(TrainingCourseType::class, $course);
@@ -245,6 +249,7 @@ class TrainingController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_training_delete', methods: ['POST'])]
+    #[IsGranted('ROLE_HR')]
     public function delete(Request $request, TrainingCourse $course, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('delete' . $course->getId(), $request->request->get('_token'))) {

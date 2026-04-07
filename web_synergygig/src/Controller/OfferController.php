@@ -72,7 +72,7 @@ class OfferController extends AbstractController
     }
 
     #[Route('/new', name: 'app_offer_new')]
-    #[IsGranted('ROLE_HR')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $offer = new Offer();
@@ -140,6 +140,11 @@ class OfferController extends AbstractController
             return $this->redirectToRoute('app_offer_show', ['id' => $offer->getId()]);
         }
 
+        if ($offer->getOwner() === $user) {
+            $this->addFlash('error', 'You cannot apply to your own offer.');
+            return $this->redirectToRoute('app_offer_show', ['id' => $offer->getId()]);
+        }
+
         if ($offer->getStatus() !== 'OPEN') {
             $this->addFlash('error', 'This offer is not currently accepting applications.');
             return $this->redirectToRoute('app_offer_show', ['id' => $offer->getId()]);
@@ -173,9 +178,12 @@ class OfferController extends AbstractController
     }
 
     #[Route('/{id}/publish', name: 'app_offer_publish', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_HR')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function publish(Offer $offer, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only publish your own offers.');
+        }
         $offer->setStatus('OPEN');
         $em->flush();
         $this->addFlash('success', 'Offer published.');
@@ -183,9 +191,12 @@ class OfferController extends AbstractController
     }
 
     #[Route('/{id}/close', name: 'app_offer_close', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_HR')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function close(Offer $offer, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only close your own offers.');
+        }
         $offer->setStatus('CLOSED');
         $em->flush();
         $this->addFlash('success', 'Offer closed.');
@@ -193,9 +204,12 @@ class OfferController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_offer_edit', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_HR')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function edit(Request $request, Offer $offer, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only edit your own offers.');
+        }
         $form = $this->createForm(OfferType::class, $offer);
         $form->handleRequest($request);
 
@@ -213,9 +227,12 @@ class OfferController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_offer_delete', methods: ['POST'])]
-    #[IsGranted('ROLE_HR')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function delete(Request $request, Offer $offer, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only delete your own offers.');
+        }
         if ($this->isCsrfTokenValid('delete' . $offer->getId(), $request->request->get('_token'))) {
             $em->remove($offer);
             $em->flush();

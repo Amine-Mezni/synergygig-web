@@ -19,6 +19,7 @@ use App\Service\N8nWebhookService;
 use App\Service\NotificationService;
 
 #[Route('/payroll')]
+#[IsGranted('ROLE_HR')]
 class PayrollController extends AbstractController
 {
     #[Route('/', name: 'app_payroll_index')]

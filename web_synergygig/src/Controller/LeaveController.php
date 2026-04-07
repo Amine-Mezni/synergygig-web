@@ -16,6 +16,7 @@ use App\Service\N8nWebhookService;
 use App\Service\NotificationService;
 
 #[Route('/leaves')]
+#[IsGranted('ROLE_EMPLOYEE')]
 class LeaveController extends AbstractController
 {
     // Balance limits per year (matching Java desktop)
@@ -27,6 +28,11 @@ class LeaveController extends AbstractController
     public function index(Request $request, LeaveRepository $repo, PaginatorInterface $paginator): Response
     {
         $qb = $repo->createQueryBuilder('l')->orderBy('l.id', 'DESC');
+
+        // Non-HR users see only their own leaves
+        if (!$this->isGranted('ROLE_HR')) {
+            $qb->andWhere('l.user = :currentUser')->setParameter('currentUser', $this->getUser());
+        }
 
         $status = $request->query->get('status');
         if ($status) {
@@ -50,10 +56,18 @@ class LeaveController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $leave = new Leave();
+        // Non-HR users can only create leaves for themselves
+        if (!$this->isGranted('ROLE_HR')) {
+            $leave->setUser($this->getUser());
+        }
         $form = $this->createForm(LeaveType::class, $leave);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // Enforce: non-HR users can only create for themselves
+            if (!$this->isGranted('ROLE_HR')) {
+                $leave->setUser($this->getUser());
+            }
             $leave->setCreatedAt(new \DateTime());
             if (!$leave->getStatus()) {
                 $leave->setStatus('PENDING');
@@ -96,6 +110,16 @@ class LeaveController extends AbstractController
     #[Route('/{id}/edit', name: 'app_leave_edit', requirements: ['id' => '\d+'])]
     public function edit(Request $request, Leave $leave, EntityManagerInterface $em): Response
     {
+        // Only HR or the leave owner can edit; only PENDING leaves can be edited by non-HR
+        if (!$this->isGranted('ROLE_HR')) {
+            if ($leave->getUser()?->getId() !== $this->getUser()?->getId()) {
+                throw $this->createAccessDeniedException('You can only edit your own leave requests.');
+            }
+            if ($leave->getStatus() !== 'PENDING') {
+                $this->addFlash('error', 'Only pending leave requests can be edited.');
+                return $this->redirectToRoute('app_leave_show', ['id' => $leave->getId()]);
+            }
+        }
         $form = $this->createForm(LeaveType::class, $leave);
         $form->handleRequest($request);
 

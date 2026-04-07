@@ -10,15 +10,22 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Knp\Component\Pager\PaginatorInterface;
 
 #[Route('/attendance')]
+#[IsGranted('ROLE_USER')]
 class AttendanceController extends AbstractController
 {
     #[Route('/', name: 'app_attendance_index')]
     public function index(Request $request, AttendanceRepository $repo, PaginatorInterface $paginator): Response
     {
         $qb = $repo->createQueryBuilder('a')->orderBy('a.id', 'DESC');
+
+        // Non-HR users see only their own attendance
+        if (!$this->isGranted('ROLE_HR')) {
+            $qb->andWhere('a.user = :currentUser')->setParameter('currentUser', $this->getUser());
+        }
 
         $status = $request->query->get('status');
         if ($status) {
@@ -43,6 +50,7 @@ class AttendanceController extends AbstractController
     }
 
     #[Route('/new', name: 'app_attendance_new')]
+    #[IsGranted('ROLE_HR')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $attendance = new Attendance();
@@ -76,6 +84,7 @@ class AttendanceController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_attendance_edit', requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_HR')]
     public function edit(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
     {
         $form = $this->createForm(AttendanceType::class, $attendance);
@@ -96,6 +105,7 @@ class AttendanceController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_attendance_delete', methods: ['POST'])]
+    #[IsGranted('ROLE_HR')]
     public function delete(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('delete' . $attendance->getId(), $request->request->get('_token'))) {

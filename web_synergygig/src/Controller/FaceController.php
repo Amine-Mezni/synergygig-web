@@ -106,7 +106,7 @@ class FaceController extends AbstractController
             $em->flush();
 
             $this->addFlash('success', 'Face enrolled successfully!');
-            return $this->redirectToRoute('app_user_show', ['id' => $user->getId()]);
+            return $this->redirectToRoute('app_profile');
         } finally {
             // Clean up temp file
             if (file_exists($tmpFile)) {
@@ -129,6 +129,6 @@ class FaceController extends AbstractController
             $this->addFlash('success', 'Face ID removed.');
         }
 
-        return $this->redirectToRoute('app_user_show', ['id' => $user->getId()]);
+        return $this->redirectToRoute('app_profile');
     }
 }

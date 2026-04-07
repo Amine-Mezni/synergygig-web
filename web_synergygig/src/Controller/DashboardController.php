@@ -56,13 +56,13 @@ class DashboardController extends AbstractController
     ): Response {
         $totalUsers = $userRepo->count([]);
         $employees = $userRepo->count(['role' => 'EMPLOYEE']);
-        $gig = $userRepo->count(['role' => 'MANAGER']);
+        $gig = $userRepo->count(['role' => 'GIG_WORKER']);
         $interviews = $interviewRepo->count(['status' => 'PENDING']);
 
         $quote = self::QUOTES[array_rand(self::QUOTES)];
 
         // Chart data: tasks by status
-        $taskStatuses = ['TODO', 'IN_PROGRESS', 'SUBMITTED', 'DONE'];
+        $taskStatuses = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
         $taskChart = [];
         foreach ($taskStatuses as $s) {
             $taskChart[$s] = $taskRepo->count(['status' => $s]);
@@ -76,7 +76,7 @@ class DashboardController extends AbstractController
         }
 
         // Chart data: users by role
-        $roles = ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'];
+        $roles = ['ADMIN', 'HR_MANAGER', 'PROJECT_OWNER', 'EMPLOYEE', 'GIG_WORKER'];
         $roleChart = [];
         foreach ($roles as $r) {
             $roleChart[$r] = $userRepo->count(['role' => $r]);

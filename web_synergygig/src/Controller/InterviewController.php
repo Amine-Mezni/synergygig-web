@@ -14,12 +14,19 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Knp\Component\Pager\PaginatorInterface;
 
 #[Route('/interviews')]
+#[IsGranted('ROLE_USER')]
 class InterviewController extends AbstractController
 {
     #[Route('/', name: 'app_interview_index')]
     public function index(Request $request, InterviewRepository $repo, PaginatorInterface $paginator): Response
     {
         $qb = $repo->createQueryBuilder('i')->orderBy('i.id', 'DESC');
+
+        // Gig workers only see interviews where they are the candidate
+        if (!$this->isGranted('ROLE_HR')) {
+            $qb->andWhere('i.candidate = :user')
+               ->setParameter('user', $this->getUser());
+        }
 
         $status = $request->query->get('status');
         if ($status) {

@@ -10,6 +10,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Knp\Component\Pager\PaginatorInterface;
@@ -23,6 +24,12 @@ class ContractController extends AbstractController
     public function index(Request $request, ContractRepository $repo, PaginatorInterface $paginator): Response
     {
         $qb = $repo->createQueryBuilder('c')->orderBy('c.id', 'DESC');
+
+        // Non-HR users see only contracts they own or are the applicant on
+        if (!$this->isGranted('ROLE_HR')) {
+            $user = $this->getUser();
+            $qb->andWhere('c.owner = :user OR c.applicant = :user')->setParameter('user', $user);
+        }
 
         $status = $request->query->get('status');
         if ($status) {
@@ -38,6 +45,7 @@ class ContractController extends AbstractController
     }
 
     #[Route('/new', name: 'app_contract_new')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $contract = new Contract();
@@ -67,8 +75,12 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_contract_edit', requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function edit(Contract $contract, Request $request, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $contract->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only edit your own contracts.');
+        }
         $form = $this->createForm(ContractType::class, $contract);
         $form->handleRequest($request);
 
@@ -85,8 +97,12 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_contract_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function delete(Contract $contract, Request $request, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $contract->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only delete your own contracts.');
+        }
         if ($this->isCsrfTokenValid('delete' . $contract->getId(), $request->request->get('_token'))) {
             $em->remove($contract);
             $em->flush();

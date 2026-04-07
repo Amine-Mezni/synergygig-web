@@ -14,20 +14,42 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 #[Route('/projects')]
 class ProjectController extends AbstractController
 {
     #[Route('/', name: 'app_project_index')]
-    public function index(ProjectRepository $repo): Response
+    public function index(ProjectRepository $repo, TaskRepository $taskRepo): Response
     {
+        $user = $this->getUser();
+
+        if ($this->isGranted('ROLE_HR')) {
+            // ADMIN and HR see all projects
+            $projects = $repo->findBy([], ['id' => 'DESC']);
+        } elseif ($this->isGranted('ROLE_PROJECT_OWNER')) {
+            // PROJECT_OWNER sees only their own projects
+            $projects = $repo->findBy(['owner' => $user], ['id' => 'DESC']);
+        } else {
+            // EMPLOYEE / GIG_WORKER see projects where they have assigned tasks
+            $myTasks = $taskRepo->findBy(['assignedTo' => $user]);
+            $projectIds = array_unique(array_filter(array_map(
+                fn($t) => $t->getProject()?->getId(), $myTasks
+            )));
+            $projects = $projectIds
+                ? $repo->createQueryBuilder('p')
+                    ->where('p.id IN (:ids)')->setParameter('ids', $projectIds)
+                    ->orderBy('p.id', 'DESC')->getQuery()->getResult()
+                : [];
+        }
+
         return $this->render('project/index.html.twig', [
-            'projects' => $repo->findBy([], ['id' => 'DESC']),
+            'projects' => $projects,
         ]);
     }
 
     #[Route('/new', name: 'app_project_new')]
-    #[IsGranted('ROLE_MANAGER')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $project = new Project();
@@ -84,9 +106,12 @@ class ProjectController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_project_edit', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_MANAGER')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function edit(Request $request, Project $project, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $project->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only edit your own projects.');
+        }
         $form = $this->createForm(ProjectType::class, $project);
         $form->handleRequest($request);
 
@@ -104,9 +129,12 @@ class ProjectController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_project_delete', methods: ['POST'])]
-    #[IsGranted('ROLE_MANAGER')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function delete(Request $request, Project $project, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $project->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only delete your own projects.');
+        }
         if ($this->isCsrfTokenValid('delete' . $project->getId(), $request->request->get('_token'))) {
             $em->remove($project);
             $em->flush();
@@ -124,6 +152,14 @@ class ProjectController extends AbstractController
 
         if (!$this->isCsrfTokenValid('task_move', $token)) {
             return new JsonResponse(['error' => 'Invalid CSRF token'], 403);
+        }
+
+        // Only project owner, task assignee, or admin can move tasks
+        $user = $this->getUser();
+        $isOwner = $task->getProject()?->getOwner()?->getId() === $user?->getId();
+        $isAssignee = $task->getAssignedTo()?->getId() === $user?->getId();
+        if (!$this->isGranted('ROLE_ADMIN') && !$isOwner && !$isAssignee) {
+            return new JsonResponse(['error' => 'Access denied'], 403);
         }
 
         $valid = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];

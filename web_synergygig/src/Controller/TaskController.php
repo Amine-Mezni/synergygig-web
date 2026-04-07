@@ -5,12 +5,14 @@ namespace App\Controller;
 use App\Entity\Task;
 use App\Form\TaskType;
 use App\Repository\TaskRepository;
+use App\Repository\ProjectRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Knp\Component\Pager\PaginatorInterface;
@@ -21,7 +23,20 @@ class TaskController extends AbstractController
     #[Route('/', name: 'app_task_index')]
     public function index(Request $request, TaskRepository $repo, PaginatorInterface $paginator): Response
     {
-        $qb = $repo->createQueryBuilder('t')->orderBy('t.id', 'DESC');
+        $qb = $repo->createQueryBuilder('t')
+            ->leftJoin('t.project', 'p')->addSelect('p')
+            ->orderBy('t.id', 'DESC');
+
+        $user = $this->getUser();
+        if (!$this->isGranted('ROLE_HR')) {
+            if ($this->isGranted('ROLE_PROJECT_OWNER')) {
+                // PROJECT_OWNER sees tasks in their own projects
+                $qb->andWhere('p.owner = :owner')->setParameter('owner', $user);
+            } else {
+                // EMPLOYEE / GIG_WORKER see only tasks assigned to them
+                $qb->andWhere('t.assignedTo = :user')->setParameter('user', $user);
+            }
+        }
 
         $q = $request->query->get('q');
         if ($q) {
@@ -42,6 +57,7 @@ class TaskController extends AbstractController
     }
 
     #[Route('/new', name: 'app_task_new')]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $task = new Task();
@@ -71,8 +87,12 @@ class TaskController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_task_edit', requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function edit(Request $request, Task $task, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $task->getProject()?->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only edit tasks in your own projects.');
+        }
         $form = $this->createForm(TaskType::class, $task);
         $form->handleRequest($request);
 
@@ -90,8 +110,12 @@ class TaskController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_task_delete', methods: ['POST'])]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function delete(Request $request, Task $task, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_ADMIN') && $task->getProject()?->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You can only delete tasks in your own projects.');
+        }
         if ($this->isCsrfTokenValid('delete' . $task->getId(), $request->request->get('_token'))) {
             $em->remove($task);
             $em->flush();
@@ -103,6 +127,12 @@ class TaskController extends AbstractController
     #[Route('/{id}/submit', name: 'app_task_submit', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function submit(Request $request, Task $task, EntityManagerInterface $em, ValidatorInterface $validator): Response
     {
+        // Only the assigned user can submit work
+        if ($task->getAssignedTo() !== $this->getUser()) {
+            $this->addFlash('error', 'Only the assigned user can submit work for this task.');
+            return $this->redirectToRoute('app_task_show', ['id' => $task->getId()]);
+        }
+
         if (!$this->isCsrfTokenValid('submit' . $task->getId(), $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_task_show', ['id' => $task->getId()]);
@@ -162,8 +192,14 @@ class TaskController extends AbstractController
     }
 
     #[Route('/{id}/review', name: 'app_task_review', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function review(Request $request, Task $task, EntityManagerInterface $em, ValidatorInterface $validator): Response
     {
+        // Only the project owner can review tasks
+        if (!$this->isGranted('ROLE_ADMIN') && $task->getProject()?->getOwner() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('Only the project owner can review this task.');
+        }
+
         if (!$this->isCsrfTokenValid('review' . $task->getId(), $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_task_show', ['id' => $task->getId()]);
