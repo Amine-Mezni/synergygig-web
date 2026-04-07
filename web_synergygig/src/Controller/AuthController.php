@@ -10,13 +10,17 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
 
 class AuthController extends AbstractController
 {
-    private const FACE_LOGIN_THRESHOLD = 0.16;
+    private const FACE_LOGIN_THRESHOLD = 0.11;
+    private const FACE_SINGLE_USER_THRESHOLD = 0.08;
+    private const FACE_RATIO_MARGIN = 0.50;
     private const FACE_PYTHON_TIMEOUT_SECONDS = 15;
 
     #[Route('/login', name: 'app_login')]
@@ -99,7 +103,7 @@ class AuthController extends AbstractController
                 }
 
                 $distance = $this->cosineDistance($capturedEncoding, $stored);
-                if ($distance === null || $distance > self::FACE_LOGIN_THRESHOLD) {
+                if ($distance === null || $distance > self::FACE_SINGLE_USER_THRESHOLD) {
                     return $this->json([
                         'success' => false,
                         'message' => 'Face did not match this email account. Try again or use password login.',
@@ -118,6 +122,8 @@ class AuthController extends AbstractController
                     ->getQuery()
                     ->getResult();
 
+                $allDistances = [];
+
                 /** @var User $candidate */
                 foreach ($users as $candidate) {
                     $storedRaw = $candidate->getFaceEncoding();
@@ -135,17 +141,35 @@ class AuthController extends AbstractController
                         continue;
                     }
 
+                    $allDistances[] = $distance;
+
                     if ($distance < $bestDistance) {
                         $bestDistance = $distance;
                         $bestUser = $candidate;
                     }
                 }
 
-                if (!$bestUser || $bestDistance > self::FACE_LOGIN_THRESHOLD) {
+                $effectiveThreshold = count($allDistances) === 1
+                    ? self::FACE_SINGLE_USER_THRESHOLD
+                    : self::FACE_LOGIN_THRESHOLD;
+
+                if (!$bestUser || $bestDistance > $effectiveThreshold) {
                     return $this->json([
                         'success' => false,
                         'message' => 'Face not recognized. Use email/password or re-enroll Face ID.',
                     ], 401);
+                }
+
+                // Ratio test: best must be significantly better than second best
+                if (count($allDistances) >= 2) {
+                    sort($allDistances);
+                    $secondBest = $allDistances[1];
+                    if ($secondBest > 1e-9 && ($bestDistance / $secondBest) > self::FACE_RATIO_MARGIN) {
+                        return $this->json([
+                            'success' => false,
+                            'message' => 'Face match is ambiguous. Please enter your email and try again.',
+                        ], 401);
+                    }
                 }
             }
 
@@ -197,7 +221,7 @@ class AuthController extends AbstractController
             $user->setEmail($data['email']);
             $user->setFirstName($data['first_name']);
             $user->setLastName($data['last_name']);
-            $user->setRole('EMPLOYEE');
+            $user->setRole($data['role']);
             $user->setCreatedAt(new \DateTime());
             $user->setIsActive(true);
             $user->setIsVerified(false);
@@ -214,6 +238,155 @@ class AuthController extends AbstractController
         return $this->render('auth/signup.html.twig', [
             'form' => $form->createView(),
         ]);
+    }
+
+    #[Route('/forgot-password', name: 'app_forgot_password', methods: ['GET', 'POST'])]
+    public function forgotPassword(
+        Request $request,
+        EntityManagerInterface $em,
+        MailerInterface $mailer,
+    ): Response {
+        if ($request->isMethod('POST')) {
+            $email = trim((string) $request->request->get('email', ''));
+            if ($email === '') {
+                $this->addFlash('error', 'Please enter your email address.');
+                return $this->redirectToRoute('app_forgot_password');
+            }
+
+            $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+            if (!$user) {
+                // Don't reveal whether the email exists
+                $this->addFlash('success', 'If an account exists with that email, a reset code has been sent.');
+                return $this->render('auth/forgot_password.html.twig', ['email_sent' => true, 'sent_email' => $email]);
+            }
+
+            // Generate 6-digit OTP
+            $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $user->setResetToken(password_hash($otp, PASSWORD_BCRYPT));
+            $user->setResetTokenExpiresAt(new \DateTime('+10 minutes'));
+            $em->flush();
+
+            // Send OTP email
+            $emailMessage = (new Email())
+                ->from('synergygig@gmail.com')
+                ->to($user->getEmail())
+                ->subject('SynergyGig - Password Reset Code')
+                ->html(
+                    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;color:#e0e0e0;border-radius:12px">' .
+                    '<h2 style="text-align:center;color:#8b5cf6;margin-bottom:8px">Password Reset</h2>' .
+                    '<p style="text-align:center;color:#a0a0a0;font-size:14px">Use this code to reset your SynergyGig password</p>' .
+                    '<div style="text-align:center;margin:24px 0">' .
+                    '<span style="display:inline-block;font-size:36px;font-weight:bold;letter-spacing:8px;color:#fff;background:#2d2d4e;padding:16px 32px;border-radius:8px;border:1px solid #8b5cf6">' . $otp . '</span>' .
+                    '</div>' .
+                    '<p style="text-align:center;color:#a0a0a0;font-size:13px">This code expires in <strong>10 minutes</strong>.</p>' .
+                    '<p style="text-align:center;color:#666;font-size:12px;margin-top:24px">If you didn\'t request this, you can safely ignore this email.</p>' .
+                    '</div>'
+                );
+
+            try {
+                $mailer->send($emailMessage);
+            } catch (\Throwable $e) {
+                $this->addFlash('error', 'Failed to send email. Please try again later.');
+                return $this->redirectToRoute('app_forgot_password');
+            }
+
+            // Store email in session for the verify step
+            $request->getSession()->set('reset_email', $email);
+
+            return $this->render('auth/forgot_password.html.twig', ['email_sent' => true, 'sent_email' => $email]);
+        }
+
+        return $this->render('auth/forgot_password.html.twig', ['email_sent' => false, 'sent_email' => '']);
+    }
+
+    #[Route('/verify-otp', name: 'app_verify_otp', methods: ['GET', 'POST'])]
+    public function verifyOtp(
+        Request $request,
+        EntityManagerInterface $em,
+    ): Response {
+        $email = $request->getSession()->get('reset_email', '');
+        if ($email === '') {
+            return $this->redirectToRoute('app_forgot_password');
+        }
+
+        if ($request->isMethod('POST')) {
+            $otp = trim((string) $request->request->get('otp', ''));
+            if (strlen($otp) !== 6) {
+                $this->addFlash('error', 'Please enter the 6-digit code.');
+                return $this->render('auth/verify_otp.html.twig', ['email' => $email]);
+            }
+
+            $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+            if (!$user || !$user->getResetToken() || !$user->getResetTokenExpiresAt()) {
+                $this->addFlash('error', 'Invalid or expired reset request. Please try again.');
+                return $this->redirectToRoute('app_forgot_password');
+            }
+
+            if ($user->getResetTokenExpiresAt() < new \DateTime()) {
+                $user->setResetToken(null);
+                $user->setResetTokenExpiresAt(null);
+                $em->flush();
+                $this->addFlash('error', 'The code has expired. Please request a new one.');
+                return $this->redirectToRoute('app_forgot_password');
+            }
+
+            if (!password_verify($otp, $user->getResetToken())) {
+                $this->addFlash('error', 'Invalid code. Please try again.');
+                return $this->render('auth/verify_otp.html.twig', ['email' => $email]);
+            }
+
+            // OTP verified — allow password reset
+            $request->getSession()->set('reset_verified', true);
+            return $this->redirectToRoute('app_reset_password');
+        }
+
+        return $this->render('auth/verify_otp.html.twig', ['email' => $email]);
+    }
+
+    #[Route('/reset-password', name: 'app_reset_password', methods: ['GET', 'POST'])]
+    public function resetPassword(
+        Request $request,
+        EntityManagerInterface $em,
+        UserPasswordHasherInterface $hasher,
+    ): Response {
+        $email = $request->getSession()->get('reset_email', '');
+        $verified = $request->getSession()->get('reset_verified', false);
+        if ($email === '' || !$verified) {
+            return $this->redirectToRoute('app_forgot_password');
+        }
+
+        if ($request->isMethod('POST')) {
+            $password = (string) $request->request->get('password', '');
+            $confirm = (string) $request->request->get('password_confirm', '');
+
+            if (strlen($password) < 8) {
+                $this->addFlash('error', 'Password must be at least 8 characters.');
+                return $this->render('auth/reset_password.html.twig');
+            }
+            if ($password !== $confirm) {
+                $this->addFlash('error', 'Passwords do not match.');
+                return $this->render('auth/reset_password.html.twig');
+            }
+
+            $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+            if (!$user) {
+                return $this->redirectToRoute('app_forgot_password');
+            }
+
+            $user->setPassword($hasher->hashPassword($user, $password));
+            $user->setResetToken(null);
+            $user->setResetTokenExpiresAt(null);
+            $em->flush();
+
+            // Cleanup session
+            $request->getSession()->remove('reset_email');
+            $request->getSession()->remove('reset_verified');
+
+            $this->addFlash('success', 'Password reset successfully! You can now sign in.');
+            return $this->redirectToRoute('app_login');
+        }
+
+        return $this->render('auth/reset_password.html.twig');
     }
 
     #[Route('/logout', name: 'app_logout')]
@@ -340,11 +513,11 @@ class AuthController extends AbstractController
         fclose($pipes[2]);
         proc_close($process);
 
-        $combined = trim($stdout . PHP_EOL . $stderr);
-        if ($combined === '') {
+        $out = trim($stdout);
+        if ($out === '') {
             throw new \RuntimeException('Face recognition service unavailable.');
         }
 
-        return $combined;
+        return $out;
     }
 }

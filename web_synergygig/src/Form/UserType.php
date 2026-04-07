@@ -47,50 +47,54 @@ class UserType extends AbstractType
                 'attr' => ['class' => 'form-control', 'placeholder' => 'john@company.com'],
                 'label_attr' => ['class' => 'form-label'],
             ])
-            ->add('role', ChoiceType::class, [
-                'choices' => [
-                    'Employee' => 'EMPLOYEE',
-                    'Manager' => 'MANAGER',
-                    'HR' => 'HR',
-                    'Admin' => 'ADMIN',
-                ],
-                'required' => false,
-                'placeholder' => 'Select role',
-                'attr' => ['class' => 'form-control form-select'],
-                'label_attr' => ['class' => 'form-label'],
-            ])
-            ->add('department', EntityType::class, [
-                'class' => Department::class,
-                'choice_label' => 'name',
-                'required' => false,
-                'placeholder' => 'Select department',
-                'attr' => ['class' => 'form-control form-select'],
-                'label_attr' => ['class' => 'form-label'],
-            ])
-            ->add('monthly_salary', NumberType::class, [
-                'required' => false,
-                'label' => 'Monthly Salary ($)',
-                'constraints' => [
-                    new Assert\PositiveOrZero(),
-                ],
-                'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
-                'label_attr' => ['class' => 'form-label'],
-            ])
-            ->add('hourly_rate', NumberType::class, [
-                'required' => false,
-                'label' => 'Hourly Rate ($)',
-                'constraints' => [
-                    new Assert\PositiveOrZero(),
-                ],
-                'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
-                'label_attr' => ['class' => 'form-label'],
-            ])
             ->add('bio', TextareaType::class, [
                 'required' => false,
                 'attr' => ['class' => 'form-control', 'rows' => 3, 'placeholder' => 'Short bio...'],
                 'label_attr' => ['class' => 'form-label'],
             ]);
 
+        if ($options['show_admin_fields']) {
+            $builder
+                ->add('role', ChoiceType::class, [
+                    'choices' => [
+                        'Employee' => 'EMPLOYEE',
+                        'Project Owner' => 'PROJECT_OWNER',
+                        'HR Manager' => 'HR_MANAGER',
+                        'Gig Worker' => 'GIG_WORKER',
+                        'Admin' => 'ADMIN',
+                    ],
+                    'required' => false,
+                    'placeholder' => 'Select role',
+                    'attr' => ['class' => 'form-control form-select'],
+                    'label_attr' => ['class' => 'form-label'],
+                ])
+                ->add('department', EntityType::class, [
+                    'class' => Department::class,
+                    'choice_label' => 'name',
+                    'required' => false,
+                    'placeholder' => 'Select department',
+                    'attr' => ['class' => 'form-control form-select'],
+                    'label_attr' => ['class' => 'form-label'],
+                ])
+                ->add('monthly_salary', NumberType::class, [
+                    'required' => false,
+                    'label' => 'Monthly Salary ($)',
+                    'constraints' => [
+                        new Assert\PositiveOrZero(),
+                    ],
+                    'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
+                    'label_attr' => ['class' => 'form-label'],
+                ])
+                ->add('hourly_rate', NumberType::class, [
+                    'required' => false,
+                    'label' => 'Hourly Rate ($)',
+                    'constraints' => [
+                        new Assert\PositiveOrZero(),
+                    ],
+                    'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
+                    'label_attr' => ['class' => 'form-label'],
+                ]);
+        }
         if ($options['is_new']) {
             $builder->add('password', PasswordType::class, [
                 'constraints' => [
@@ -108,6 +112,7 @@ class UserType extends AbstractType
         $resolver->setDefaults([
             'data_class' => User::class,
             'is_new' => false,
+            'show_admin_fields' => true,
         ]);
     }
 }
