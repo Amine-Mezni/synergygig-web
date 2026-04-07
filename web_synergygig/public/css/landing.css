@@ -622,6 +622,49 @@ html.landing-html { scroll-behavior: smooth; }
 }
 
 /* ══════════════════════════════════════
+   MASK REVEAL — scroll-driven clip-path
+   Elements with .mask-reveal get a circular
+   clip-path that expands from 0% to full as
+   they scroll into view.
+   ══════════════════════════════════════ */
+.mask-reveal {
+    --mask-progress: 0;
+    clip-path: circle(calc(var(--mask-progress) * 150%) at 50% 50%);
+    will-change: clip-path;
+}
+
+.mask-reveal--left {
+    clip-path: circle(calc(var(--mask-progress) * 150%) at 20% 50%);
+}
+
+.mask-reveal--right {
+    clip-path: circle(calc(var(--mask-progress) * 150%) at 80% 50%);
+}
+
+.mask-reveal--bottom {
+    clip-path: circle(calc(var(--mask-progress) * 150%) at 50% 80%);
+}
+
+/* Text line wipe variant — horizontal reveal */
+.mask-reveal-text {
+    --mask-progress: 0;
+    clip-path: inset(0 calc((1 - var(--mask-progress)) * 100%) 0 0);
+    will-change: clip-path;
+}
+
+/* Diamond/rhombus variant for accent elements */
+.mask-reveal-diamond {
+    --mask-progress: 0;
+    clip-path: polygon(
+        50% calc(50% - var(--mask-progress) * 60%),
+        calc(50% + var(--mask-progress) * 60%) 50%,
+        50% calc(50% + var(--mask-progress) * 60%),
+        calc(50% - var(--mask-progress) * 60%) 50%
+    );
+    will-change: clip-path;
+}
+
+/* ══════════════════════════════════════
    SECTION SHARED — narrative sections
    ══════════════════════════════════════ */
 .narr {
@@ -1243,5 +1286,14 @@ html.landing-html { scroll-behavior: smooth; }
         transform: none !important;
         filter: none !important;
         opacity: 1 !important;
+    }
+
+    .mask-reveal,
+    .mask-reveal--left,
+    .mask-reveal--right,
+    .mask-reveal--bottom,
+    .mask-reveal-text,
+    .mask-reveal-diamond {
+        clip-path: none !important;
     }
 }
