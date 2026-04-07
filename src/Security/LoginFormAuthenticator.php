@@ -51,7 +51,7 @@ class LoginFormAuthenticator extends AbstractLoginFormAuthenticator
         }
 
         if (in_array('ROLE_HR', $user->getRoles(), true)) {
-            return new RedirectResponse($this->urlGenerator->generate('app_project_owner_offer_list'));
+            return new RedirectResponse($this->urlGenerator->generate('app_home'));
         }
 
         if (in_array('ROLE_GIG_WORKER', $user->getRoles(), true)) {
