@@ -1,140 +1,140 @@
-{% extends 'front/base_front.html.twig' %}
+{% extends 'admin/base_admin.html.twig' %}
 
 {% block title %}Créer une offre{% endblock %}
 
 {% block body %}
-<section class="post-offer-section">
-    <div class="container">
-        <div class="post-offer-wrapper">
-            <div class="post-offer-header text-center">
-                <span class="post-offer-badge">SynergyGig</span>
-                <h1>Créer une offre</h1>
-                <p>Publiez votre gig rapidement avec une présentation moderne et professionnelle.</p>
-            </div>
+<div class="container py-4">
+    <div class="offer-form-wrapper">
+        <div class="offer-form-header text-center">
+            <span class="offer-form-badge">SynergyGig</span>
+            <h1>Créer une offre</h1>
+            <p>Publiez votre offre avec une présentation moderne et un contrôle de saisie côté serveur.</p>
+        </div>
 
-            <div class="post-offer-card">
-                {% for message in app.flashes('success') %}
-                    <div class="front-success-popup">
-                        <i class="bi bi-check-circle-fill me-2"></i>
-                        {{ message }}
-                    </div>
-                {% endfor %}
+        <div class="offer-form-card">
+            {% for message in app.flashes('success') %}
+                <div class="custom-success-popup">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    {{ message }}
+                </div>
+            {% endfor %}
 
-                {% for message in app.flashes('error') %}
-                    <div class="front-error-popup">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        {{ message }}
-                    </div>
-                {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="custom-error-popup">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    {{ message }}
+                </div>
+            {% endfor %}
 
-                {{ form_start(form, {'attr': {'enctype': 'multipart/form-data'}}) }}
+            {{ form_start(form, {'attr': {'novalidate': 'novalidate', 'enctype': 'multipart/form-data'}}) }}
 
-                {{ form_errors(form) }}
-
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="front-field">
-                            {{ form_label(form.title) }}
-                            {{ form_widget(form.title, {
-                                'attr': {
-                                    'class': 'form-control front-input',
-                                    'placeholder': 'Ex: Création logo gaming'
-                                }
-                            }) }}
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="offer-field">
+                        {{ form_label(form.title, 'Titre') }}
+                        {{ form_widget(form.title, {
+                            'attr': {
+                                'class': 'form-control offer-input',
+                                'placeholder': 'Ex: Création logo gaming'
+                            }
+                        }) }}
+                        <div class="text-danger small mt-2">
                             {{ form_errors(form.title) }}
                         </div>
                     </div>
+                </div>
 
-                    <div class="col-md-6">
-                        <div class="front-field">
-                            {{ form_label(form.type) }}
-                            {{ form_widget(form.type, {
-                                'attr': {
-                                    'class': 'form-select front-input'
-                                }
-                            }) }}
+                <div class="col-md-6">
+                    <div class="offer-field">
+                        {{ form_label(form.type, 'Type') }}
+                        {{ form_widget(form.type, {
+                            'attr': {
+                                'class': 'form-select offer-input'
+                            }
+                        }) }}
+                        <div class="text-danger small mt-2">
                             {{ form_errors(form.type) }}
                         </div>
                     </div>
+                </div>
 
-                    <div class="col-12">
-                        <div class="front-field">
-                            {{ form_label(form.description) }}
-                            {{ form_widget(form.description, {
-                                'attr': {
-                                    'class': 'form-control front-input front-textarea',
-                                    'rows': 7,
-                                    'placeholder': 'Décrivez clairement votre besoin, le style souhaité, les délais, les objectifs...'
-                                }
-                            }) }}
+                <div class="col-12">
+                    <div class="offer-field">
+                        {{ form_label(form.description, 'Description') }}
+                        {{ form_widget(form.description, {
+                            'attr': {
+                                'class': 'form-control offer-input offer-textarea',
+                                'rows': 7,
+                                'placeholder': 'Décrivez clairement votre besoin, les compétences attendues, les délais et les objectifs...'
+                            }
+                        }) }}
+                        <div class="text-danger small mt-2">
                             {{ form_errors(form.description) }}
                         </div>
                     </div>
+                </div>
 
-                    <div class="col-md-6">
-                        <div class="front-field">
-                            {{ form_label(form.amount) }}
-                            {{ form_widget(form.amount, {
-                                'attr': {
-                                    'class': 'form-control front-input',
-                                    'placeholder': 'Ex: 150'
-                                }
-                            }) }}
+                <div class="col-md-6">
+                    <div class="offer-field">
+                        {{ form_label(form.amount, 'Montant') }}
+                        {{ form_widget(form.amount, {
+                            'attr': {
+                                'class': 'form-control offer-input',
+                                'placeholder': 'Ex: 150'
+                            }
+                        }) }}
+                        <div class="text-danger small mt-2">
                             {{ form_errors(form.amount) }}
                         </div>
                     </div>
+                </div>
 
+                {% if form.imageFile is defined %}
                     <div class="col-md-6">
-                        <div class="front-field">
-                            {{ form_label(form.imageFile) }}
+                        <div class="offer-field">
+                            {{ form_label(form.imageFile, 'Image de l’offre') }}
                             {{ form_widget(form.imageFile, {
                                 'attr': {
-                                    'class': 'form-control front-input front-file-input'
+                                    'class': 'form-control offer-input offer-file-input'
                                 }
                             }) }}
-                            {{ form_errors(form.imageFile) }}
+                            <div class="text-danger small mt-2">
+                                {{ form_errors(form.imageFile) }}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="post-offer-actions">
-                    <button type="submit" class="front-btn front-btn-primary">
-                        Créer l'offre
-                    </button>
-
-                    <a href="{{ path('app_home') }}" class="front-btn front-btn-secondary">
-                        Retour
-                    </a>
-                </div>
-
-                {{ form_end(form) }}
+                {% endif %}
             </div>
+
+            <div class="offer-form-actions">
+                <button type="submit" class="offer-btn offer-btn-primary">
+                    Créer l’offre
+                </button>
+
+                <a href="{{ path('app_project_owner_offer_list') }}" class="offer-btn offer-btn-secondary">
+                    Retour
+                </a>
+            </div>
+
+            {{ form_end(form) }}
         </div>
     </div>
-</section>
+</div>
 {% endblock %}
 
 {% block stylesheets %}
+{{ parent() }}
 <style>
-    .post-offer-section {
-        min-height: 100vh;
-        padding: 140px 0 80px;
-        background:
-            radial-gradient(circle at top left, rgba(255, 0, 76, 0.18), transparent 30%),
-            radial-gradient(circle at bottom right, rgba(255, 60, 60, 0.12), transparent 28%),
-            linear-gradient(135deg, #050505 0%, #0b0b12 45%, #12060a 100%);
-    }
-
-    .post-offer-wrapper {
+    .offer-form-wrapper {
         max-width: 1100px;
         margin: 0 auto;
     }
 
-    .post-offer-header {
+    .offer-form-header {
         margin-bottom: 35px;
     }
 
-    .post-offer-badge {
+    .offer-form-badge {
         display: inline-block;
         padding: 8px 18px;
         border-radius: 999px;
@@ -145,21 +145,21 @@
         margin-bottom: 16px;
     }
 
-    .post-offer-header h1 {
+    .offer-form-header h1 {
         color: #ffffff;
-        font-size: 2.6rem;
+        font-size: 2.4rem;
         font-weight: 800;
         margin-bottom: 12px;
     }
 
-    .post-offer-header p {
+    .offer-form-header p {
         color: rgba(255, 255, 255, 0.72);
         max-width: 700px;
         margin: 0 auto;
         font-size: 1.05rem;
     }
 
-    .post-offer-card {
+    .offer-form-card {
         position: relative;
         overflow: hidden;
         border-radius: 28px;
@@ -169,7 +169,7 @@
         box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
     }
 
-    .post-offer-card::before {
+    .offer-form-card::before {
         content: "";
         position: absolute;
         inset: 0;
@@ -177,37 +177,7 @@
         pointer-events: none;
     }
 
-    .front-success-popup {
-        position: relative;
-        z-index: 1;
-        background: linear-gradient(90deg, #b3002d, #ff003c);
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.12);
-        padding: 14px 18px;
-        border-radius: 14px;
-        font-weight: 700;
-        margin-bottom: 20px;
-        box-shadow: 0 12px 28px rgba(255, 0, 76, 0.22);
-        display: flex;
-        align-items: center;
-    }
-
-    .front-error-popup {
-        position: relative;
-        z-index: 1;
-        background: linear-gradient(90deg, #2c0b0b, #5c1111);
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.10);
-        padding: 14px 18px;
-        border-radius: 14px;
-        font-weight: 700;
-        margin-bottom: 20px;
-        box-shadow: 0 12px 28px rgba(120, 0, 0, 0.20);
-        display: flex;
-        align-items: center;
-    }
-
-    .front-field {
+    .offer-field {
         position: relative;
         z-index: 1;
         display: flex;
@@ -215,14 +185,14 @@
         height: 100%;
     }
 
-    .front-field label {
+    .offer-field label {
         display: block;
         color: #ffffff;
         font-weight: 600;
         margin-bottom: 10px;
     }
 
-    .front-input {
+    .offer-input {
         background: linear-gradient(145deg, rgba(20,20,28,0.96), rgba(12,12,18,0.96)) !important;
         border: 1px solid rgba(255, 255, 255, 0.10) !important;
         color: #ffffff !important;
@@ -233,29 +203,23 @@
         width: 100%;
     }
 
-    .front-input::placeholder {
+    .offer-input::placeholder {
         color: rgba(255, 255, 255, 0.45);
     }
 
-    .front-input:focus {
+    .offer-input:focus {
         border-color: rgba(255, 0, 76, 0.60) !important;
         box-shadow: 0 0 0 0.2rem rgba(255, 0, 76, 0.12) !important;
         background: rgba(255, 255, 255, 0.08) !important;
     }
 
-    .front-textarea {
+    .offer-textarea {
         min-height: 180px !important;
         resize: vertical;
         padding-top: 14px;
     }
 
-    .form-select option,
-    select option {
-        background: #ffffff;
-        color: #111111;
-    }
-
-    .front-file-input {
+    .offer-file-input {
         padding: 12px 14px;
         cursor: pointer;
         height: 58px;
@@ -263,7 +227,7 @@
         align-items: center;
     }
 
-    .front-file-input::file-selector-button {
+    .offer-file-input::file-selector-button {
         background: linear-gradient(90deg, #ff003c, #ff4d4d);
         color: white;
         border: none;
@@ -273,7 +237,7 @@
         cursor: pointer;
     }
 
-    .post-offer-actions {
+    .offer-form-actions {
         position: relative;
         z-index: 1;
         display: flex;
@@ -282,7 +246,7 @@
         margin-top: 28px;
     }
 
-    .front-btn {
+    .offer-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -295,45 +259,44 @@
         transition: all 0.25s ease;
     }
 
-    .front-btn-primary {
+    .offer-btn-primary {
         background: linear-gradient(90deg, #ff003c, #ff4d4d);
         color: #fff;
         box-shadow: 0 10px 24px rgba(255, 0, 76, 0.28);
     }
 
-    .front-btn-primary:hover {
+    .offer-btn-primary:hover {
         transform: translateY(-2px);
         color: #fff;
     }
 
-    .front-btn-secondary {
+    .offer-btn-secondary {
         background: rgba(255, 255, 255, 0.08);
         color: #ffffff;
         border: 1px solid rgba(255, 255, 255, 0.12);
     }
 
-    .front-btn-secondary:hover {
+    .offer-btn-secondary:hover {
         background: rgba(255, 255, 255, 0.14);
         color: #ffffff;
     }
 
-    .invalid-feedback,
-    .form-error-message,
-    ul li {
+    .text-danger ul {
+        margin: 0;
+        padding-left: 18px;
+    }
+
+    .text-danger li {
         color: #ff7b93;
     }
 
     @media (max-width: 768px) {
-        .post-offer-section {
-            padding: 120px 0 60px;
-        }
-
-        .post-offer-card {
+        .offer-form-card {
             padding: 24px;
             border-radius: 22px;
         }
 
-        .post-offer-header h1 {
+        .offer-form-header h1 {
             font-size: 2rem;
         }
     }
