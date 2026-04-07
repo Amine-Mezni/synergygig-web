@@ -10,8 +10,6 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
@@ -244,7 +242,6 @@ class AuthController extends AbstractController
     public function forgotPassword(
         Request $request,
         EntityManagerInterface $em,
-        MailerInterface $mailer,
     ): Response {
         if ($request->isMethod('POST')) {
             $email = trim((string) $request->request->get('email', ''));
@@ -255,9 +252,8 @@ class AuthController extends AbstractController
 
             $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
             if (!$user) {
-                // Don't reveal whether the email exists
-                $this->addFlash('success', 'If an account exists with that email, a reset code has been sent.');
-                return $this->render('auth/forgot_password.html.twig', ['email_sent' => true, 'sent_email' => $email]);
+                $this->addFlash('error', 'No account found with this email address.');
+                return $this->redirectToRoute('app_forgot_password');
             }
 
             // Generate 6-digit OTP
@@ -266,37 +262,58 @@ class AuthController extends AbstractController
             $user->setResetTokenExpiresAt(new \DateTime('+10 minutes'));
             $em->flush();
 
-            // Send OTP email
-            $emailMessage = (new Email())
-                ->from('synergygig@gmail.com')
-                ->to($user->getEmail())
-                ->subject('SynergyGig - Password Reset Code')
-                ->html(
-                    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;color:#e0e0e0;border-radius:12px">' .
-                    '<h2 style="text-align:center;color:#8b5cf6;margin-bottom:8px">Password Reset</h2>' .
-                    '<p style="text-align:center;color:#a0a0a0;font-size:14px">Use this code to reset your SynergyGig password</p>' .
-                    '<div style="text-align:center;margin:24px 0">' .
-                    '<span style="display:inline-block;font-size:36px;font-weight:bold;letter-spacing:8px;color:#fff;background:#2d2d4e;padding:16px 32px;border-radius:8px;border:1px solid #8b5cf6">' . $otp . '</span>' .
-                    '</div>' .
-                    '<p style="text-align:center;color:#a0a0a0;font-size:13px">This code expires in <strong>10 minutes</strong>.</p>' .
-                    '<p style="text-align:center;color:#666;font-size:12px;margin-top:24px">If you didn\'t request this, you can safely ignore this email.</p>' .
-                    '</div>'
-                );
-
-            try {
-                $mailer->send($emailMessage);
-            } catch (\Throwable $e) {
-                $this->addFlash('error', 'Failed to send email. Please try again later.');
-                return $this->redirectToRoute('app_forgot_password');
-            }
-
             // Store email in session for the verify step
             $request->getSession()->set('reset_email', $email);
 
-            return $this->render('auth/forgot_password.html.twig', ['email_sent' => true, 'sent_email' => $email]);
+            // Send OTP via Brevo HTTP API (direct curl)
+            $emailSent = false;
+            $apiKey = $_ENV['BREVO_API_KEY'] ?? '';
+
+            if ($apiKey !== '') {
+                $htmlBody =
+                    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px">' .
+                    '<h2 style="text-align:center;color:#8b5cf6;margin:0 0 8px">SynergyGig</h2>' .
+                    '<p style="text-align:center;color:#94a3b8;font-size:14px;margin:0 0 24px">Password Reset Code</p>' .
+                    '<div style="text-align:center;padding:20px;background:rgba(139,92,246,0.1);border-radius:8px;margin:0 0 24px">' .
+                    '<span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#3b82f6">' . $otp . '</span>' .
+                    '</div>' .
+                    '<p style="text-align:center;color:#94a3b8;font-size:13px;margin:0">This code expires in 10 minutes.<br>If you did not request this, ignore this email.</p>' .
+                    '</div>';
+
+                $payload = json_encode([
+                    'sender' => ['name' => 'SynergyGig', 'email' => 'mohamedsejibouallegue@gmail.com'],
+                    'to' => [['email' => $email, 'name' => $user->getFirstName() . ' ' . $user->getLastName()]],
+                    'subject' => 'SynergyGig - Password Reset Code',
+                    'htmlContent' => $htmlBody,
+                ]);
+
+                $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $payload,
+                    CURLOPT_HTTPHEADER => [
+                        'api-key: ' . $apiKey,
+                        'Content-Type: application/json',
+                        'Accept: application/json',
+                    ],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 10,
+                    CURLOPT_CONNECTTIMEOUT => 5,
+                ]);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                $emailSent = ($httpCode >= 200 && $httpCode < 300);
+            }
+
+            // Show OTP on screen as fallback if email fails
+            $request->getSession()->set('reset_otp_display', $emailSent ? null : $otp);
+
+            return $this->redirectToRoute('app_verify_otp');
         }
 
-        return $this->render('auth/forgot_password.html.twig', ['email_sent' => false, 'sent_email' => '']);
+        return $this->render('auth/forgot_password.html.twig');
     }
 
     #[Route('/verify-otp', name: 'app_verify_otp', methods: ['GET', 'POST'])]
@@ -340,7 +357,13 @@ class AuthController extends AbstractController
             return $this->redirectToRoute('app_reset_password');
         }
 
-        return $this->render('auth/verify_otp.html.twig', ['email' => $email]);
+        $otpDisplay = $request->getSession()->get('reset_otp_display');
+        $request->getSession()->remove('reset_otp_display');
+
+        return $this->render('auth/verify_otp.html.twig', [
+            'email' => $email,
+            'otp_display' => $otpDisplay,
+        ]);
     }
 
     #[Route('/reset-password', name: 'app_reset_password', methods: ['GET', 'POST'])]

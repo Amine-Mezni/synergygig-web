@@ -42,7 +42,7 @@ class OfferController extends AbstractController
             $qb->andWhere('o.offer_type = :type')->setParameter('type', $type);
         }
 
-        $sort = $request->query->get('sort', 'recent');
+        $sort = $request->query->get('order_by', 'recent');
         switch ($sort) {
             case 'budget_asc':  $qb->orderBy('o.amount', 'ASC'); break;
             case 'budget_desc': $qb->orderBy('o.amount', 'DESC'); break;
