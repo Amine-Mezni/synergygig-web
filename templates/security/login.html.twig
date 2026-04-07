@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion | SynergyGig</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        :root {
+            --sg-red: #ff003c;
+            --sg-red-soft: #ff4d4d;
+            --sg-dark: #050505;
+            --sg-dark-2: #0c0c12;
+            --sg-dark-3: #14141d;
+            --sg-text: #ffffff;
+            --sg-text-soft: rgba(255,255,255,0.72);
+            --sg-border: rgba(255,255,255,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #050505;
+        }
+
+        .sg-login-page {
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top left, rgba(255, 0, 60, 0.16), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(255, 80, 80, 0.10), transparent 30%),
+                linear-gradient(135deg, #050505 0%, #090910 45%, #18070d 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .sg-bg-blur {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.45;
+            animation: floatBlob 10s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .sg-blur-1 {
+            width: 280px;
+            height: 280px;
+            background: rgba(255, 0, 60, 0.35);
+            top: 8%;
+            left: 8%;
+        }
+
+        .sg-blur-2 {
+            width: 360px;
+            height: 360px;
+            background: rgba(255, 90, 90, 0.20);
+            bottom: 5%;
+            right: 5%;
+            animation-delay: 2s;
+        }
+
+        .sg-bg-grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 32px 32px;
+            mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .sg-login-wrapper {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 1220px;
+        }
+
+        .sg-login-card {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            background: linear-gradient(145deg, rgba(16,16,24,0.96), rgba(10,10,16,0.94));
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 32px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+            backdrop-filter: blur(12px);
+        }
+
+        .sg-login-left {
+            position: relative;
+            padding: 60px 50px;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+                radial-gradient(circle at top, rgba(255,0,60,0.12), transparent 30%);
+            border-right: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 680px;
+        }
+
+        .sg-brand-block {
+            max-width: 520px;
+        }
+
+        .sg-logo-circle {
+            width: 92px;
+            height: 92px;
+            border-radius: 28px;
+            background: linear-gradient(135deg, #ff003c, #ff5c5c);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 18px 36px rgba(255, 0, 60, 0.28);
+            margin-bottom: 28px;
+            animation: pulseLogo 3.8s ease-in-out infinite;
+        }
+
+        .sg-logo-text {
+            font-size: 2rem;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .sg-login-left h1 {
+            color: #fff;
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            margin-bottom: 18px;
+        }
+
+        .sg-login-left p {
+            color: rgba(255,255,255,0.76);
+            font-size: 1.05rem;
+            line-height: 1.9;
+            max-width: 500px;
+            margin: 0;
+        }
+
+        .sg-floating-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .sg-floating-badges span {
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.85);
+            font-size: 0.85rem;
+            font-weight: 600;
+            animation: subtleFloat 4.5s ease-in-out infinite;
+        }
+
+        .sg-floating-badges span:nth-child(2) { animation-delay: 0.4s; }
+        .sg-floating-badges span:nth-child(3) { animation-delay: 0.8s; }
+        .sg-floating-badges span:nth-child(4) { animation-delay: 1.2s; }
+
+        .sg-login-right {
+            padding: 60px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background:
+                linear-gradient(145deg, rgba(20,20,28,0.92), rgba(12,12,18,0.94));
+        }
+
+        .sg-form-header {
+            margin-bottom: 28px;
+        }
+
+        .sg-mini-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 999px;
+            background: rgba(255, 0, 60, 0.12);
+            border: 1px solid rgba(255, 0, 60, 0.25);
+            color: #ff5f7a;
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .sg-form-header h2 {
+            color: #fff;
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .sg-form-header p {
+            color: rgba(255,255,255,0.70);
+            margin: 0;
+        }
+
+        .sg-alert-error {
+            background: rgba(220, 53, 69, 0.14);
+            border: 1px solid rgba(220, 53, 69, 0.30);
+            color: #ff8594;
+            padding: 14px 16px;
+            border-radius: 16px;
+            margin-bottom: 22px;
+            font-weight: 600;
+        }
+
+        .sg-login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sg-form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: rgba(255,255,255,0.88);
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .sg-input {
+            width: 100%;
+            min-height: 58px;
+            padding: 0 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: linear-gradient(145deg, rgba(28,28,36,0.95), rgba(16,16,24,0.95));
+            color: #fff;
+            font-size: 1rem;
+            transition: all 0.25s ease;
+            outline: none;
+        }
+
+        .sg-input::placeholder {
+            color: rgba(255,255,255,0.38);
+        }
+
+        .sg-input:focus {
+            border-color: rgba(255, 0, 60, 0.55);
+            box-shadow: 0 0 0 4px rgba(255, 0, 60, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .sg-login-btn {
+            margin-top: 8px;
+            min-height: 58px;
+            border: none;
+            border-radius: 18px;
+            background: linear-gradient(90deg, #ff003c, #ff4d4d);
+            color: #fff;
+            font-weight: 800;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 16px 34px rgba(255, 0, 60, 0.28);
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .sg-login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 22px 42px rgba(255, 0, 60, 0.34);
+        }
+
+        .sg-login-btn i {
+            transition: transform 0.25s ease;
+        }
+
+        .sg-login-btn:hover i {
+            transform: translateX(4px);
+        }
+
+        .sg-login-footer {
+            margin-top: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            color: rgba(255,255,255,0.50);
+            font-size: 0.88rem;
+        }
+
+        .sg-login-footer span {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        @keyframes floatBlob {
+            0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+            50% { transform: translateY(-16px) translateX(10px) scale(1.04); }
+        }
+
+        @keyframes subtleFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+
+        @keyframes pulseLogo {
+            0%, 100% { transform: scale(1); box-shadow: 0 18px 36px rgba(255, 0, 60, 0.28); }
+            50% { transform: scale(1.03); box-shadow: 0 24px 44px rgba(255, 0, 60, 0.36); }
+        }
+
+        @media (max-width: 991px) {
+            .sg-login-card {
+                grid-template-columns: 1fr;
+            }
+
+            .sg-login-left {
+                min-height: auto;
+                padding: 40px 28px 28px;
+                border-right: none;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+            }
+
+            .sg-login-right {
+                padding: 40px 28px;
+            }
+
+            .sg-login-left h1 {
+                font-size: 2.2rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .sg-login-page {
+                padding: 20px 14px;
+            }
+
+            .sg-login-card {
+                border-radius: 24px;
+            }
+
+            .sg-login-left,
+            .sg-login-right {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .sg-form-header h2 {
+                font-size: 1.8rem;
+            }
+
+            .sg-logo-circle {
+                width: 78px;
+                height: 78px;
+                border-radius: 24px;
+            }
+        }
+        /* TON CSS EXISTANT ... */
+
+/* AJOUTE ICI */
+.no-bg {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.no-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 12px rgba(255, 0, 60, 0.6));
+}
+    </style>
+</head>
+<body>
+<div class="sg-login-page">
+
+    <div class="sg-bg-blur sg-blur-1"></div>
+    <div class="sg-bg-blur sg-blur-2"></div>
+    <div class="sg-bg-grid"></div>
+
+    <div class="sg-login-wrapper">
+        <div class="sg-login-card">
+
+            <div class="sg-login-left">
+                <div class="sg-brand-block">
+                   <div class="sg-logo-circle p-0 overflow-hidden">
+    <img src="{{ asset('uploads/offers/logo-69c6e13d3e91c.png') }}" alt="SynergyGig Logo" style="width:100%; height:100%; object-fit:cover;">
+</div>
+
+                    <h1>SynergyGig</h1>
+                    <p>
+                        Connectez-vous à votre espace pour gérer vos offres, suivre vos candidatures
+                        et accéder à une expérience professionnelle moderne.
+                    </p>
+                </div>
+
+                <div class="sg-floating-badges">
+                    <span>Recruitment</span>
+                    <span>Gigs</span>
+                    <span>HR Space</span>
+                    <span>Smart Workflow</span>
+                </div>
+            </div>
+
+            <div class="sg-login-right">
+                <div class="sg-form-header">
+                    <span class="sg-mini-badge">Secure Access</span>
+                    <h2>Connexion</h2>
+                    <p>Accédez à votre compte SynergyGig</p>
+                </div>
+
+                {% if error %}
+                    <div class="sg-alert-error">
+                        Email ou mot de passe invalide.
+                    </div>
+                {% endif %}
+
+                <form method="post" class="sg-login-form">
+                    <div class="sg-form-group">
+                        <label for="username">Email</label>
+                        <input
+                            type="email"
+                            value="{{ last_username }}"
+                            name="_username"
+                            id="username"
+                            class="sg-input"
+                            placeholder="exemple@sg.com"
+                            autocomplete="email"
+                            required
+                            autofocus
+                        >
+                    </div>
+
+                    <div class="sg-form-group">
+                        <label for="password">Mot de passe</label>
+                        <input
+                            type="password"
+                            name="_password"
+                            id="password"
+                            class="sg-input"
+                            placeholder="Votre mot de passe"
+                            autocomplete="current-password"
+                            required
+                        >
+                    </div>
+
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+                    <button class="sg-login-btn" type="submit">
+                        <span>Se connecter</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </button>
+                </form>
+
+                <div class="sg-login-footer">
+                    <span>Plateforme sécurisée</span>
+                    <span>Redirection selon le rôle</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -57,7 +57,7 @@ class OfferController extends AbstractController
 
             $this->addFlash('success', 'Offre créée avec succès.');
 
-            return $this->redirectToRoute('app_project_owner_offer_new');
+            return $this->redirectToRoute('app_project_owner_offer_list');
         }
 
         return $this->render('project_owner/offer/new.html.twig', [
