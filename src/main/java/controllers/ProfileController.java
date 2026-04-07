@@ -29,6 +29,7 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import services.ServiceUser;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.FaceRecognitionUtil;
 import utils.SessionManager;
 
@@ -624,6 +625,7 @@ public class ProfileController {
         }
 
         cropStage.setScene(scene);
+        DialogHelper.themeStage(cropStage);
         cropStage.showAndWait();
     }
 

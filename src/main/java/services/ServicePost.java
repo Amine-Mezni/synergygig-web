@@ -35,7 +35,7 @@ public class ServicePost implements IService<Post> {
         if (obj.has("image_base64") && !obj.get("image_base64").isJsonNull()) {
             imageBase64 = obj.get("image_base64").getAsString();
         }
-        return new Post(
+        Post p = new Post(
                 obj.get("id").getAsInt(),
                 obj.get("author_id").getAsInt(),
                 obj.get("content").getAsString(),
@@ -44,6 +44,13 @@ public class ServicePost implements IService<Post> {
                 obj.has("comments_count") ? obj.get("comments_count").getAsInt() : 0,
                 createdAt
         );
+        if (obj.has("shares_count") && !obj.get("shares_count").isJsonNull())
+            p.setSharesCount(obj.get("shares_count").getAsInt());
+        if (obj.has("visibility") && !obj.get("visibility").isJsonNull())
+            p.setVisibility(obj.get("visibility").getAsString());
+        if (obj.has("group_id") && !obj.get("group_id").isJsonNull())
+            p.setGroupId(obj.get("group_id").getAsInt());
+        return p;
     }
 
     private List<Post> jsonArrayToPosts(JsonElement el) {
@@ -140,7 +147,7 @@ public class ServicePost implements IService<Post> {
                 "(SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS comments_count " +
                 "FROM posts p ORDER BY p.created_at DESC")) {
             while (rs.next()) {
-                posts.add(new Post(
+                Post p = new Post(
                         rs.getInt("id"),
                         rs.getInt("author_id"),
                         rs.getString("content"),
@@ -148,7 +155,11 @@ public class ServicePost implements IService<Post> {
                         rs.getInt("likes_count"),
                         rs.getInt("comments_count"),
                         rs.getTimestamp("created_at")
-                ));
+                );
+                try { p.setSharesCount(rs.getInt("shares_count")); } catch (Exception ignored) {}
+                try { p.setVisibility(rs.getString("visibility")); } catch (Exception ignored) {}
+                try { p.setGroupId(rs.getObject("group_id") != null ? rs.getInt("group_id") : null); } catch (Exception ignored) {}
+                posts.add(p);
             }
         }
         return posts;

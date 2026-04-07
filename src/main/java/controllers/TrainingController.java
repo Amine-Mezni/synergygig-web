@@ -80,6 +80,7 @@ public class TrainingController {
     private User currentUser;
     private boolean isHrOrAdmin;
     private Button activeTab;
+    private Region trAmbienceIndicator;
 
     private Map<Integer, TrainingCourse> courseMap = new HashMap<>();
 
@@ -109,12 +110,16 @@ public class TrainingController {
         for (String[] tab : tabs) {
             Button btn = new Button(tab[0] + "  " + tab[1]);
             btn.getStyleClass().add("tr-tab-btn");
+            btn.setUserData(tab[1]);
             btn.setOnAction(e -> {
                 SoundManager.getInstance().play(SoundManager.TAB_SWITCH);
                 switchTab(btn, tab[1]);
             });
             tabBar.getChildren().add(btn);
         }
+
+        // Spotlight Pill Navbar
+        setupSpotlightPillNavbar();
 
         // Load course map in background, then trigger first tab
         AppThreadPool.io(() -> {
@@ -148,6 +153,7 @@ public class TrainingController {
         if (activeTab != null) activeTab.getStyleClass().remove("tr-tab-active");
         btn.getStyleClass().add("tr-tab-active");
         activeTab = btn;
+        animateTrAmbience(btn);
 
         switch (tabName) {
             case "Dashboard":    showDashboardTab(); break;
@@ -156,6 +162,90 @@ public class TrainingController {
             case "Certificates": showCertificatesTab(); break;
             case "Manage":       showManageTab(); break;
         }
+    }
+
+    // ==================== Spotlight Pill Navbar ====================
+
+    private void setupSpotlightPillNavbar() {
+        javafx.scene.layout.VBox topBar = (javafx.scene.layout.VBox) tabBar.getParent();
+        int idx = topBar.getChildren().indexOf(tabBar);
+        topBar.getChildren().remove(tabBar);
+
+        StackPane navContainer = new StackPane();
+        navContainer.getStyleClass().add("tr-nav-container");
+
+        StackPane pill = new StackPane();
+        pill.getStyleClass().add("tr-nav-pill");
+
+        tabBar.getStyleClass().remove("tr-tab-bar");
+        tabBar.getStyleClass().add("tr-pill-tabs");
+        tabBar.setAlignment(Pos.CENTER);
+
+        Region spotlightGlow = new Region();
+        spotlightGlow.setMouseTransparent(true);
+        spotlightGlow.setOpacity(0);
+        spotlightGlow.getStyleClass().add("tr-spotlight-glow");
+
+        trAmbienceIndicator = new Region();
+        trAmbienceIndicator.setManaged(false);
+        trAmbienceIndicator.setPrefHeight(2);
+        trAmbienceIndicator.setMaxHeight(2);
+        trAmbienceIndicator.setPrefWidth(50);
+        trAmbienceIndicator.setMaxWidth(50);
+        trAmbienceIndicator.getStyleClass().add("tr-ambience-line");
+
+        Region trackLine = new Region();
+        trackLine.setManaged(false);
+        trackLine.setPrefHeight(1);
+        trackLine.setMaxHeight(1);
+        trackLine.getStyleClass().add("tr-track-line");
+
+        pill.getChildren().addAll(tabBar, spotlightGlow, trackLine, trAmbienceIndicator);
+        navContainer.getChildren().add(pill);
+        topBar.getChildren().add(idx, navContainer);
+
+        pill.layoutBoundsProperty().addListener((obs, ov, nv) -> {
+            double h = nv.getHeight();
+            trackLine.setLayoutY(h - 1);
+            trackLine.setPrefWidth(nv.getWidth() - 16);
+            trackLine.setLayoutX(8);
+            trAmbienceIndicator.setLayoutY(h - 2);
+        });
+
+        tabBar.setOnMouseMoved(e -> {
+            double xInPill = e.getX() + tabBar.getLayoutX();
+            double pillW = pill.getWidth();
+            if (pillW <= 0) return;
+            double pct = Math.max(0, Math.min(100, (xInPill / pillW) * 100.0));
+            spotlightGlow.setOpacity(1.0);
+            spotlightGlow.setStyle(String.format(
+                    "-fx-background-color: radial-gradient(center %.1f%% 100%%, radius 25%%, rgba(138,138,255,0.12), transparent);",
+                    pct));
+        });
+
+        tabBar.setOnMouseExited(e -> {
+            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(
+                    javafx.util.Duration.millis(400), spotlightGlow);
+            ft.setToValue(0);
+            ft.play();
+        });
+    }
+
+    private void animateTrAmbience(Button btn) {
+        if (trAmbienceIndicator == null) return;
+        Platform.runLater(() -> {
+            javafx.geometry.Bounds b = btn.getBoundsInParent();
+            if (b.getWidth() == 0) return;
+            double offset = tabBar.getLayoutX();
+            double targetX = offset + b.getMinX() + b.getWidth() / 2 - trAmbienceIndicator.getPrefWidth() / 2;
+            javafx.animation.KeyValue kv = new javafx.animation.KeyValue(
+                    trAmbienceIndicator.layoutXProperty(), targetX,
+                    javafx.animation.Interpolator.SPLINE(0.25, 0.1, 0.25, 1.0));
+            javafx.animation.KeyFrame kf = new javafx.animation.KeyFrame(
+                    javafx.util.Duration.millis(350), kv);
+            javafx.animation.Timeline tl = new javafx.animation.Timeline(kf);
+            tl.play();
+        });
     }
 
     // ================================================================
@@ -1070,6 +1160,7 @@ public class TrainingController {
         javafx.scene.Scene loadingScene = new javafx.scene.Scene(loadingBox, 420, 200);
         loadingStage.setScene(loadingScene);
         loadingStage.setResizable(false);
+        DialogHelper.themeStage(loadingStage);
         loadingStage.show();
 
         // Generate quiz on background thread
@@ -1295,6 +1386,7 @@ public class TrainingController {
         } catch (Exception ignored) {}
         quizStage.setScene(scene);
         quizStage.setResizable(false);
+        DialogHelper.themeStage(quizStage);
         quizStage.show();
 
         // ══════════════════════════════════════════════
@@ -1499,6 +1591,7 @@ public class TrainingController {
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
                     "Are you sure you want to quit the quiz? Your progress will be lost.",
                     ButtonType.YES, ButtonType.NO);
+            DialogHelper.theme(confirm);
             confirm.setHeaderText("Quit Quiz?");
             confirm.showAndWait().ifPresent(btn -> {
                 if (btn == ButtonType.YES) quizStage.close();
@@ -1564,8 +1657,11 @@ public class TrainingController {
             JsonObject q = questions.get(i).getAsJsonObject();
             int correctIdx = q.get("answer").getAsInt();
             int selectedIdx = (int) toggleGroups.get(i).getSelectedToggle().getUserData();
-            boolean isCorrect = selectedIdx == correctIdx;
             JsonArray options = q.getAsJsonArray("options");
+
+            // Handle unanswered questions (selectedIdx == -1 when time expired)
+            boolean answered = selectedIdx >= 0 && selectedIdx < options.size();
+            boolean isCorrect = answered && selectedIdx == correctIdx;
 
             VBox reviewCard = new VBox(6);
             reviewCard.setPadding(new Insets(12));
@@ -1577,7 +1673,12 @@ public class TrainingController {
             qText.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #e0e0ff;");
             qText.setWrapText(true);
 
-            Label yourAnswer = new Label("Your answer: " + letters[selectedIdx] + ") " + options.get(selectedIdx).getAsString());
+            Label yourAnswer;
+            if (answered) {
+                yourAnswer = new Label("Your answer: " + letters[selectedIdx] + ") " + options.get(selectedIdx).getAsString());
+            } else {
+                yourAnswer = new Label("Your answer: ⏰ Not answered (time expired)");
+            }
             yourAnswer.setStyle("-fx-font-size: 12px; -fx-text-fill: " + (isCorrect ? "#4CAF50;" : "#FF6B6B;"));
 
             reviewCard.getChildren().addAll(qText, yourAnswer);
@@ -1676,6 +1777,7 @@ public class TrainingController {
         javafx.scene.Scene scene = new javafx.scene.Scene(scroll, 680, 700);
         resultStage.setScene(scene);
         resultStage.setResizable(true);
+        DialogHelper.themeStage(resultStage);
         resultStage.show();
     }
 
@@ -1698,6 +1800,7 @@ public class TrainingController {
 
     private void dropEnrollment(TrainingEnrollment enrollment) {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Drop this course?", ButtonType.YES, ButtonType.NO);
+        DialogHelper.theme(confirm);
         confirm.setHeaderText("Are you sure you want to drop this course?");
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.YES) {
@@ -2039,6 +2142,7 @@ public class TrainingController {
         javafx.scene.Scene scene = new javafx.scene.Scene(root, cw + 48, ch + 90);
         dialog.setScene(scene);
         dialog.setResizable(false);
+        DialogHelper.themeStage(dialog);
         dialog.show();
     }
 
@@ -2252,6 +2356,7 @@ public class TrainingController {
         javafx.scene.Scene scene = new javafx.scene.Scene(root, canvasW + 96, canvasH + 220);
         dialog.setScene(scene);
         dialog.setResizable(false);
+        DialogHelper.themeStage(dialog);
         dialog.show();
     }
 
@@ -2451,6 +2556,7 @@ public class TrainingController {
 
     private void showCourseDialog(TrainingCourse existing) {
         Dialog<TrainingCourse> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle(existing == null ? "Add Course" : "Edit Course");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.getDialogPane().getStyleClass().add("tr-dialog");
@@ -2560,6 +2666,7 @@ public class TrainingController {
     private void deleteCourse(TrainingCourse course) {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
                 "Delete course: " + course.getTitle() + "?", ButtonType.YES, ButtonType.NO);
+        DialogHelper.theme(confirm);
         confirm.setHeaderText("This will also remove all enrollments for this course.");
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.YES) {
@@ -2717,6 +2824,7 @@ public class TrainingController {
 
         btnLearningPath.setOnAction(e -> {
             TextInputDialog dialog = new TextInputDialog("Improve my skills");
+            DialogHelper.theme(dialog);
             dialog.setTitle("Learning Path");
             dialog.setHeaderText("📍 What are your learning goals?");
             dialog.setContentText("Goals:");
@@ -2775,6 +2883,7 @@ public class TrainingController {
     private void showAlert(Alert.AlertType type, String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(type);
+            DialogHelper.theme(alert);
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(content);

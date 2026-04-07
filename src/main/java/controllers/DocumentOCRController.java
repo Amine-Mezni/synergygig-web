@@ -9,6 +9,7 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import services.ZAIService;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.DocumentExtractor;
 import utils.SoundManager;
 
@@ -94,7 +95,9 @@ public class DocumentOCRController implements Stoppable {
                     statusBar.setVisible(false);
                     statusBar.setManaged(false);
                     SoundManager.getInstance().play(SoundManager.ERROR);
-                    new Alert(Alert.AlertType.ERROR, "Error: " + e.getMessage(), ButtonType.OK).showAndWait();
+                    Alert alert = new Alert(Alert.AlertType.ERROR, "Error: " + e.getMessage(), ButtonType.OK);
+                    DialogHelper.theme(alert);
+                    alert.showAndWait();
                 });
             }
         });

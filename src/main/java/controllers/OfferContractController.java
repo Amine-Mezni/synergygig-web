@@ -93,6 +93,7 @@ public class OfferContractController {
     private User currentUser;
     private boolean isOwnerOrAdmin;
     private Button activeTab;
+    private Region ocAmbienceIndicator;
     private String currentMarketFilter = "ALL";
     private Map<Integer, Offer> offerMap = new HashMap<>();
     private List<Offer> allOffers = new ArrayList<>();
@@ -148,12 +149,16 @@ public class OfferContractController {
         for (String[] tab : tabs) {
             Button btn = new Button(tab[0] + "  " + tab[1]);
             btn.getStyleClass().add("oc-tab-btn");
+            btn.setUserData(tab[1]);
             btn.setOnAction(e -> {
                 SoundManager.getInstance().play(SoundManager.TAB_SWITCH);
                 switchTab(btn, tab[1]);
             });
             tabBar.getChildren().add(btn);
         }
+
+        // Spotlight Pill Navbar
+        setupSpotlightPillNavbar();
 
         setupContractsTable();
 
@@ -188,12 +193,97 @@ public class OfferContractController {
         return utils.UserNameCache.getName(userId);
     }
 
+    // ==================== Spotlight Pill Navbar ====================
+
+    private void setupSpotlightPillNavbar() {
+        javafx.scene.layout.VBox topBar = (javafx.scene.layout.VBox) tabBar.getParent();
+        int idx = topBar.getChildren().indexOf(tabBar);
+        topBar.getChildren().remove(tabBar);
+
+        StackPane navContainer = new StackPane();
+        navContainer.getStyleClass().add("oc-nav-container");
+
+        StackPane pill = new StackPane();
+        pill.getStyleClass().add("oc-nav-pill");
+
+        tabBar.getStyleClass().remove("oc-tab-bar");
+        tabBar.getStyleClass().add("oc-pill-tabs");
+        tabBar.setAlignment(Pos.CENTER);
+
+        Region spotlightGlow = new Region();
+        spotlightGlow.setMouseTransparent(true);
+        spotlightGlow.setOpacity(0);
+        spotlightGlow.getStyleClass().add("oc-spotlight-glow");
+
+        ocAmbienceIndicator = new Region();
+        ocAmbienceIndicator.setManaged(false);
+        ocAmbienceIndicator.setPrefHeight(2);
+        ocAmbienceIndicator.setMaxHeight(2);
+        ocAmbienceIndicator.setPrefWidth(50);
+        ocAmbienceIndicator.setMaxWidth(50);
+        ocAmbienceIndicator.getStyleClass().add("oc-ambience-line");
+
+        Region trackLine = new Region();
+        trackLine.setManaged(false);
+        trackLine.setPrefHeight(1);
+        trackLine.setMaxHeight(1);
+        trackLine.getStyleClass().add("oc-track-line");
+
+        pill.getChildren().addAll(tabBar, spotlightGlow, trackLine, ocAmbienceIndicator);
+        navContainer.getChildren().add(pill);
+        topBar.getChildren().add(idx, navContainer);
+
+        pill.layoutBoundsProperty().addListener((obs, ov, nv) -> {
+            double h = nv.getHeight();
+            trackLine.setLayoutY(h - 1);
+            trackLine.setPrefWidth(nv.getWidth() - 16);
+            trackLine.setLayoutX(8);
+            ocAmbienceIndicator.setLayoutY(h - 2);
+        });
+
+        tabBar.setOnMouseMoved(e -> {
+            double xInPill = e.getX() + tabBar.getLayoutX();
+            double pillW = pill.getWidth();
+            if (pillW <= 0) return;
+            double pct = Math.max(0, Math.min(100, (xInPill / pillW) * 100.0));
+            spotlightGlow.setOpacity(1.0);
+            spotlightGlow.setStyle(String.format(
+                    "-fx-background-color: radial-gradient(center %.1f%% 100%%, radius 25%%, rgba(138,138,255,0.12), transparent);",
+                    pct));
+        });
+
+        tabBar.setOnMouseExited(e -> {
+            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(
+                    javafx.util.Duration.millis(400), spotlightGlow);
+            ft.setToValue(0);
+            ft.play();
+        });
+    }
+
+    private void animateOcAmbience(Button btn) {
+        if (ocAmbienceIndicator == null) return;
+        Platform.runLater(() -> {
+            javafx.geometry.Bounds b = btn.getBoundsInParent();
+            if (b.getWidth() == 0) return;
+            double offset = tabBar.getLayoutX();
+            double targetX = offset + b.getMinX() + b.getWidth() / 2 - ocAmbienceIndicator.getPrefWidth() / 2;
+            javafx.animation.KeyValue kv = new javafx.animation.KeyValue(
+                    ocAmbienceIndicator.layoutXProperty(), targetX,
+                    javafx.animation.Interpolator.SPLINE(0.25, 0.1, 0.25, 1.0));
+            javafx.animation.KeyFrame kf = new javafx.animation.KeyFrame(
+                    javafx.util.Duration.millis(350), kv);
+            javafx.animation.Timeline tl = new javafx.animation.Timeline(kf);
+            tl.play();
+        });
+    }
+
     // ==================== Tab Switching ====================
 
     private void switchTab(Button btn, String tabName) {
         if (activeTab != null) activeTab.getStyleClass().remove("oc-tab-active");
         btn.getStyleClass().add("oc-tab-active");
         activeTab = btn;
+        animateOcAmbience(btn);
 
         // Hide all views
         marketplaceView.setVisible(false); marketplaceView.setManaged(false);
@@ -480,6 +570,7 @@ public class OfferContractController {
 
     private void showOfferDetails(Offer o) {
         Dialog<Void> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Offer Details");
         dialog.setHeaderText(o.getTitle());
 
@@ -635,7 +726,13 @@ public class OfferContractController {
         btnDelete.setOnAction(e -> deleteOffer(o));
 
         Button btnToggle = new Button(Offer.STATUS_DRAFT.equals(o.getStatus()) ? "Publish" : Offer.STATUS_PUBLISHED.equals(o.getStatus()) ? "Close" : o.getStatus());
-        btnToggle.getStyleClass().add("oc-btn-primary");
+        if (Offer.STATUS_DRAFT.equals(o.getStatus())) {
+            btnToggle.getStyleClass().add("oc-btn-publish");
+        } else if (Offer.STATUS_PUBLISHED.equals(o.getStatus())) {
+            btnToggle.getStyleClass().add("oc-btn-close");
+        } else {
+            btnToggle.getStyleClass().add("oc-btn-secondary");
+        }
         btnToggle.setOnAction(e -> toggleOfferStatus(o));
 
         row.getChildren().addAll(badge, info, status, btnToggle, btnEdit, btnDelete);
@@ -653,70 +750,244 @@ public class OfferContractController {
 
     private void showOfferFormDialog(Offer existing) {
         Dialog<Offer> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle(existing == null ? "New Offer" : "Edit Offer");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        dialog.getDialogPane().setMinWidth(500);
+        dialog.getDialogPane().setMinWidth(580);
 
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(16));
+        Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
 
+        VBox form = new VBox(14);
+        form.setPadding(new Insets(20, 24, 20, 24));
+
+        // ── Title ──
+        VBox titleSec = new VBox(4);
+        Label lblTitle = new Label("Title *");
+        lblTitle.getStyleClass().add("offer-field-label");
         TextField tfTitle = new TextField(existing != null ? existing.getTitle() : "");
         tfTitle.setPromptText("Offer title");
+        tfTitle.getStyleClass().add("offer-field-input");
+        Label errTitle = new Label();
+        errTitle.getStyleClass().add("offer-field-error");
+        errTitle.setVisible(false); errTitle.setManaged(false);
+        titleSec.getChildren().addAll(lblTitle, tfTitle, errTitle);
 
+        // ── Description ──
+        VBox descSec = new VBox(4);
+        Label lblDesc = new Label("Description *");
+        lblDesc.getStyleClass().add("offer-field-label");
         TextArea taDesc = new TextArea(existing != null ? existing.getDescription() : "");
-        taDesc.setPromptText("Description");
-        taDesc.setPrefRowCount(4);
+        taDesc.setPromptText("Describe the offer, requirements, responsibilities...");
+        taDesc.setPrefRowCount(3);
+        taDesc.setWrapText(true);
+        taDesc.getStyleClass().add("offer-field-input");
+        Label errDesc = new Label();
+        errDesc.getStyleClass().add("offer-field-error");
+        errDesc.setVisible(false); errDesc.setManaged(false);
+        descSec.getChildren().addAll(lblDesc, taDesc, errDesc);
 
-        ComboBox<String> cbType = new ComboBox<>(FXCollections.observableArrayList("FULL_TIME", "PART_TIME", "FREELANCE", "INTERNSHIP", "CONTRACT"));
+        // ── Type + Skills ──
+        HBox typeSkillsRow = new HBox(12);
+        VBox typeBox = new VBox(4);
+        typeBox.setPrefWidth(160);
+        Label lblType = new Label("Type");
+        lblType.getStyleClass().add("offer-field-label");
+        ComboBox<String> cbType = new ComboBox<>(FXCollections.observableArrayList(
+                "FULL_TIME", "PART_TIME", "FREELANCE", "INTERNSHIP", "CONTRACT"));
         cbType.setValue(existing != null ? existing.getOfferType() : "FREELANCE");
+        cbType.setMaxWidth(Double.MAX_VALUE);
+        typeBox.getChildren().addAll(lblType, cbType);
 
+        VBox skillsBox = new VBox(4);
+        HBox.setHgrow(skillsBox, Priority.ALWAYS);
+        Label lblSkills = new Label("Skills *");
+        lblSkills.getStyleClass().add("offer-field-label");
         TextField tfSkills = new TextField(existing != null ? existing.getRequiredSkills() : "");
         tfSkills.setPromptText("Java, Python, React...");
+        tfSkills.getStyleClass().add("offer-field-input");
+        Label errSkills = new Label();
+        errSkills.getStyleClass().add("offer-field-error");
+        errSkills.setVisible(false); errSkills.setManaged(false);
+        skillsBox.getChildren().addAll(lblSkills, tfSkills, errSkills);
+        typeSkillsRow.getChildren().addAll(typeBox, skillsBox);
 
-        TextField tfLocation = new TextField(existing != null ? existing.getLocation() : "");
-        tfLocation.setPromptText("Remote / City");
+        // ── Location: Remote / On-site toggle ──
+        VBox locationSec = new VBox(6);
+        Label lblLocation = new Label("Location *");
+        lblLocation.getStyleClass().add("offer-field-label");
 
+        boolean[] isRemote = { true };
+        if (existing != null && existing.getLocation() != null
+                && !"Remote".equalsIgnoreCase(existing.getLocation().trim())) {
+            isRemote[0] = false;
+        }
+
+        Button btnRemote = new Button("\uD83C\uDF0D  Remote");
+        Button btnOnsite = new Button("\uD83C\uDFE2  On-site");
+        HBox toggleBox = new HBox(0, btnRemote, btnOnsite);
+        toggleBox.setAlignment(Pos.CENTER_LEFT);
+
+        TextField tfCity = new TextField();
+        tfCity.setPromptText("Enter city name...");
+        tfCity.getStyleClass().add("offer-field-input");
+        if (!isRemote[0] && existing != null) tfCity.setText(existing.getLocation());
+        tfCity.setVisible(!isRemote[0]);
+        tfCity.setManaged(!isRemote[0]);
+
+        Label errLocation = new Label();
+        errLocation.getStyleClass().add("offer-field-error");
+        errLocation.setVisible(false); errLocation.setManaged(false);
+
+        Runnable updateToggle = () -> {
+            if (isRemote[0]) {
+                btnRemote.getStyleClass().setAll("offer-toggle", "offer-toggle-left", "offer-toggle-active");
+                btnOnsite.getStyleClass().setAll("offer-toggle", "offer-toggle-right");
+                tfCity.setVisible(false); tfCity.setManaged(false);
+            } else {
+                btnRemote.getStyleClass().setAll("offer-toggle", "offer-toggle-left");
+                btnOnsite.getStyleClass().setAll("offer-toggle", "offer-toggle-right", "offer-toggle-active");
+                tfCity.setVisible(true); tfCity.setManaged(true);
+                Platform.runLater(tfCity::requestFocus);
+            }
+        };
+        updateToggle.run();
+        btnRemote.setOnAction(e -> { isRemote[0] = true; updateToggle.run(); });
+        btnOnsite.setOnAction(e -> { isRemote[0] = false; updateToggle.run(); });
+        locationSec.getChildren().addAll(lblLocation, toggleBox, tfCity, errLocation);
+
+        // ── Amount + Currency ──
+        HBox amountRow = new HBox(12);
+        VBox amountBox = new VBox(4);
+        HBox.setHgrow(amountBox, Priority.ALWAYS);
+        Label lblAmount = new Label("Amount");
+        lblAmount.getStyleClass().add("offer-field-label");
         TextField tfAmount = new TextField(existing != null ? String.valueOf(existing.getAmount()) : "0");
+        tfAmount.setPromptText("0");
+        tfAmount.getStyleClass().add("offer-field-input");
+        Label errAmount = new Label();
+        errAmount.getStyleClass().add("offer-field-error");
+        errAmount.setVisible(false); errAmount.setManaged(false);
+        amountBox.getChildren().addAll(lblAmount, tfAmount, errAmount);
+
+        VBox currencyBox = new VBox(4);
+        currencyBox.setPrefWidth(100);
+        Label lblCurrency = new Label("Currency");
+        lblCurrency.getStyleClass().add("offer-field-label");
         ComboBox<String> cbCurrency = new ComboBox<>(FXCollections.observableArrayList("USD", "EUR", "GBP", "TND"));
         cbCurrency.setValue(existing != null ? existing.getCurrency() : "USD");
+        cbCurrency.setMaxWidth(Double.MAX_VALUE);
+        currencyBox.getChildren().addAll(lblCurrency, cbCurrency);
+        amountRow.getChildren().addAll(amountBox, currencyBox);
 
-        DatePicker dpStart = new DatePicker(existing != null && existing.getStartDate() != null ? existing.getStartDate().toLocalDate() : null);
-        DatePicker dpEnd = new DatePicker(existing != null && existing.getEndDate() != null ? existing.getEndDate().toLocalDate() : null);
+        // ── Date Range Calendar ──
+        VBox dateSec = new VBox(6);
+        Label lblDates = new Label("Duration *");
+        lblDates.getStyleClass().add("offer-field-label");
+        LocalDate[] startDate = {
+                existing != null && existing.getStartDate() != null ? existing.getStartDate().toLocalDate() : null
+        };
+        LocalDate[] endDate = {
+                existing != null && existing.getEndDate() != null ? existing.getEndDate().toLocalDate() : null
+        };
+        VBox calendarWidget = buildOfferDateRangeCalendar(startDate, endDate);
+        Label errDates = new Label();
+        errDates.getStyleClass().add("offer-field-error");
+        errDates.setVisible(false); errDates.setManaged(false);
+        dateSec.getChildren().addAll(lblDates, calendarWidget, errDates);
 
-        grid.add(new Label("Title:"), 0, 0);     grid.add(tfTitle, 1, 0, 2, 1);
-        grid.add(new Label("Description:"), 0, 1); grid.add(taDesc, 1, 1, 2, 1);
-        grid.add(new Label("Type:"), 0, 2);       grid.add(cbType, 1, 2);
-        grid.add(new Label("Skills:"), 0, 3);     grid.add(tfSkills, 1, 3, 2, 1);
-        grid.add(new Label("Location:"), 0, 4);   grid.add(tfLocation, 1, 4);
-        grid.add(new Label("Amount:"), 0, 5);     grid.add(tfAmount, 1, 5);
-        grid.add(new Label("Currency:"), 0, 6);   grid.add(cbCurrency, 1, 6);
-        grid.add(new Label("Start Date:"), 0, 7); grid.add(dpStart, 1, 7);
-        grid.add(new Label("End Date:"), 0, 8);   grid.add(dpEnd, 1, 8);
+        // ── Assemble form ──
+        Separator sep1 = new Separator();
+        Separator sep2 = new Separator();
+        Separator sep3 = new Separator();
+        form.getChildren().addAll(
+                titleSec, descSec, sep1,
+                typeSkillsRow, locationSec, sep2,
+                amountRow, sep3,
+                dateSec
+        );
 
-        dialog.getDialogPane().setContent(grid);
-        styleDarkDialog(dialog.getDialogPane());
+        ScrollPane scroll = new ScrollPane(form);
+        scroll.setFitToWidth(true);
+        scroll.setPrefViewportHeight(540);
+        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        dialog.getDialogPane().setContent(scroll);
 
+        // ── Validation (prevents close on invalid input) ──
+        okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            boolean valid = true;
+            for (Label err : new Label[]{ errTitle, errDesc, errSkills, errLocation, errAmount, errDates }) {
+                err.setVisible(false); err.setManaged(false);
+            }
+            tfTitle.getStyleClass().remove("offer-field-invalid");
+            taDesc.getStyleClass().remove("offer-field-invalid");
+            tfSkills.getStyleClass().remove("offer-field-invalid");
+            tfCity.getStyleClass().remove("offer-field-invalid");
+            tfAmount.getStyleClass().remove("offer-field-invalid");
+
+            if (tfTitle.getText().trim().length() < 3) {
+                errTitle.setText("\u26A0 Title must be at least 3 characters");
+                errTitle.setVisible(true); errTitle.setManaged(true);
+                tfTitle.getStyleClass().add("offer-field-invalid");
+                valid = false;
+            }
+            if (taDesc.getText().trim().isEmpty()) {
+                errDesc.setText("\u26A0 Description is required");
+                errDesc.setVisible(true); errDesc.setManaged(true);
+                taDesc.getStyleClass().add("offer-field-invalid");
+                valid = false;
+            }
+            if (tfSkills.getText().trim().isEmpty()) {
+                errSkills.setText("\u26A0 At least one skill is required");
+                errSkills.setVisible(true); errSkills.setManaged(true);
+                tfSkills.getStyleClass().add("offer-field-invalid");
+                valid = false;
+            }
+            if (!isRemote[0] && tfCity.getText().trim().isEmpty()) {
+                errLocation.setText("\u26A0 City name is required for on-site offers");
+                errLocation.setVisible(true); errLocation.setManaged(true);
+                tfCity.getStyleClass().add("offer-field-invalid");
+                valid = false;
+            }
+            try {
+                double amt = Double.parseDouble(tfAmount.getText().trim());
+                if (amt < 0) throw new NumberFormatException();
+            } catch (NumberFormatException ex) {
+                errAmount.setText("\u26A0 Enter a valid positive number");
+                errAmount.setVisible(true); errAmount.setManaged(true);
+                tfAmount.getStyleClass().add("offer-field-invalid");
+                valid = false;
+            }
+            if (startDate[0] == null || endDate[0] == null) {
+                errDates.setText("\u26A0 Select both start and end dates on the calendar");
+                errDates.setVisible(true); errDates.setManaged(true);
+                valid = false;
+            } else if (endDate[0].isBefore(startDate[0])) {
+                errDates.setText("\u26A0 End date must be on or after start date");
+                errDates.setVisible(true); errDates.setManaged(true);
+                valid = false;
+            }
+            if (!valid) {
+                event.consume();
+                SoundManager.getInstance().play(SoundManager.ERROR);
+            }
+        });
+
+        // ── Result ──
         dialog.setResultConverter(btn -> {
             if (btn == ButtonType.OK) {
-                try {
-                    Offer o = existing != null ? existing : new Offer();
-                    o.setTitle(tfTitle.getText().trim());
-                    o.setDescription(taDesc.getText().trim());
-                    o.setOfferType(cbType.getValue());
-                    o.setRequiredSkills(tfSkills.getText().trim());
-                    o.setLocation(tfLocation.getText().trim());
-                    o.setAmount(Double.parseDouble(tfAmount.getText().trim()));
-                    o.setCurrency(cbCurrency.getValue());
-                    o.setOwnerId(currentUser.getId());
-                    if (existing == null) o.setStatus("DRAFT");
-                    o.setStartDate(dpStart.getValue() != null ? Date.valueOf(dpStart.getValue()) : null);
-                    o.setEndDate(dpEnd.getValue() != null ? Date.valueOf(dpEnd.getValue()) : null);
-                    return o;
-                } catch (Exception ex) {
-                    showError("Invalid input: " + ex.getMessage());
-                }
+                Offer o = existing != null ? existing : new Offer();
+                o.setTitle(tfTitle.getText().trim());
+                o.setDescription(taDesc.getText().trim());
+                o.setOfferType(cbType.getValue());
+                o.setRequiredSkills(tfSkills.getText().trim());
+                o.setLocation(isRemote[0] ? "Remote" : tfCity.getText().trim());
+                o.setAmount(Double.parseDouble(tfAmount.getText().trim()));
+                o.setCurrency(cbCurrency.getValue());
+                o.setOwnerId(currentUser.getId());
+                if (existing == null) o.setStatus("DRAFT");
+                o.setStartDate(startDate[0] != null ? Date.valueOf(startDate[0]) : null);
+                o.setEndDate(endDate[0] != null ? Date.valueOf(endDate[0]) : null);
+                return o;
             }
             return null;
         });
@@ -736,6 +1007,147 @@ public class OfferContractController {
                 showError("Save failed: " + e.getMessage());
             }
         });
+    }
+
+    /** MUI-inspired inline date range calendar for offer forms. */
+    private VBox buildOfferDateRangeCalendar(LocalDate[] startDate, LocalDate[] endDate) {
+        VBox cal = new VBox(8);
+        cal.getStyleClass().add("offer-calendar");
+        cal.setPadding(new Insets(14));
+
+        LocalDate[] viewMonth = {
+                startDate[0] != null ? startDate[0].withDayOfMonth(1) : LocalDate.now().withDayOfMonth(1)
+        };
+        boolean[] selectingEnd = { startDate[0] != null && endDate[0] == null };
+
+        // ── Selected dates display ──
+        HBox selectedDates = new HBox(16);
+        selectedDates.setAlignment(Pos.CENTER);
+
+        VBox startBox = new VBox(2);
+        startBox.setAlignment(Pos.CENTER);
+        startBox.getStyleClass().add("offer-cal-date-box");
+        Label startLabel = new Label("START");
+        startLabel.getStyleClass().add("offer-cal-section-label");
+        Label startValue = new Label(startDate[0] != null
+                ? startDate[0].format(DateTimeFormatter.ofPattern("MMM d, yyyy")) : "Select...");
+        startValue.getStyleClass().add("offer-cal-date-value");
+        if (startDate[0] != null) startValue.getStyleClass().add("offer-cal-date-active");
+        startBox.getChildren().addAll(startLabel, startValue);
+
+        Label arrowLbl = new Label("\u2192");
+        arrowLbl.setStyle("-fx-text-fill: #6B6B78; -fx-font-size: 20; -fx-padding: 8 0 0 0;");
+
+        VBox endBox = new VBox(2);
+        endBox.setAlignment(Pos.CENTER);
+        endBox.getStyleClass().add("offer-cal-date-box");
+        Label endLabel = new Label("END");
+        endLabel.getStyleClass().add("offer-cal-section-label");
+        Label endValue = new Label(endDate[0] != null
+                ? endDate[0].format(DateTimeFormatter.ofPattern("MMM d, yyyy")) : "Select...");
+        endValue.getStyleClass().add("offer-cal-date-value");
+        if (endDate[0] != null) endValue.getStyleClass().add("offer-cal-date-active");
+        endBox.getChildren().addAll(endLabel, endValue);
+
+        selectedDates.getChildren().addAll(startBox, arrowLbl, endBox);
+
+        // ── Month navigation ──
+        HBox monthNav = new HBox();
+        monthNav.setAlignment(Pos.CENTER);
+        monthNav.setPadding(new Insets(4, 0, 4, 0));
+        Button prevBtn = new Button("\u25C2");
+        prevBtn.getStyleClass().setAll("offer-cal-nav");
+        Label monthLabel = new Label();
+        monthLabel.getStyleClass().add("offer-cal-month-label");
+        HBox.setHgrow(monthLabel, Priority.ALWAYS);
+        monthLabel.setMaxWidth(Double.MAX_VALUE);
+        monthLabel.setAlignment(Pos.CENTER);
+        Button nextBtn = new Button("\u25B8");
+        nextBtn.getStyleClass().setAll("offer-cal-nav");
+        monthNav.getChildren().addAll(prevBtn, monthLabel, nextBtn);
+
+        // ── Day-of-week headers ──
+        GridPane dowRow = new GridPane();
+        dowRow.setAlignment(Pos.CENTER);
+        double cellW = 42;
+        String[] dows = {"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};
+        for (int i = 0; i < 7; i++) {
+            Label d = new Label(dows[i]);
+            d.getStyleClass().add("offer-cal-dow");
+            d.setPrefWidth(cellW);
+            d.setAlignment(Pos.CENTER);
+            dowRow.add(d, i, 0);
+        }
+
+        // ── Day grid ──
+        GridPane dayGrid = new GridPane();
+        dayGrid.setAlignment(Pos.CENTER);
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MMM d, yyyy");
+
+        Runnable[] renderRef = new Runnable[1];
+        renderRef[0] = () -> {
+            dayGrid.getChildren().clear();
+            LocalDate first = viewMonth[0];
+            monthLabel.setText(first.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+            int startDow = first.getDayOfWeek().getValue() % 7; // Sun=0
+            int daysInMonth = first.lengthOfMonth();
+            LocalDate today = LocalDate.now();
+
+            int row = 0, col = startDow;
+            for (int d = 1; d <= daysInMonth; d++) {
+                LocalDate date = first.withDayOfMonth(d);
+                Button dayBtn = new Button(String.valueOf(d));
+                dayBtn.setPrefSize(cellW, 34);
+                dayBtn.setMinSize(cellW, 34);
+                dayBtn.getStyleClass().setAll("offer-cal-day");
+
+                boolean isStart = date.equals(startDate[0]);
+                boolean isEnd = date.equals(endDate[0]);
+                boolean inRange = startDate[0] != null && endDate[0] != null
+                        && !date.isBefore(startDate[0]) && !date.isAfter(endDate[0]);
+                boolean isToday = date.equals(today);
+
+                if (isStart || isEnd) {
+                    dayBtn.getStyleClass().add("offer-cal-day-selected");
+                } else if (inRange) {
+                    dayBtn.getStyleClass().add("offer-cal-day-range");
+                }
+                if (isToday) {
+                    dayBtn.getStyleClass().add("offer-cal-day-today");
+                }
+
+                final LocalDate clickDate = date;
+                dayBtn.setOnAction(ev -> {
+                    if (!selectingEnd[0] || startDate[0] == null || clickDate.isBefore(startDate[0])) {
+                        startDate[0] = clickDate;
+                        endDate[0] = null;
+                        selectingEnd[0] = true;
+                    } else {
+                        endDate[0] = clickDate;
+                        selectingEnd[0] = false;
+                    }
+                    startValue.setText(startDate[0] != null ? startDate[0].format(fmt) : "Select...");
+                    startValue.getStyleClass().remove("offer-cal-date-active");
+                    if (startDate[0] != null) startValue.getStyleClass().add("offer-cal-date-active");
+                    endValue.setText(endDate[0] != null ? endDate[0].format(fmt) : "Select...");
+                    endValue.getStyleClass().remove("offer-cal-date-active");
+                    if (endDate[0] != null) endValue.getStyleClass().add("offer-cal-date-active");
+                    renderRef[0].run();
+                });
+
+                dayGrid.add(dayBtn, col, row);
+                col++;
+                if (col > 6) { col = 0; row++; }
+            }
+        };
+
+        prevBtn.setOnAction(e -> { viewMonth[0] = viewMonth[0].minusMonths(1); renderRef[0].run(); });
+        nextBtn.setOnAction(e -> { viewMonth[0] = viewMonth[0].plusMonths(1); renderRef[0].run(); });
+        renderRef[0].run();
+
+        Separator sep = new Separator();
+        cal.getChildren().addAll(selectedDates, sep, monthNav, dowRow, dayGrid);
+        return cal;
     }
 
     private void toggleOfferStatus(Offer o) {
@@ -758,6 +1170,7 @@ public class OfferContractController {
 
     private void deleteOffer(Offer o) {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Delete offer '" + o.getTitle() + "'? This will also delete all applications and contracts.", ButtonType.YES, ButtonType.NO);
+        DialogHelper.theme(confirm);
         styleDarkDialog(confirm.getDialogPane());
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.YES) {
@@ -778,6 +1191,24 @@ public class OfferContractController {
 
     private void refreshApplications() {
         applicationsList.getChildren().clear();
+
+        // ── Auto-cleanup: remove interviews whose date has already passed ──
+        AppThreadPool.io(() -> {
+            try {
+                List<Interview> allInterviews = serviceInterview.recuperer();
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                for (Interview iv : allInterviews) {
+                    if (iv.getDateTime() != null && iv.getDateTime().toLocalDateTime().isBefore(now)
+                            && "SCHEDULED".equalsIgnoreCase(iv.getStatus())) {
+                        serviceInterview.supprimer(iv.getId());
+                        System.out.println("[OC] Auto-removed past interview #" + iv.getId());
+                    }
+                }
+            } catch (Exception ex) {
+                System.err.println("Past interview cleanup failed: " + ex.getMessage());
+            }
+        });
+
         try {
             List<JobApplication> apps;
             if (isOwnerOrAdmin) {
@@ -927,15 +1358,58 @@ public class OfferContractController {
         Button btnViewCover = new Button("View");
         btnViewCover.getStyleClass().add("oc-btn-secondary");
         btnViewCover.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Application Details");
-            alert.setHeaderText(offerTitle + " — " + getUserName(a.getApplicantId()));
-            String content = "Cover Letter:\n" + (a.getCoverLetter() != null ? a.getCoverLetter() : "N/A");
-            if (a.getAiFeedback() != null) content += "\n\nAI Feedback:\n" + a.getAiFeedback();
-            alert.setContentText(content);
-            alert.getDialogPane().setMinWidth(500);
-            styleDarkDialog(alert.getDialogPane());
-            alert.showAndWait();
+            Dialog<ButtonType> detailDialog = new Dialog<>();
+            DialogHelper.theme(detailDialog);
+            detailDialog.setTitle("Application Details");
+            detailDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+            detailDialog.getDialogPane().setMinWidth(520);
+
+            VBox detailContent = new VBox(12);
+            detailContent.setPadding(new Insets(16));
+
+            Label detailHeader = new Label(offerTitle + " — " + getUserName(a.getApplicantId()));
+            detailHeader.setStyle("-fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: #F0EDEE;");
+            detailHeader.setWrapText(true);
+
+            Label coverHeader = new Label("\ud83d\udcdd Cover Letter");
+            coverHeader.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #90DDF0;");
+            Label coverBody = new Label(a.getCoverLetter() != null ? a.getCoverLetter() : "N/A");
+            coverBody.setWrapText(true);
+            coverBody.setStyle("-fx-text-fill: #C0C0D8; -fx-font-size: 12; -fx-padding: 8 12; -fx-background-color: #14131A; -fx-background-radius: 8;");
+
+            detailContent.getChildren().addAll(detailHeader, new Separator(), coverHeader, coverBody);
+
+            if (a.getAiFeedback() != null && !a.getAiFeedback().isBlank()) {
+                Label aiHeader = new Label("\ud83e\udd16 AI Assessment");
+                aiHeader.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #90DDF0; -fx-padding: 8 0 0 0;");
+
+                String feedbackDisplay = a.getAiFeedback();
+                try {
+                    String cleaned = feedbackDisplay.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*$", "").trim();
+                    JsonObject fbJson = JsonParser.parseString(cleaned).getAsJsonObject();
+                    feedbackDisplay = formatAiFeedback(fbJson);
+                } catch (Exception ignored) { }
+
+                Label aiBody = new Label(feedbackDisplay);
+                aiBody.setWrapText(true);
+                aiBody.setStyle("-fx-text-fill: #C0C0D8; -fx-font-size: 12; -fx-padding: 8 12; -fx-background-color: #14131A; -fx-background-radius: 8;");
+
+                if (a.getAiScore() != null) {
+                    String color = a.getAiScore() >= 70 ? "#22C55E" : a.getAiScore() >= 40 ? "#F59E0B" : "#EF4444";
+                    Label scoreBadge = new Label("AI Fit Score: " + a.getAiScore() + "%");
+                    scoreBadge.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + color + "; -fx-padding: 4 0 0 0;");
+                    detailContent.getChildren().addAll(aiHeader, scoreBadge, aiBody);
+                } else {
+                    detailContent.getChildren().addAll(aiHeader, aiBody);
+                }
+            }
+
+            ScrollPane sp = new ScrollPane(detailContent);
+            sp.setFitToWidth(true);
+            sp.setPrefViewportHeight(400);
+            sp.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+            detailDialog.getDialogPane().setContent(sp);
+            detailDialog.showAndWait();
         });
         actions.getChildren().add(btnViewCover);
 
@@ -968,6 +1442,7 @@ public class OfferContractController {
         }
 
         Dialog<JobApplication> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Apply to: " + offer.getTitle());
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.getDialogPane().setMinWidth(450);
@@ -1020,9 +1495,10 @@ public class OfferContractController {
                         );
                         // Parse score from AI result
                         try {
-                            com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(result).getAsJsonObject();
+                            String cleaned = result.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*$", "").trim();
+                            com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(cleaned).getAsJsonObject();
                             if (json.has("score")) a.setAiScore(json.get("score").getAsInt());
-                            if (json.has("feedback")) a.setAiFeedback(json.get("feedback").getAsString());
+                            a.setAiFeedback(formatAiFeedback(json));
                         } catch (Exception parseEx) {
                             a.setAiFeedback(result);
                         }
@@ -1159,13 +1635,20 @@ public class OfferContractController {
                                 finalOffer.getCurrency(), finalOffer.getAmount(),
                                 hash, pdf
                         );
+                        System.out.println("[OfferContract] ✅ Contract email sent to " + applicant.getEmail());
+                    } else {
+                        System.err.println("[OfferContract] ⚠ Cannot send contract email: applicant or email is null (userId=" + a.getApplicantId() + ")");
+                        Platform.runLater(() -> showError(
+                                "Contract #" + finalContract.getId() + " was created, but the applicant has no email address.\n"
+                                + "The contract is available in the Contracts tab."));
                     }
                     serviceNotification.notifyContractReady(
                             a.getApplicantId(), applicantName, finalOffer.getTitle(), finalContract.getId());
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     Platform.runLater(() -> showError(
-                            "Contract was created but post-processing failed:\n" + ex.getMessage()));
+                            "Contract was created but email/PDF failed:\n" + ex.getMessage()
+                            + "\n\nThe contract is still available in the Contracts tab."));
                 }
             });
         } catch (Exception contractEx) {
@@ -1187,6 +1670,7 @@ public class OfferContractController {
         String candidateName = getUserName(app.getApplicantId());
 
         Dialog<Interview> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Schedule Interview");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.getDialogPane().setMinWidth(450);
@@ -1273,7 +1757,7 @@ public class OfferContractController {
         Offer offer = offerMap.get(a.getOfferId());
         if (offer == null) { showError("Offer not found."); return; }
 
-        aiStatusLabel.setText("🤖 Scoring applicant...");
+        aiStatusLabel.setText("\ud83e\udd16 Scoring applicant...");
         AppThreadPool.io(() -> {
             String result = zaiService.scoreApplicant(
                     offer.getTitle(),
@@ -1285,16 +1769,15 @@ public class OfferContractController {
             Platform.runLater(() -> {
                 aiStatusLabel.setText("");
                 try {
-                    JsonObject json = JsonParser.parseString(result).getAsJsonObject();
+                    String cleaned = result.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*$", "").trim();
+                    JsonObject json = JsonParser.parseString(cleaned).getAsJsonObject();
                     int score = json.get("score").getAsInt();
                     a.setAiScore(score);
-                    a.setAiFeedback(result);
+                    a.setAiFeedback(formatAiFeedback(json));
 
-                    // Auto-reject if AI score < 60%
                     if (score < 60) {
                         a.setStatus("REJECTED");
                         serviceApp.modifier(a);
-                        // Notify applicant
                         try {
                             String offerTitle = offer.getTitle() != null ? offer.getTitle() : "Offer #" + offer.getId();
                             serviceNotification.notifyInterview(a.getApplicantId(), "REJECTED",
@@ -1302,20 +1785,127 @@ public class OfferContractController {
                         } catch (Exception notifEx) {
                             System.err.println("Auto-reject notification failed: " + notifEx.getMessage());
                         }
-                        showInfo("AI Score: " + score + "/100 — Auto-rejected (below 60% threshold)");
+                        showInfo("\u26a0\ufe0f AI Score: " + score + "/100 \u2014 Auto-rejected (below 60% threshold)");
                     } else {
                         a.setStatus("REVIEWED");
                         serviceApp.modifier(a);
-                        showInfo("AI Score: " + score + "/100");
+                        showInfo("\u2705 AI Score: " + score + "/100 \u2014 Application reviewed!");
                     }
                     refreshApplications();
                 } catch (Exception ex) {
-                    // Couldn't parse JSON, store raw feedback
                     a.setAiFeedback(result);
                     try { serviceApp.modifier(a); } catch (Exception ignored) {}
-                    showInfo("AI feedback received (raw):\n" + result.substring(0, Math.min(200, result.length())));
+                    showInfo("\u2705 AI scoring complete.\n" + result.substring(0, Math.min(200, result.length())));
                 }
             });
+        });
+    }
+
+    /** Parse AI JSON feedback into readable, user-friendly text. */
+    private String formatAiFeedback(JsonObject json) {
+        StringBuilder sb = new StringBuilder();
+        if (json.has("score")) {
+            sb.append("Score: ").append(json.get("score").getAsInt()).append("/100\n\n");
+        }
+        if (json.has("strengths") && json.get("strengths").isJsonArray()) {
+            sb.append("\u2705 Strengths:\n");
+            for (var el : json.getAsJsonArray("strengths")) {
+                sb.append("   \u2022 ").append(el.getAsString()).append("\n");
+            }
+            sb.append("\n");
+        }
+        if (json.has("gaps") && json.get("gaps").isJsonArray()) {
+            sb.append("\u26a0\ufe0f Gaps:\n");
+            for (var el : json.getAsJsonArray("gaps")) {
+                sb.append("   \u2022 ").append(el.getAsString()).append("\n");
+            }
+            sb.append("\n");
+        }
+        if (json.has("feedback")) {
+            sb.append("\ud83d\udcac Feedback:\n").append(json.get("feedback").getAsString()).append("\n");
+        }
+        if (json.has("recommendation")) {
+            sb.append("\n\ud83d\udccb Recommendation: ").append(json.get("recommendation").getAsString()).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    /** Score ALL unscored applications at once. */
+    @FXML
+    private void scoreAllApplications() {
+        aiStatusLabel.setText("\ud83e\udd16 Scoring all applications...");
+        AppThreadPool.io(() -> {
+            try {
+                List<JobApplication> allApps = serviceApp.recuperer();
+                List<JobApplication> unscored = allApps.stream()
+                        .filter(ap -> ap.getAiScore() == null
+                                && !"REJECTED".equals(ap.getStatus())
+                                && !"WITHDRAWN".equals(ap.getStatus()))
+                        .collect(Collectors.toList());
+
+                if (unscored.isEmpty()) {
+                    Platform.runLater(() -> {
+                        aiStatusLabel.setText("");
+                        showInfo("All applications have already been scored!");
+                    });
+                    return;
+                }
+
+                int[] progress = {0};
+                int total = unscored.size();
+
+                for (JobApplication ap : unscored) {
+                    Offer offer = offerMap.get(ap.getOfferId());
+                    if (offer == null) continue;
+
+                    progress[0]++;
+                    int p = progress[0];
+                    Platform.runLater(() -> aiStatusLabel.setText("\ud83e\udd16 Scoring " + p + "/" + total + "..."));
+
+                    try {
+                        String res = zaiService.scoreApplicant(
+                                offer.getTitle(),
+                                offer.getRequiredSkills() != null ? offer.getRequiredSkills() : "",
+                                ap.getCoverLetter() != null ? ap.getCoverLetter() : "",
+                                getUserName(ap.getApplicantId())
+                        );
+                        try {
+                            String cleaned = res.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*$", "").trim();
+                            JsonObject json = JsonParser.parseString(cleaned).getAsJsonObject();
+                            int score = json.get("score").getAsInt();
+                            ap.setAiScore(score);
+                            ap.setAiFeedback(formatAiFeedback(json));
+                            if (score < 60) {
+                                ap.setStatus("REJECTED");
+                                try {
+                                    String offerTitle = offer.getTitle() != null ? offer.getTitle() : "Offer #" + offer.getId();
+                                    serviceNotification.notifyInterview(ap.getApplicantId(), "REJECTED",
+                                            offerTitle + ": Application auto-rejected (AI fit score: " + score + "%). Minimum required: 60%.", 0);
+                                } catch (Exception ignored) {}
+                            } else {
+                                ap.setStatus("REVIEWED");
+                            }
+                            serviceApp.modifier(ap);
+                        } catch (Exception parseEx) {
+                            ap.setAiFeedback(res);
+                            try { serviceApp.modifier(ap); } catch (Exception ignored) {}
+                        }
+                    } catch (Exception scoreEx) {
+                        System.err.println("Score failed for app #" + ap.getId() + ": " + scoreEx.getMessage());
+                    }
+                }
+
+                Platform.runLater(() -> {
+                    aiStatusLabel.setText("");
+                    showInfo("\u2705 Scored " + total + " application" + (total > 1 ? "s" : "") + "! Applications below 60% were auto-rejected.");
+                    refreshApplications();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    aiStatusLabel.setText("");
+                    showError("Batch scoring failed: " + ex.getMessage());
+                });
+            }
         });
     }
 
@@ -1545,6 +2135,24 @@ public class OfferContractController {
                     }
                 }
 
+                // ── Sign button — available to BOTH owner and applicant when PENDING_SIGNATURE ──
+                if (Contract.STATUS_PENDING_SIGNATURE.equals(st) && !c.isSigned()) {
+                    Button btnSign = new Button("✍ Sign");
+                    btnSign.getStyleClass().add("oc-btn-primary");
+                    btnSign.setStyle("-fx-background-color: linear-gradient(to right, #07393C, #2C666E); -fx-text-fill: #F0EDEE; "
+                            + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6; -fx-cursor: hand;");
+                    btnSign.setTooltip(new Tooltip("Verify blockchain hash & draw your signature"));
+                    btnSign.setOnAction(e -> showContractSignatureDialog(c));
+                    box.getChildren().add(0, btnSign);
+                }
+                // Show signed badge if already signed
+                if (c.isSigned()) {
+                    Label signedBadge = new Label("✅ Signed");
+                    signedBadge.setStyle("-fx-background-color: #166534; -fx-text-fill: #86efac; -fx-padding: 3 8; "
+                            + "-fx-background-radius: 4; -fx-font-size: 10px; -fx-font-weight: bold;");
+                    box.getChildren().add(0, signedBadge);
+                }
+
                 // ── Applicant actions ──
                 if (!isOwnerOrAdmin) {
                     if (Contract.STATUS_PENDING_REVIEW.equals(st)) {
@@ -1598,7 +2206,11 @@ public class OfferContractController {
     private void refreshContracts() {
         try {
             List<Contract> contracts;
-            if (isOwnerOrAdmin) {
+            String role = currentUser != null ? currentUser.getRole() : "";
+            if ("ADMIN".equals(role) || "HR_MANAGER".equals(role)) {
+                // Admins & HR managers see ALL contracts
+                contracts = serviceContract.recuperer();
+            } else if (isOwnerOrAdmin) {
                 contracts = serviceContract.getByOwner(currentUser.getId());
             } else {
                 contracts = serviceContract.getByApplicant(currentUser.getId());
@@ -1623,6 +2235,7 @@ public class OfferContractController {
 
     private void showCounterOfferDialog(Contract c) {
         Dialog<ButtonType> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Counter-Offer");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.getDialogPane().setMinWidth(500);
@@ -1698,6 +2311,7 @@ public class OfferContractController {
 
     private void showQrVerificationDialog(Contract contract) {
         Dialog<ButtonType> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Contract QR Verification");
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CLOSE);
         dialog.getDialogPane().setMinWidth(600);
@@ -1957,6 +2571,279 @@ public class OfferContractController {
         dialog.showAndWait();
     }
 
+    // ================================================================
+    // CONTRACT SIGNATURE DIALOG (Blockchain verify → Draw signature)
+    // ================================================================
+
+    private void showContractSignatureDialog(Contract contract) {
+        javafx.stage.Stage dialog = new javafx.stage.Stage();
+        dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        dialog.initOwner(rootPane.getScene().getWindow());
+
+        Offer offer = offerMap.get(contract.getOfferId());
+        String offerTitle = offer != null ? offer.getTitle() : "Contract #" + contract.getId();
+        dialog.setTitle("Sign Contract — " + offerTitle);
+
+        VBox root = new VBox(14);
+        root.setAlignment(Pos.TOP_CENTER);
+        root.setPadding(new Insets(24));
+        root.setStyle("-fx-background-color: #1a1a2e;");
+
+        // ── Header ──
+        Label header = new Label("🔐 Blockchain Verified Signing");
+        header.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #90DDF0;");
+
+        Label subtitle = new Label("Contract #" + contract.getId() + "  •  " + offerTitle);
+        subtitle.setStyle("-fx-font-size: 12px; -fx-text-fill: #6B6B80;");
+        subtitle.setWrapText(true);
+
+        // ── Status Timeline ──
+        HBox timeline = createContractTimeline(contract);
+
+        // ══════════════════════════════════════════════════════
+        //  STEP 1: BLOCKCHAIN VERIFICATION
+        // ══════════════════════════════════════════════════════
+        VBox step1Box = new VBox(10);
+        step1Box.setStyle("-fx-background-color: #14131A; -fx-background-radius: 12; -fx-padding: 16; "
+                + "-fx-border-color: #1E1E3A; -fx-border-radius: 12; -fx-border-width: 1;");
+
+        Label step1Title = new Label("STEP 1 — VERIFY BLOCKCHAIN HASH");
+        step1Title.setStyle("-fx-font-size: 11px; -fx-text-fill: #90DDF0; -fx-font-weight: bold;");
+
+        Label hashDisplay = new Label("Hash: " + (contract.getBlockchainHash() != null
+                ? contract.getBlockchainHash().substring(0, Math.min(50, contract.getBlockchainHash().length())) + "..."
+                : "No hash"));
+        hashDisplay.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 10px; -fx-text-fill: #6B6B80;");
+
+        TextField verifyInput = new TextField();
+        verifyInput.setPromptText("Paste blockchain hash to verify...");
+        verifyInput.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 11px; -fx-background-color: #0F0E11; "
+                + "-fx-text-fill: #F0EDEE; -fx-border-color: #2A2A4A; -fx-border-radius: 6; -fx-background-radius: 6; -fx-padding: 8;");
+
+        Label verifyResult = new Label();
+        verifyResult.setWrapText(true);
+
+        Button btnVerify = new Button("🔍 Verify Hash");
+        btnVerify.setStyle("-fx-background-color: linear-gradient(to right, #07393C, #2C666E); -fx-text-fill: #F0EDEE; "
+                + "-fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 8; -fx-cursor: hand;");
+
+        step1Box.getChildren().addAll(step1Title, hashDisplay, verifyInput, btnVerify, verifyResult);
+
+        // ══════════════════════════════════════════════════════
+        //  STEP 2: DRAW SIGNATURE (hidden until verified)
+        // ══════════════════════════════════════════════════════
+        VBox step2Box = new VBox(12);
+        step2Box.setStyle("-fx-background-color: #14131A; -fx-background-radius: 12; -fx-padding: 16; "
+                + "-fx-border-color: #1E1E3A; -fx-border-radius: 12; -fx-border-width: 1;");
+        step2Box.setVisible(false);
+        step2Box.setManaged(false);
+
+        Label step2Title = new Label("STEP 2 — DRAW YOUR SIGNATURE");
+        step2Title.setStyle("-fx-font-size: 11px; -fx-text-fill: #22c55e; -fx-font-weight: bold;");
+
+        Label signAs = new Label("Signing as: " + currentUser.getFullName());
+        signAs.setStyle("-fx-font-size: 12px; -fx-text-fill: #90DDF0;");
+
+        // ── Canvas ──
+        double canvasW = 480, canvasH = 180;
+        StackPane canvasWrapper = new StackPane();
+        canvasWrapper.setMaxSize(canvasW + 4, canvasH + 4);
+        canvasWrapper.setStyle("-fx-background-color: #2C666E; -fx-background-radius: 10; -fx-padding: 2;");
+
+        javafx.scene.canvas.Canvas sigCanvas = new javafx.scene.canvas.Canvas(canvasW, canvasH);
+        javafx.scene.canvas.GraphicsContext gc = sigCanvas.getGraphicsContext2D();
+
+        // White background
+        gc.setFill(javafx.scene.paint.Color.WHITE);
+        gc.fillRect(0, 0, canvasW, canvasH);
+
+        // Guide line
+        gc.setStroke(javafx.scene.paint.Color.rgb(200, 200, 210));
+        gc.setLineWidth(0.8);
+        gc.strokeLine(40, canvasH * 0.72, canvasW - 40, canvasH * 0.72);
+
+        // "Sign here" hint
+        gc.setFill(javafx.scene.paint.Color.rgb(180, 180, 195));
+        gc.setFont(javafx.scene.text.Font.font("Arial", 10));
+        gc.fillText("Sign here", canvasW / 2 - 22, canvasH * 0.72 + 14);
+
+        // Drawing state
+        final boolean[] drawing = {false};
+        final double[] lastX = {0}, lastY = {0};
+
+        gc.setStroke(javafx.scene.paint.Color.rgb(25, 25, 60));
+        gc.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+        gc.setLineWidth(2.5);
+
+        sigCanvas.setOnMousePressed(e -> {
+            drawing[0] = true;
+            lastX[0] = e.getX();
+            lastY[0] = e.getY();
+        });
+        sigCanvas.setOnMouseDragged(e -> {
+            if (!drawing[0]) return;
+            gc.strokeLine(lastX[0], lastY[0], e.getX(), e.getY());
+            lastX[0] = e.getX();
+            lastY[0] = e.getY();
+        });
+        sigCanvas.setOnMouseReleased(e -> drawing[0] = false);
+
+        canvasWrapper.getChildren().add(sigCanvas);
+
+        // ── Pen controls ──
+        HBox penControls = new HBox(12);
+        penControls.setAlignment(Pos.CENTER);
+
+        String pcBtnStyle = "-fx-background-color: #333; -fx-text-fill: #ccc; -fx-font-size: 11px; "
+                + "-fx-padding: 4 10; -fx-background-radius: 5; -fx-cursor: hand;";
+
+        Label penLabel = new Label("Pen:");
+        penLabel.setStyle("-fx-text-fill: #9696A5; -fx-font-size: 11px;");
+
+        Button thinBtn = new Button("Thin");
+        thinBtn.setStyle(pcBtnStyle);
+        thinBtn.setOnAction(e -> gc.setLineWidth(1.5));
+
+        Button medBtn = new Button("Medium");
+        medBtn.setStyle(pcBtnStyle);
+        medBtn.setOnAction(e -> gc.setLineWidth(2.5));
+
+        Button boldBtn = new Button("Bold");
+        boldBtn.setStyle(pcBtnStyle);
+        boldBtn.setOnAction(e -> gc.setLineWidth(4.0));
+
+        Label colorLabel = new Label("Color:");
+        colorLabel.setStyle("-fx-text-fill: #9696A5; -fx-font-size: 11px;");
+
+        Button blackPen = new Button("⬛");
+        blackPen.setStyle(pcBtnStyle);
+        blackPen.setOnAction(e -> gc.setStroke(javafx.scene.paint.Color.rgb(25, 25, 60)));
+
+        Button bluePen = new Button("🔵");
+        bluePen.setStyle(pcBtnStyle);
+        bluePen.setOnAction(e -> gc.setStroke(javafx.scene.paint.Color.rgb(20, 50, 140)));
+
+        penControls.getChildren().addAll(penLabel, thinBtn, medBtn, boldBtn,
+                new Region() {{ setPrefWidth(12); }},
+                colorLabel, blackPen, bluePen);
+
+        // ── Action buttons ──
+        HBox actionBar = new HBox(12);
+        actionBar.setAlignment(Pos.CENTER);
+
+        Button clearBtn = new Button("🗑 Clear");
+        clearBtn.setStyle("-fx-background-color: #444; -fx-text-fill: #F0EDEE; -fx-font-size: 13px; "
+                + "-fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+        clearBtn.setOnAction(e -> {
+            gc.setFill(javafx.scene.paint.Color.WHITE);
+            gc.fillRect(0, 0, canvasW, canvasH);
+            gc.setStroke(javafx.scene.paint.Color.rgb(200, 200, 210));
+            gc.setLineWidth(0.8);
+            gc.strokeLine(40, canvasH * 0.72, canvasW - 40, canvasH * 0.72);
+            gc.setFill(javafx.scene.paint.Color.rgb(180, 180, 195));
+            gc.setFont(javafx.scene.text.Font.font("Arial", 10));
+            gc.fillText("Sign here", canvasW / 2 - 22, canvasH * 0.72 + 14);
+            gc.setStroke(javafx.scene.paint.Color.rgb(25, 25, 60));
+            gc.setLineWidth(2.5);
+        });
+
+        Button confirmBtn = new Button("✅ Confirm & Sign Contract");
+        confirmBtn.setStyle("-fx-background-color: linear-gradient(to right, #166534, #22c55e); -fx-text-fill: white; "
+                + "-fx-font-size: 13px; -fx-padding: 8 24; -fx-background-radius: 6; -fx-cursor: hand; -fx-font-weight: bold;");
+        confirmBtn.setOnAction(e -> {
+            try {
+                // Snapshot canvas to base64 PNG
+                javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+                params.setFill(javafx.scene.paint.Color.WHITE);
+                javafx.scene.image.WritableImage snapshot = sigCanvas.snapshot(params, null);
+
+                java.awt.image.BufferedImage bImg = javafx.embed.swing.SwingFXUtils.fromFXImage(snapshot, null);
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                javax.imageio.ImageIO.write(bImg, "png", baos);
+                String base64 = java.util.Base64.getEncoder().encodeToString(baos.toByteArray());
+
+                // Persist signature
+                serviceContract.signContract(contract.getId(), currentUser.getId(), base64);
+
+                // Update in-memory object
+                contract.setSignedByUserId(currentUser.getId());
+                contract.setSignatureData(base64);
+                contract.setSignedAt(new Timestamp(System.currentTimeMillis()));
+                contract.setStatus(Contract.STATUS_ACTIVE);
+
+                SoundManager.getInstance().play(SoundManager.MESSAGE_SENT);
+                dialog.close();
+                refreshContracts();
+
+                // Notify the other party
+                int notifyUserId = (currentUser.getId() == contract.getOwnerId())
+                        ? contract.getApplicantId() : contract.getOwnerId();
+                serviceNotification.create(notifyUserId, "CONTRACT",
+                        "✍ Contract Signed",
+                        "Contract #" + contract.getId() + " for \"" + offerTitle + "\" has been signed by "
+                                + currentUser.getFullName() + " and is now ACTIVE.",
+                        contract.getId(), "CONTRACT");
+
+                showInfo("Contract signed and activated!\n\nContract #" + contract.getId()
+                        + " is now ACTIVE.\nSigned by: " + currentUser.getFullName());
+            } catch (Exception ex) {
+                showError("Failed to sign contract: " + ex.getMessage());
+            }
+        });
+
+        Button cancelBtn = new Button("Cancel");
+        cancelBtn.setStyle("-fx-background-color: #333; -fx-text-fill: #ccc; -fx-font-size: 13px; "
+                + "-fx-padding: 8 20; -fx-background-radius: 6; -fx-cursor: hand;");
+        cancelBtn.setOnAction(e -> dialog.close());
+
+        actionBar.getChildren().addAll(clearBtn, confirmBtn, cancelBtn);
+
+        step2Box.getChildren().addAll(step2Title, signAs, canvasWrapper, penControls, actionBar);
+
+        // ── Step 1 verify logic ──
+        btnVerify.setOnAction(e -> {
+            String inputHash = verifyInput.getText().trim();
+            if (inputHash.isEmpty()) {
+                verifyResult.setText("⚠ Please paste the blockchain hash to verify.");
+                verifyResult.setStyle("-fx-font-size: 13px; -fx-text-fill: #f59e0b;");
+                return;
+            }
+
+            BlockchainVerifier.VerificationResult vr = BlockchainVerifier.verifyContract(
+                    contract.getId(), inputHash, contract.getBlockchainHash());
+
+            if (vr.matches) {
+                verifyResult.setText("✅ " + vr.message.split("\n")[0] + "\nBlockchain integrity confirmed — you may now sign.");
+                verifyResult.setStyle("-fx-font-size: 13px; -fx-text-fill: #22c55e; -fx-font-weight: bold;");
+                SoundManager.getInstance().play(SoundManager.MESSAGE_SENT);
+
+                // Reveal Step 2
+                step2Box.setVisible(true);
+                step2Box.setManaged(true);
+            } else {
+                verifyResult.setText("❌ " + vr.message);
+                verifyResult.setStyle("-fx-font-size: 13px; -fx-text-fill: #ef4444; -fx-font-weight: bold;");
+                SoundManager.getInstance().play(SoundManager.ERROR);
+                step2Box.setVisible(false);
+                step2Box.setManaged(false);
+            }
+        });
+
+        root.getChildren().addAll(header, subtitle, timeline, step1Box, step2Box);
+
+        ScrollPane scroll = new ScrollPane(root);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background: #1a1a2e; -fx-background-color: #1a1a2e;");
+
+        javafx.scene.Scene scene = new javafx.scene.Scene(scroll, 580, 700);
+        // Apply stylesheets from parent if available
+        try {
+            scene.getStylesheets().addAll(rootPane.getScene().getStylesheets());
+        } catch (Exception ignored) {}
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
     /**
      * Creates a visual status timeline for a contract.
      * Shows: DRAFT → PENDING_SIGNATURE → ACTIVE → COMPLETED with current step highlighted.
@@ -2150,6 +3037,7 @@ public class OfferContractController {
                 addAiMessage("assistant", result);
                 // Ask if they want to apply the terms
                 Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Apply these generated terms to the contract?", ButtonType.YES, ButtonType.NO);
+                DialogHelper.theme(confirm);
                 styleDarkDialog(confirm.getDialogPane());
                 confirm.showAndWait().ifPresent(btn -> {
                     if (btn == ButtonType.YES) {
@@ -2208,10 +3096,12 @@ public class OfferContractController {
         if (selectedAiContract == null) { showError("Select a contract first."); return; }
         // Show dialog to choose email type and style
         ChoiceDialog<String> typeDialog = new ChoiceDialog<>("CONTRACT_READY", "ACCEPTED", "REJECTED", "CONTRACT_READY");
+        DialogHelper.theme(typeDialog);
         typeDialog.setTitle("Draft Email");
         typeDialog.setHeaderText("What type of email?");
         typeDialog.showAndWait().ifPresent(type -> {
             ChoiceDialog<String> styleDialog = new ChoiceDialog<>("Professional", "Professional", "Friendly", "Direct");
+            DialogHelper.theme(styleDialog);
             styleDialog.setTitle("Email Style");
             styleDialog.setHeaderText("Choose tone:");
             styleDialog.showAndWait().ifPresent(style -> {
@@ -2241,6 +3131,7 @@ public class OfferContractController {
                     .collect(Collectors.toList());
             if (choices.isEmpty()) { showError("No applications found."); return; }
             ChoiceDialog<String> d = new ChoiceDialog<>(choices.get(0), choices);
+            DialogHelper.theme(d);
             d.setTitle("Score Applicant");
             d.setHeaderText("Select an application to score:");
             d.showAndWait().ifPresent(choice -> {
@@ -2258,6 +3149,7 @@ public class OfferContractController {
                     .map(o -> "#" + o.getId() + " — " + o.getTitle())
                     .collect(Collectors.toList());
             ChoiceDialog<String> d = new ChoiceDialog<>(choices.get(0), choices);
+            DialogHelper.theme(d);
             d.setTitle("Offer Strategy");
             d.setHeaderText("Select an offer to analyze:");
             d.showAndWait().ifPresent(choice -> {
@@ -2283,11 +3175,13 @@ public class OfferContractController {
 
     @FXML private void aiEnhanceDescription() {
         TextInputDialog dialog = new TextInputDialog();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Enhance Description");
         dialog.setHeaderText("Enter bullet points for the offer description:");
         dialog.getEditor().setPrefWidth(400);
         dialog.showAndWait().ifPresent(bullets -> {
             TextInputDialog titleDialog = new TextInputDialog();
+            DialogHelper.theme(titleDialog);
             titleDialog.setTitle("Offer Title");
             titleDialog.setHeaderText("What's the offer title?");
             titleDialog.showAndWait().ifPresent(title -> {
@@ -2373,6 +3267,7 @@ public class OfferContractController {
      */
     private void showStyledPopup(String title, String msg, String accentColor, String bgTint) {
         Dialog<ButtonType> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle(title.replaceAll("[^\\w\\s]", "").trim());
         dialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
         dialog.getDialogPane().setStyle("-fx-background-color: #0D0D1A;");

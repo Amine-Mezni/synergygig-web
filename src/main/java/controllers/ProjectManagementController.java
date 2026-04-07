@@ -25,13 +25,19 @@ import utils.SessionManager;
 import utils.SoundManager;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import utils.AppConfig;
 import utils.AppThreadPool;
 
+import java.io.File;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -66,6 +72,13 @@ public class ProjectManagementController {
     @FXML private VBox teamView;
     @FXML private HBox kanbanBoard;
 
+    // ═══ Employee Dashboard (task-centric, replaces project grid for EMPLOYEE/GIG_WORKER) ═══
+    @FXML private VBox employeeDashboard;
+
+    // ═══ Workload Constants ═══
+    private static final int MAX_ACTIVE_TASKS = 8;
+    private static final int WARN_THRESHOLD = 6;
+
     // ═══ Services ═══
     private final ServiceProject serviceProject = new ServiceProject();
     private final ServiceTask serviceTask = new ServiceTask();
@@ -92,6 +105,7 @@ public class ProjectManagementController {
 
         isAdmin = "ADMIN".equals(role) || "HR_MANAGER".equals(role);
         isProjectOwner = "PROJECT_OWNER".equals(role);
+        boolean isEmployee = "EMPLOYEE".equals(role) || "GIG_WORKER".equals(role);
 
         // PROJECT_OWNER and ADMIN can create new projects
         if (isProjectOwner || isAdmin) {
@@ -112,7 +126,7 @@ public class ProjectManagementController {
         } else if ("PROJECT_OWNER".equals(role)) {
             projectSubtitle.setText("Your projects and tasks");
         } else {
-            projectSubtitle.setText("Projects and tasks assigned to you");
+            projectSubtitle.setText("Your assigned tasks across all projects");
         }
 
         // Load users in background, projects already loads async
@@ -121,12 +135,29 @@ public class ProjectManagementController {
                 List<User> users = serviceUser.recuperer();
                 Platform.runLater(() -> {
                     for (User u : users) userCache.put(u.getId(), u);
+                    // Employee dashboard requires users to be loaded first
+                    if (isEmployee && employeeDashboard != null) {
+                        showEmployeeDashboard();
+                    }
                 });
             } catch (SQLException e) {
                 System.err.println("⚠ Failed to load users: " + e.getMessage());
             }
         });
-        loadProjects();
+
+        // Employee/GigWorker: show task-centric dashboard instead of project grid
+        if (isEmployee && employeeDashboard != null) {
+            projectListView.setVisible(false);
+            projectListView.setManaged(false);
+            employeeDashboard.setVisible(true);
+            employeeDashboard.setManaged(true);
+        } else {
+            if (employeeDashboard != null) {
+                employeeDashboard.setVisible(false);
+                employeeDashboard.setManaged(false);
+            }
+            loadProjects();
+        }
     }
 
     // ════════════════════════════════════════════════════════
@@ -596,9 +627,20 @@ public class ProjectManagementController {
 
             // Review task (PM only) — available for IN_REVIEW tasks
             if ("IN_REVIEW".equals(task.getStatus())) {
+                MenuItem viewSub = new MenuItem("📋 View Submission");
+                viewSub.setOnAction(e -> showSubmissionPopup(task));
+                ctx.getItems().add(viewSub);
                 MenuItem reviewItem = new MenuItem("\u2B50 Review & Feedback");
                 reviewItem.setOnAction(e -> showReviewDialog(task));
                 ctx.getItems().add(reviewItem);
+                ctx.getItems().add(new SeparatorMenuItem());
+            }
+
+            // View submission for DONE tasks that have one
+            if ("DONE".equals(task.getStatus()) && (task.getSubmissionText() != null || task.getSubmissionFile() != null)) {
+                MenuItem viewSub = new MenuItem("📋 View Submission");
+                viewSub.setOnAction(e -> showSubmissionPopup(task));
+                ctx.getItems().add(viewSub);
                 ctx.getItems().add(new SeparatorMenuItem());
             }
 
@@ -635,6 +677,17 @@ public class ProjectManagementController {
         }
 
         card.setCursor(javafx.scene.Cursor.HAND);
+
+        // Double-click to view submission (IN_REVIEW / DONE with submission)
+        card.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                if ("IN_REVIEW".equals(task.getStatus()) ||
+                        ("DONE".equals(task.getStatus()) && (task.getSubmissionText() != null || task.getSubmissionFile() != null))) {
+                    showSubmissionPopup(task);
+                }
+            }
+        });
+
         return card;
     }
 
@@ -781,23 +834,43 @@ public class ProjectManagementController {
         filterRow.getChildren().addAll(nameSearch, roleCombo, spacer, countLabel, colToggle);
         teamView.getChildren().add(filterRow);
 
-        // Listeners
-        nameSearch.textProperty().addListener((obs, ov, nv) ->
-                renderTeamTable(teamView, teamMembersCache, nv, roleCombo.getValue(), colVisible));
-        roleCombo.valueProperty().addListener((obs, ov, nv) ->
-                renderTeamTable(teamView, teamMembersCache, nameSearch.getText(), nv, colVisible));
+        // (Listeners are set up after scroll content creation below)
 
-        // Initial render
-        renderTeamTable(teamView, members, nameFilter, roleFilter, colVisible);
+        // Wrap everything in a ScrollPane so team table + workload are scrollable
+        ScrollPane teamScroll = new ScrollPane();
+        teamScroll.setFitToWidth(true);
+        teamScroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        VBox.setVgrow(teamScroll, Priority.ALWAYS);
+
+        VBox scrollContent = new VBox(12);
+        scrollContent.setPadding(new Insets(0));
+        teamScroll.setContent(scrollContent);
+        teamView.getChildren().add(teamScroll);
+
+        // Initial render — pass scrollContent for the table + workload
+        renderTeamTable(scrollContent, members, nameFilter, roleFilter, colVisible);
+
+        // Workload panel for project owner/admin (below the table)
+        if (isProjectOwner || isAdmin) {
+            addWorkloadToTeamView(members, scrollContent);
+        }
+
+        // Re-wire filter listeners to target scrollContent
+        nameSearch.textProperty().addListener((obs2, ov2, nv2) -> {
+            scrollContent.getChildren().clear();
+            renderTeamTable(scrollContent, teamMembersCache, nv2, roleCombo.getValue(), colVisible);
+            if (isProjectOwner || isAdmin) addWorkloadToTeamView(teamMembersCache, scrollContent);
+        });
+        roleCombo.valueProperty().addListener((obs2, ov2, nv2) -> {
+            scrollContent.getChildren().clear();
+            renderTeamTable(scrollContent, teamMembersCache, nameSearch.getText(), nv2, colVisible);
+            if (isProjectOwner || isAdmin) addWorkloadToTeamView(teamMembersCache, scrollContent);
+        });
     }
 
     private void renderTeamTable(VBox container,
                                  List<ServiceProjectMember.ProjectMember> allMembers,
                                  String nameFilter, String roleFilter, boolean[] colVisible) {
-        // Remove old table (keep filter row at index 0)
-        if (container.getChildren().size() > 1) {
-            container.getChildren().remove(1, container.getChildren().size());
-        }
 
         // Filter
         List<ServiceProjectMember.ProjectMember> filtered = allMembers.stream()
@@ -814,18 +887,14 @@ public class ProjectManagementController {
                 })
                 .collect(Collectors.toList());
 
-        // Update count if present
-        for (Node n : ((HBox) container.getChildren().get(0)).getChildren()) {
-            if (n instanceof Label && ((Label) n).getStyleClass().contains("pm-team-count")) {
-                ((Label) n).setText(filtered.size() + " member" + (filtered.size() != 1 ? "s" : ""));
+        // Update count label in filter row (which lives in teamView, not this container)
+        if (teamView.getChildren().size() > 0 && teamView.getChildren().get(0) instanceof HBox) {
+            for (Node n : ((HBox) teamView.getChildren().get(0)).getChildren()) {
+                if (n instanceof Label && ((Label) n).getStyleClass().contains("pm-team-count")) {
+                    ((Label) n).setText(filtered.size() + " member" + (filtered.size() != 1 ? "s" : ""));
+                }
             }
         }
-
-        // Table wrapper
-        ScrollPane scroll = new ScrollPane();
-        scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
-        VBox.setVgrow(scroll, Priority.ALWAYS);
 
         VBox table = new VBox(0);
         table.getStyleClass().add("pm-team-table");
@@ -847,8 +916,7 @@ public class ProjectManagementController {
             }
         }
 
-        scroll.setContent(table);
-        container.getChildren().add(scroll);
+        container.getChildren().add(table);
     }
 
     private HBox buildTeamRow(ServiceProjectMember.ProjectMember member,
@@ -1468,20 +1536,22 @@ public class ProjectManagementController {
             Integer uid = assigneeIdMap.get(newVal);
             if (uid == null || uid == 0) { workloadWarning.setVisible(false); workloadWarning.setManaged(false); return; }
             try {
-                List<Task> allTasks = serviceTask.getByProject(currentProject.getId());
-                long active = allTasks.stream()
-                        .filter(t -> t.getAssigneeId() == uid)
-                        .filter(t -> "TODO".equals(t.getStatus()) || "IN_PROGRESS".equals(t.getStatus()) || "IN_REVIEW".equals(t.getStatus()))
-                        .count();
-                if (active >= 5) {
-                    workloadWarning.setText("\u26A0\uFE0F This person already has " + active + " active tasks. Consider distributing work.");
+                int activeCount = serviceTask.getActiveTaskCount(uid);
+                if (activeCount >= MAX_ACTIVE_TASKS) {
+                    workloadWarning.setText("🚫 LIMIT REACHED — " + activeCount + "/" + MAX_ACTIVE_TASKS + " active tasks. Cannot assign more.");
+                    workloadWarning.setStyle("-fx-text-fill: #FF4444; -fx-font-size: 11; -fx-font-weight: bold; -fx-padding: 2 0 0 0;");
+                    workloadWarning.setVisible(true);
+                    workloadWarning.setManaged(true);
+                } else if (activeCount >= WARN_THRESHOLD) {
+                    workloadWarning.setText("⚠️ High workload — " + activeCount + "/" + MAX_ACTIVE_TASKS + " active tasks.");
+                    workloadWarning.setStyle("-fx-text-fill: #FF6B35; -fx-font-size: 11; -fx-padding: 2 0 0 0;");
                     workloadWarning.setVisible(true);
                     workloadWarning.setManaged(true);
                 } else {
                     workloadWarning.setVisible(false);
                     workloadWarning.setManaged(false);
                 }
-            } catch (SQLException ignored) { workloadWarning.setVisible(false); workloadWarning.setManaged(false); }
+            } catch (Exception ignored) { workloadWarning.setVisible(false); workloadWarning.setManaged(false); }
         });
 
         // Due date
@@ -1526,6 +1596,18 @@ public class ProjectManagementController {
         });
 
         dialog.showAndWait().ifPresent(task -> {
+            // ── Hard limit: block if assignee already at MAX_ACTIVE_TASKS ──
+            if (task.getAssigneeId() > 0) {
+                try {
+                    int activeCount = serviceTask.getActiveTaskCount(task.getAssigneeId());
+                    // Skip check if editing and assignee hasn't changed
+                    boolean sameAssignee = isEdit && existing.getAssigneeId() == task.getAssigneeId();
+                    if (!sameAssignee && activeCount >= MAX_ACTIVE_TASKS) {
+                        showError("Cannot assign — this person already has " + activeCount + "/" + MAX_ACTIVE_TASKS + " active tasks.\n\nPlease complete or reassign some tasks first.");
+                        return;
+                    }
+                } catch (Exception ignored) {}
+            }
             AppThreadPool.io(() -> {
                 try {
                     if (isEdit) {
@@ -1593,26 +1675,119 @@ public class ProjectManagementController {
     // ════════════════════════════════════════════════════════
 
     private void submitTaskForReview(Task task) {
-        SoundManager.getInstance().play(SoundManager.TASK_SUBMITTED);
-        AppThreadPool.io(() -> {
-            try {
-                serviceTask.updateStatus(task.getId(), "IN_REVIEW");
-                task.setStatus("IN_REVIEW");
+        // ── Submit dialog: text field + file upload ──
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Submit for Review");
+        DialogHelper.theme(dialog);
+        DialogPane pane = dialog.getDialogPane();
+        pane.getStyleClass().add("pm-dialog-pane");
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        Button okBtn = (Button) pane.lookupButton(ButtonType.OK);
+        okBtn.setText("📤 Submit");
+        okBtn.getStyleClass().add("pm-dialog-ok-btn");
+        ((Button) pane.lookupButton(ButtonType.CANCEL)).getStyleClass().add("pm-dialog-cancel-btn");
 
-                // Notify project manager
-                User assignee = userCache.get(task.getAssigneeId());
-                String empName = assignee != null ? assignee.getFirstName() + " " + assignee.getLastName() : "Employee";
-                serviceNotification.notifyTaskSubmitted(
-                        currentProject.getManagerId(), empName, task.getTitle(),
-                        currentProject.getName(), task.getId());
+        VBox content = new VBox(14);
+        content.setPadding(new Insets(20));
+        content.getStyleClass().add("pm-dialog-form");
+        content.setPrefWidth(460);
 
-                Platform.runLater(() -> {
-                    loadTaskBoard();
-                    showInfo("Task submitted for review! Awaiting manager approval.");
-                });
-            } catch (SQLException e) {
-                Platform.runLater(() -> showError("Failed: " + e.getMessage()));
+        Label header = new Label("📤  Submit \"" + task.getTitle() + "\"");
+        header.getStyleClass().add("pm-dialog-header");
+
+        Label infoLabel = new Label("Describe what you've done and optionally attach a file.");
+        infoLabel.setStyle("-fx-text-fill: #8A8A9A; -fx-font-size: 12;");
+        infoLabel.setWrapText(true);
+
+        // Submission text
+        Label textLabel = new Label("Submission Notes");
+        textLabel.getStyleClass().add("pm-form-label");
+        TextArea submissionText = new TextArea();
+        submissionText.setPromptText("Describe your work, deliverables, or any notes for the reviewer...");
+        submissionText.setPrefRowCount(5);
+        submissionText.setWrapText(true);
+        submissionText.getStyleClass().add("pm-form-control");
+
+        // File upload
+        Label fileLabel = new Label("Attach File (optional)");
+        fileLabel.getStyleClass().add("pm-form-label");
+        HBox fileRow = new HBox(10);
+        fileRow.setAlignment(Pos.CENTER_LEFT);
+        Label fileNameLabel = new Label("No file selected");
+        fileNameLabel.setStyle("-fx-text-fill: #6B6B78; -fx-font-size: 12;");
+        final File[] selectedFile = {null};
+        Button chooseFile = new Button("📎 Choose File");
+        chooseFile.getStyleClass().add("pm-btn-secondary");
+        chooseFile.setOnAction(e -> {
+            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+            fc.setTitle("Attach File");
+            fc.getExtensionFilters().addAll(
+                    new javafx.stage.FileChooser.ExtensionFilter("All Files", "*.*"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif")
+            );
+            File f = fc.showOpenDialog(pane.getScene().getWindow());
+            if (f != null) {
+                selectedFile[0] = f;
+                fileNameLabel.setText("📄 " + f.getName() + " (" + (f.length() / 1024) + " KB)");
+                fileNameLabel.setStyle("-fx-text-fill: #34d399; -fx-font-size: 12;");
             }
+        });
+        fileRow.getChildren().addAll(chooseFile, fileNameLabel);
+
+        content.getChildren().addAll(header, infoLabel, textLabel, submissionText, fileLabel, fileRow);
+        pane.setContent(content);
+
+        okBtn.setDisable(true);
+        submissionText.textProperty().addListener((obs, o, n) -> okBtn.setDisable(n.trim().isEmpty()));
+
+        dialog.showAndWait().ifPresent(btn -> {
+            if (btn != ButtonType.OK) return;
+            SoundManager.getInstance().play(SoundManager.TASK_SUBMITTED);
+            AppThreadPool.io(() -> {
+                try {
+                    // Upload file via ImgBB or server if selected
+                    if (selectedFile[0] != null) {
+                        String fileUrl = uploadFileToImgBB(selectedFile[0]);
+                        if (fileUrl != null) {
+                            task.setSubmissionFile(fileUrl);
+                        }
+                    }
+
+                    String subText = submissionText.getText().trim();
+                    task.setSubmissionText(subText);
+                    serviceTask.submitForReview(task.getId(), subText);
+                    if (task.getSubmissionFile() != null) {
+                        Map<String, Object> fileBody = new HashMap<>();
+                        fileBody.put("submission_file", task.getSubmissionFile());
+                        utils.ApiClient.put("/tasks/" + task.getId(), fileBody);
+                    }
+                    task.setStatus("IN_REVIEW");
+
+                    // Notify project manager
+                    User assignee = userCache.get(task.getAssigneeId());
+                    String empName = assignee != null ? assignee.getFirstName() + " " + assignee.getLastName() : "Employee";
+                    Project proj = null;
+                    try {
+                        for (Project p : serviceProject.recuperer()) {
+                            if (p.getId() == task.getProjectId()) { proj = p; break; }
+                        }
+                    } catch (Exception ignored) {}
+                    if (proj != null) {
+                        serviceNotification.notifyTaskSubmitted(
+                                proj.getManagerId(), empName, task.getTitle(),
+                                proj.getName(), task.getId());
+                    }
+
+                    Platform.runLater(() -> {
+                        if (currentProject != null) loadTaskBoard();
+                        refreshEmployeeDashboard();
+                        showInfo("Task submitted for review! Awaiting manager approval.");
+                    });
+                } catch (SQLException e) {
+                    Platform.runLater(() -> showError("Failed: " + e.getMessage()));
+                }
+            });
         });
     }
 
@@ -1656,6 +1831,255 @@ public class ProjectManagementController {
         });
     }
 
+    // ════════════════════════════════════════════════════════
+    //  VIEW EMPLOYEE SUBMISSION
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Shows a read-only popup displaying what the employee/gig worker submitted.
+     * Includes submission notes, attached file, and review info if any.
+     */
+    private void showSubmissionPopup(Task task) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Task Submission");
+        dialog.setHeaderText(null);
+
+        DialogHelper.theme(dialog);
+        DialogPane pane = dialog.getDialogPane();
+        pane.getStyleClass().add("pm-dialog-pane");
+        pane.getButtonTypes().add(ButtonType.CLOSE);
+        Button closeBtn = (Button) pane.lookupButton(ButtonType.CLOSE);
+        closeBtn.getStyleClass().add("pm-dialog-cancel-btn");
+
+        VBox content = new VBox(14);
+        content.setPadding(new Insets(20));
+        content.getStyleClass().add("pm-dialog-form");
+        content.setPrefWidth(520);
+
+        // ── Header ──
+        Label header = new Label("📋  Task Submission");
+        header.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #F0EDEE;");
+
+        // ── Task info ──
+        Label taskTitle = new Label("📌 " + task.getTitle());
+        taskTitle.setStyle("-fx-text-fill: #E0E0F0; -fx-font-size: 15; -fx-font-weight: bold;");
+        taskTitle.setWrapText(true);
+
+        User assignee = userCache.get(task.getAssigneeId());
+        String assigneeName = assignee != null ? assignee.getFirstName() + " " + assignee.getLastName() : "Unknown";
+        String assigneeRole = assignee != null ? assignee.getRole() : "";
+
+        HBox assigneeRow = new HBox(8);
+        assigneeRow.setAlignment(Pos.CENTER_LEFT);
+        Label avatar = new Label(assignee != null ?
+                ("" + assignee.getFirstName().charAt(0) + assignee.getLastName().charAt(0)).toUpperCase() : "??");
+        String[] colors = {"#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444"};
+        String avColor = colors[Math.abs(assigneeName.hashCode()) % colors.length];
+        avatar.setStyle("-fx-background-color: " + avColor + "; -fx-text-fill: white; " +
+                "-fx-min-width: 36; -fx-min-height: 36; -fx-max-width: 36; -fx-max-height: 36; " +
+                "-fx-background-radius: 18; -fx-alignment: center; -fx-font-weight: bold; -fx-font-size: 13;");
+        VBox nameBox = new VBox(1);
+        Label nameLabel = new Label(assigneeName);
+        nameLabel.setStyle("-fx-text-fill: #E0E0F0; -fx-font-size: 13; -fx-font-weight: bold;");
+        Label roleLabel = new Label(assigneeRole.replace("_", " "));
+        roleLabel.setStyle("-fx-text-fill: #8A8A9A; -fx-font-size: 11;");
+        nameBox.getChildren().addAll(nameLabel, roleLabel);
+        assigneeRow.getChildren().addAll(avatar, nameBox);
+
+        // Status badge
+        Label statusBadge = new Label(formatStatus(task.getStatus()));
+        statusBadge.getStyleClass().addAll("emp-status-badge",
+                "emp-status-" + task.getStatus().toLowerCase().replace("_", "-"));
+        statusBadge.setStyle(statusBadge.getStyle() + "-fx-font-size: 12; -fx-padding: 4 12;");
+
+        content.getChildren().addAll(header, new Separator(), taskTitle, assigneeRow, statusBadge);
+
+        // ── Submission text ──
+        if (task.getSubmissionText() != null && !task.getSubmissionText().isEmpty()) {
+            Label subLabel = new Label("📝 Submission Notes");
+            subLabel.setStyle("-fx-text-fill: #90DDF0; -fx-font-size: 13; -fx-font-weight: bold; -fx-padding: 10 0 4 0;");
+
+            TextArea subText = new TextArea(task.getSubmissionText());
+            subText.setEditable(false);
+            subText.setWrapText(true);
+            subText.setPrefRowCount(Math.min(8, (int) Math.ceil(task.getSubmissionText().length() / 60.0) + 1));
+            subText.getStyleClass().add("pm-form-control");
+            subText.setStyle("-fx-opacity: 0.9; -fx-background-color: #12111A; -fx-text-fill: #E0E0F0;");
+
+            content.getChildren().addAll(subLabel, subText);
+        } else {
+            Label noSub = new Label("ℹ️ No submission notes provided");
+            noSub.setStyle("-fx-text-fill: #6B6B7B; -fx-font-size: 12; -fx-padding: 10 0 0 0;");
+            content.getChildren().add(noSub);
+        }
+
+        // ── Attached file ──
+        if (task.getSubmissionFile() != null && !task.getSubmissionFile().isEmpty()) {
+            Label fileLabel = new Label("📎 Attached File");
+            fileLabel.setStyle("-fx-text-fill: #90DDF0; -fx-font-size: 13; -fx-font-weight: bold; -fx-padding: 8 0 4 0;");
+
+            HBox fileRow = new HBox(10);
+            fileRow.setAlignment(Pos.CENTER_LEFT);
+            fileRow.setPadding(new Insets(8, 12, 8, 12));
+            fileRow.setStyle("-fx-background-color: #1A1A2E; -fx-background-radius: 8; -fx-border-color: #2D2D3F; -fx-border-radius: 8;");
+
+            Label fileIcon = new Label("🖼️");
+            fileIcon.setStyle("-fx-font-size: 20;");
+
+            Hyperlink fileLink = new Hyperlink(task.getSubmissionFile().length() > 60
+                    ? task.getSubmissionFile().substring(0, 60) + "…" : task.getSubmissionFile());
+            fileLink.setStyle("-fx-text-fill: #7B61FF; -fx-font-size: 12;");
+            fileLink.setWrapText(true);
+            fileLink.setOnAction(e -> {
+                try {
+                    java.awt.Desktop.getDesktop().browse(new URI(task.getSubmissionFile()));
+                } catch (Exception ex) {
+                    showError("Can't open file: " + ex.getMessage());
+                }
+            });
+
+            Button copyBtn = new Button("📋 Copy URL");
+            copyBtn.getStyleClass().add("pm-btn-ghost");
+            copyBtn.setStyle("-fx-font-size: 11;");
+            copyBtn.setOnAction(e -> {
+                ClipboardContent cc = new ClipboardContent();
+                cc.putString(task.getSubmissionFile());
+                javafx.scene.input.Clipboard.getSystemClipboard().setContent(cc);
+                copyBtn.setText("✅ Copied!");
+                new java.util.Timer().schedule(new java.util.TimerTask() {
+                    @Override public void run() { Platform.runLater(() -> copyBtn.setText("📋 Copy URL")); }
+                }, 2000);
+            });
+
+            Button downloadBtn = new Button("⬇ Download");
+            downloadBtn.getStyleClass().add("pm-btn-ghost");
+            downloadBtn.setStyle("-fx-font-size: 11;");
+            downloadBtn.setOnAction(e -> {
+                String url = task.getSubmissionFile();
+                // Guess extension from URL
+                String ext = ".png";
+                if (url.contains(".")) {
+                    String last = url.substring(url.lastIndexOf('.'));
+                    if (last.matches("\\.[a-zA-Z0-9]{2,5}(\\?.*)?")) {
+                        ext = last.contains("?") ? last.substring(0, last.indexOf('?')) : last;
+                    }
+                }
+                javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+                fc.setTitle("Save Attachment");
+                fc.setInitialFileName(task.getTitle().replaceAll("[^a-zA-Z0-9_\\-]", "_") + ext);
+                fc.getExtensionFilters().addAll(
+                        new javafx.stage.FileChooser.ExtensionFilter("All Files", "*.*"),
+                        new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"),
+                        new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt")
+                );
+                java.io.File saveFile = fc.showSaveDialog(downloadBtn.getScene().getWindow());
+                if (saveFile != null) {
+                    downloadBtn.setText("⏳ Downloading...");
+                    downloadBtn.setDisable(true);
+                    AppThreadPool.io(() -> {
+                        try {
+                            HttpRequest req = HttpRequest.newBuilder()
+                                    .uri(new URI(url))
+                                    .timeout(Duration.ofSeconds(30))
+                                    .GET().build();
+                            HttpResponse<byte[]> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofByteArray());
+                            if (resp.statusCode() == 200) {
+                                Files.write(saveFile.toPath(), resp.body());
+                                Platform.runLater(() -> {
+                                    downloadBtn.setText("✅ Saved!");
+                                    downloadBtn.setDisable(false);
+                                    new java.util.Timer().schedule(new java.util.TimerTask() {
+                                        @Override public void run() { Platform.runLater(() -> downloadBtn.setText("⬇ Download")); }
+                                    }, 2000);
+                                });
+                            } else {
+                                Platform.runLater(() -> {
+                                    downloadBtn.setText("⬇ Download");
+                                    downloadBtn.setDisable(false);
+                                    showError("Download failed: HTTP " + resp.statusCode());
+                                });
+                            }
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> {
+                                downloadBtn.setText("⬇ Download");
+                                downloadBtn.setDisable(false);
+                                showError("Download failed: " + ex.getMessage());
+                            });
+                        }
+                    });
+                }
+            });
+
+            fileRow.getChildren().addAll(fileIcon, fileLink, copyBtn, downloadBtn);
+            content.getChildren().addAll(fileLabel, fileRow);
+        }
+
+        // ── Review info (if already reviewed) ──
+        if (task.getReviewStatus() != null && !task.getReviewStatus().isEmpty()) {
+            Label reviewLabel = new Label("⭐ Review");
+            reviewLabel.setStyle("-fx-text-fill: #FBBF24; -fx-font-size: 13; -fx-font-weight: bold; -fx-padding: 10 0 4 0;");
+
+            VBox reviewBox = new VBox(6);
+            reviewBox.setPadding(new Insets(10, 14, 10, 14));
+            reviewBox.setStyle("-fx-background-color: #1A1A2E; -fx-background-radius: 8; -fx-border-color: #2D2D3F; -fx-border-radius: 8;");
+
+            // Status
+            String statusEmoji = "APPROVED".equals(task.getReviewStatus()) ? "✅" :
+                    "NEEDS_REVISION".equals(task.getReviewStatus()) ? "🔄" : "❌";
+            Label rvStatus = new Label(statusEmoji + " " + task.getReviewStatus().replace("_", " "));
+            rvStatus.setStyle("-fx-text-fill: #E0E0F0; -fx-font-size: 13; -fx-font-weight: bold;");
+
+            // Rating — MUI-style read-only
+            if (task.getReviewRating() != null && task.getReviewRating() > 0) {
+                HBox ratingStars = createReadOnlyStarRating(task.getReviewRating(), 5);
+                reviewBox.getChildren().add(ratingStars);
+            }
+
+            reviewBox.getChildren().add(0, rvStatus);
+
+            // Feedback
+            if (task.getReviewFeedback() != null && !task.getReviewFeedback().isEmpty()) {
+                Label fb = new Label("💬 " + task.getReviewFeedback());
+                fb.setStyle("-fx-text-fill: #B0B0C0; -fx-font-size: 12;");
+                fb.setWrapText(true);
+                reviewBox.getChildren().add(fb);
+            }
+
+            if (task.getReviewDate() != null) {
+                Label dateLabel = new Label("📅 Reviewed: " + task.getReviewDate().toString());
+                dateLabel.setStyle("-fx-text-fill: #6B6B7B; -fx-font-size: 11;");
+                reviewBox.getChildren().add(dateLabel);
+            }
+
+            content.getChildren().addAll(reviewLabel, reviewBox);
+        }
+
+        // ── Action buttons for manager ──
+        if ("IN_REVIEW".equals(task.getStatus()) &&
+                (currentProject.getManagerId() == currentUser.getId() || isAdmin)) {
+            HBox actions = new HBox(10);
+            actions.setAlignment(Pos.CENTER_RIGHT);
+            actions.setPadding(new Insets(12, 0, 0, 0));
+
+            Button reviewBtn = new Button("⭐ Review & Decide");
+            reviewBtn.getStyleClass().add("pm-btn-primary");
+            reviewBtn.setOnAction(e -> {
+                dialog.close();
+                showReviewDialog(task);
+            });
+            actions.getChildren().add(reviewBtn);
+            content.getChildren().add(actions);
+        }
+
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.setPrefHeight(500);
+        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        pane.setContent(scroll);
+
+        dialog.showAndWait();
+    }
+
     private void showReviewDialog(Task task) {
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Review Task");
@@ -1674,7 +2098,7 @@ public class ProjectManagementController {
         VBox content = new VBox(14);
         content.setPadding(new Insets(20));
         content.getStyleClass().add("pm-dialog-form");
-        content.setPrefWidth(420);
+        content.setPrefWidth(480);
 
         Label header = new Label("\u2B50  Review Task");
         header.getStyleClass().add("review-dialog-header");
@@ -1686,28 +2110,39 @@ public class ProjectManagementController {
         taskInfo.setStyle("-fx-text-fill: #8A8A9A; -fx-font-size: 12;");
         taskInfo.setWrapText(true);
 
-        // Rating (1-5 stars)
-        Label ratingLabel = new Label("Rating");
-        ratingLabel.getStyleClass().add("pm-form-label");
-        HBox stars = new HBox(4);
-        stars.setAlignment(Pos.CENTER_LEFT);
-        final int[] rating = {0};
-        Label[] starLabels = new Label[5];
-        for (int i = 0; i < 5; i++) {
-            final int idx = i;
-            starLabels[i] = new Label("\u2606"); // empty star
-            starLabels[i].getStyleClass().add("review-rating-star");
-            starLabels[i].setOnMouseClicked(e -> {
-                rating[0] = idx + 1;
-                for (int j = 0; j < 5; j++) {
-                    starLabels[j].setText(j <= idx ? "\u2605" : "\u2606");
-                    starLabels[j].getStyleClass().remove("review-rating-star-active");
-                    if (j <= idx) starLabels[j].getStyleClass().add("review-rating-star-active");
-                }
-                SoundManager.getInstance().play(SoundManager.STAR_RATING);
-            });
-            stars.getChildren().add(starLabels[i]);
+        content.getChildren().addAll(header, taskInfo);
+
+        // ── Show employee's submission (text + file) ──
+        if (task.getSubmissionText() != null && !task.getSubmissionText().isEmpty()) {
+            Label subLabel = new Label("📝 Employee's Submission:");
+            subLabel.getStyleClass().add("pm-form-label");
+            subLabel.setStyle("-fx-padding: 8 0 2 0;");
+            TextArea subPreview = new TextArea(task.getSubmissionText());
+            subPreview.setEditable(false);
+            subPreview.setWrapText(true);
+            subPreview.setPrefRowCount(3);
+            subPreview.getStyleClass().add("pm-form-control");
+            subPreview.setStyle("-fx-opacity: 0.85;");
+            content.getChildren().addAll(subLabel, subPreview);
         }
+        if (task.getSubmissionFile() != null && !task.getSubmissionFile().isEmpty()) {
+            Hyperlink fileLink = new Hyperlink("📎 View Attached File");
+            fileLink.setStyle("-fx-text-fill: #7B61FF; -fx-font-size: 12;");
+            fileLink.setOnAction(e -> {
+                try {
+                    java.awt.Desktop.getDesktop().browse(new URI(task.getSubmissionFile()));
+                } catch (Exception ex) {
+                    showError("Can't open file: " + ex.getMessage());
+                }
+            });
+            content.getChildren().add(fileLink);
+        }
+
+        // Rating (1-5 stars) — MUI-style interactive
+        Label ratingLabel = new Label("⭐ Rating");
+        ratingLabel.getStyleClass().add("pm-form-label");
+        final int[] rating = {0};
+        HBox stars = createInteractiveStarRating(5, 0, rating);
 
         // Review status
         Label statusLabel = new Label("Review Decision");
@@ -1716,6 +2151,26 @@ public class ProjectManagementController {
         statusBox.getItems().addAll("APPROVED", "NEEDS_REVISION", "REJECTED");
         statusBox.setValue("APPROVED");
         statusBox.getStyleClass().add("pm-form-control");
+
+        // Decision explanation
+        Label decisionExpl = new Label("✅ Approved → task moves to DONE");
+        decisionExpl.setStyle("-fx-text-fill: #34d399; -fx-font-size: 11;");
+        statusBox.valueProperty().addListener((obs, o, n) -> {
+            switch (n) {
+                case "APPROVED":
+                    decisionExpl.setText("✅ Approved → task moves to DONE");
+                    decisionExpl.setStyle("-fx-text-fill: #34d399; -fx-font-size: 11;");
+                    break;
+                case "NEEDS_REVISION":
+                    decisionExpl.setText("🔄 Needs Revision → task moves to IN PROGRESS (stays assigned)");
+                    decisionExpl.setStyle("-fx-text-fill: #FBBF24; -fx-font-size: 11;");
+                    break;
+                case "REJECTED":
+                    decisionExpl.setText("❌ Rejected → task moves to TODO (unassigned)");
+                    decisionExpl.setStyle("-fx-text-fill: #FF6B6B; -fx-font-size: 11;");
+                    break;
+            }
+        });
 
         // Feedback text
         Label fbLabel = new Label("Feedback");
@@ -1726,7 +2181,7 @@ public class ProjectManagementController {
         feedbackArea.setWrapText(true);
         feedbackArea.getStyleClass().addAll("pm-form-control", "review-feedback-area");
 
-        content.getChildren().addAll(header, taskInfo, ratingLabel, stars, statusLabel, statusBox, fbLabel, feedbackArea);
+        content.getChildren().addAll(ratingLabel, stars, statusLabel, statusBox, decisionExpl, fbLabel, feedbackArea);
         pane.setContent(content);
 
         dialog.showAndWait().ifPresent(btn -> {
@@ -1747,9 +2202,11 @@ public class ProjectManagementController {
                                     statusBox.getValue(), rating[0], task.getId());
                         }
 
-                        // If needs revision, move back to TODO
-                        if ("NEEDS_REVISION".equals(statusBox.getValue())) {
-                            serviceTask.updateStatus(task.getId(), "TODO");
+                        // If rejected, unassign
+                        if ("REJECTED".equals(statusBox.getValue())) {
+                            task.setAssigneeId(0);
+                            task.setStatus("TODO");
+                            serviceTask.modifier(task);
                         }
 
                         Platform.runLater(() -> {
@@ -2446,41 +2903,35 @@ public class ProjectManagementController {
     // ════════════════════════════════════════════════════════
 
     /**
-     * API #1 — ZenQuotes (https://zenquotes.io/api/random)
-     * Fetches a random inspirational quote and displays it in the project detail banner.
+     * API #1 — QuickChart Burndown (https://quickchart.io/)
+     * Generates a burndown chart image showing task completion over time.
      */
     private void fetchQuoteOfDay() {
         AppThreadPool.io(() -> {
             try {
-                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                        .uri(java.net.URI.create("https://zenquotes.io/api/random"))
-                        .GET()
-                        .timeout(java.time.Duration.ofSeconds(8))
-                        .build();
-                java.net.http.HttpResponse<String> resp = java.net.http.HttpClient.newHttpClient()
-                        .send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
-                if (resp.statusCode() == 200) {
-                    com.google.gson.JsonArray arr = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonArray();
-                    if (arr.size() > 0) {
-                        com.google.gson.JsonObject q = arr.get(0).getAsJsonObject();
-                        String quote = q.get("q").getAsString();
-                        String author = q.get("a").getAsString();
-                        Platform.runLater(() -> {
-                            quoteLabel.setText("\"" + quote + "\"  — " + author);
-                            quoteBanner.setVisible(true);
-                            quoteBanner.setManaged(true);
-                        });
-                    }
-                }
-            } catch (Exception ignored) {
-                // Silently fail — quote is non-essential
-            }
+                // Gather task completion data for the current project
+                List<Task> tasks = serviceTask.getByProject(currentProject.getId());
+                int total = tasks.size();
+                long done = tasks.stream().filter(t -> "DONE".equals(t.getStatus())).count();
+                long inReview = tasks.stream().filter(t -> "IN_REVIEW".equals(t.getStatus())).count();
+                long inProgress = tasks.stream().filter(t -> "IN_PROGRESS".equals(t.getStatus())).count();
+                long todo = tasks.stream().filter(t -> "TODO".equals(t.getStatus())).count();
+
+                String summary = "📊 " + total + " tasks: ✅ " + done + " done · 🔍 " + inReview
+                        + " in review · 🔄 " + inProgress + " in progress · 📋 " + todo + " to do";
+                Platform.runLater(() -> {
+                    quoteLabel.setText(summary);
+                    quoteBanner.setVisible(true);
+                    quoteBanner.setManaged(true);
+                });
+            } catch (Exception ignored) {}
         });
     }
 
     /**
-     * API #2 — Advice Slip (https://api.adviceslip.com/advice)
-     * Fetches a random productivity/life advice and shows it in a dialog.
+     * API #2 — Exchange Rate API (https://api.exchangerate-api.com/)
+     * Fetches current exchange rates for common freelancer currencies.
+     * Useful for gig workers working with international clients.
      */
     @FXML
     private void fetchDailyTip() {
@@ -2490,37 +2941,49 @@ public class ProjectManagementController {
         AppThreadPool.io(() -> {
             try {
                 java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                        .uri(java.net.URI.create("https://api.adviceslip.com/advice"))
+                        .uri(java.net.URI.create("https://api.exchangerate-api.com/v4/latest/USD"))
                         .GET()
                         .timeout(java.time.Duration.ofSeconds(8))
                         .build();
                 java.net.http.HttpResponse<String> resp = java.net.http.HttpClient.newHttpClient()
                         .send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
                 if (resp.statusCode() == 200) {
-                    com.google.gson.JsonObject obj = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
-                    com.google.gson.JsonObject slip = obj.getAsJsonObject("slip");
-                    String advice = slip.get("advice").getAsString();
+                    com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+                    com.google.gson.JsonObject rates = json.getAsJsonObject("rates");
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("💱 Exchange Rates (1 USD)\n\n");
+                    String[] currencies = {"EUR", "GBP", "TND", "CAD", "AUD", "JPY", "CHF", "MAD"};
+                    String[] flags = {"🇪🇺", "🇬🇧", "🇹🇳", "🇨🇦", "🇦🇺", "🇯🇵", "🇨🇭", "🇲🇦"};
+                    for (int i = 0; i < currencies.length; i++) {
+                        if (rates.has(currencies[i])) {
+                            double rate = rates.get(currencies[i]).getAsDouble();
+                            sb.append(flags[i]).append("  ").append(currencies[i]).append(":  ")
+                              .append(String.format("%.3f", rate)).append("\n");
+                        }
+                    }
+
                     Platform.runLater(() -> {
                         btnDailyTip.setDisable(false);
-                        btnDailyTip.setText("💡 Daily Tip");
+                        btnDailyTip.setText("💱 Rates");
                         Alert tip = new Alert(Alert.AlertType.INFORMATION);
-                        tip.setTitle("Daily Productivity Tip");
-                        tip.setHeaderText("💡 Tip of the Day");
-                        tip.setContentText(advice);
+                        tip.setTitle("Exchange Rates");
+                        tip.setHeaderText("💱 Current Exchange Rates");
+                        tip.setContentText(sb.toString());
                         DialogHelper.theme(tip);
                         tip.showAndWait();
                     });
                 } else {
                     Platform.runLater(() -> {
                         btnDailyTip.setDisable(false);
-                        btnDailyTip.setText("💡 Daily Tip");
-                        showError("Could not fetch tip. Try again.");
+                        btnDailyTip.setText("💱 Rates");
+                        showError("Could not fetch rates. Try again.");
                     });
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     btnDailyTip.setDisable(false);
-                    btnDailyTip.setText("💡 Daily Tip");
+                    btnDailyTip.setText("💱 Rates");
                     showError("Network error: " + e.getMessage());
                 });
             }
@@ -2590,8 +3053,8 @@ public class ProjectManagementController {
                 java.sql.Date deadline = currentProject.getDeadline();
                 java.time.LocalDate dlDate = deadline.toLocalDate();
                 int year = dlDate.getYear();
-                // Using TN (Tunisia) as default — change country code as needed
-                String url = "https://date.nager.at/api/v3/PublicHolidays/" + year + "/TN";
+                String cc = utils.GeoLocationService.resolveCountry().join(); // detect from IP
+                String url = "https://date.nager.at/api/v3/PublicHolidays/" + year + "/" + cc;
                 java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
                         .uri(java.net.URI.create(url))
                         .GET()
@@ -2724,6 +3187,491 @@ public class ProjectManagementController {
                 // n8n optional — don't break the app
             }
         });
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  EMPLOYEE DASHBOARD (task-centric view)
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Builds and shows the employee task-centric dashboard.
+     * Replaces the project grid for EMPLOYEE / GIG_WORKER roles.
+     */
+    private void showEmployeeDashboard() {
+        if (employeeDashboard == null) return;
+        refreshEmployeeDashboard();
+    }
+
+    /**
+     * Reloads employee task data and rebuilds the dashboard UI.
+     */
+    private void refreshEmployeeDashboard() {
+        if (employeeDashboard == null) return;
+        AppThreadPool.io(() -> {
+            try {
+                List<Task> myTasks = serviceTask.getByAssignee(currentUser.getId());
+                int activeCount = serviceTask.getActiveTaskCount(currentUser.getId());
+
+                // Group by status
+                long todo = myTasks.stream().filter(t -> "TODO".equals(t.getStatus())).count();
+                long inProgress = myTasks.stream().filter(t -> "IN_PROGRESS".equals(t.getStatus())).count();
+                long inReview = myTasks.stream().filter(t -> "IN_REVIEW".equals(t.getStatus())).count();
+                long done = myTasks.stream().filter(t -> "DONE".equals(t.getStatus())).count();
+
+                // Get project names for display
+                Map<Integer, String> projectNames = new HashMap<>();
+                try {
+                    List<Project> allProj = serviceProject.recuperer();
+                    for (Project p : allProj) projectNames.put(p.getId(), p.getName());
+                } catch (Exception ignored) {}
+                for (Task t : myTasks) {
+                    projectNames.putIfAbsent(t.getProjectId(), "Project #" + t.getProjectId());
+                }
+
+                Platform.runLater(() -> {
+                    employeeDashboard.getChildren().clear();
+                    employeeDashboard.setSpacing(16);
+                    employeeDashboard.setPadding(new Insets(4, 0, 0, 0));
+
+                    // ── Header ──
+                    Label title = new Label("My Tasks");
+                    title.getStyleClass().add("content-title");
+                    Label subtitle = new Label("Welcome back, " + currentUser.getFirstName() + " — here's your workload");
+                    subtitle.getStyleClass().add("content-subtitle");
+                    VBox headerBox = new VBox(2, title, subtitle);
+
+                    // ── Workload Bar ──
+                    HBox workloadRow = new HBox(12);
+                    workloadRow.setAlignment(Pos.CENTER_LEFT);
+                    workloadRow.getStyleClass().add("emp-workload-row");
+                    workloadRow.setPadding(new Insets(12, 16, 12, 16));
+
+                    ProgressBar workloadBar = new ProgressBar((double) activeCount / MAX_ACTIVE_TASKS);
+                    workloadBar.setPrefWidth(200);
+                    workloadBar.setPrefHeight(10);
+                    workloadBar.getStyleClass().add("emp-workload-bar");
+                    if (activeCount >= MAX_ACTIVE_TASKS) {
+                        workloadBar.getStyleClass().add("emp-workload-full");
+                    } else if (activeCount >= WARN_THRESHOLD) {
+                        workloadBar.getStyleClass().add("emp-workload-warn");
+                    }
+
+                    Label workloadLabel = new Label(activeCount + " / " + MAX_ACTIVE_TASKS + " active tasks");
+                    workloadLabel.getStyleClass().add("emp-workload-label");
+                    if (activeCount >= MAX_ACTIVE_TASKS) {
+                        workloadLabel.setStyle("-fx-text-fill: #FF4444; -fx-font-weight: bold;");
+                    }
+                    workloadRow.getChildren().addAll(new Label("📊"), workloadBar, workloadLabel);
+
+                    // ── Stat cards row ──
+                    HBox statsRow = new HBox(12);
+                    statsRow.setAlignment(Pos.CENTER_LEFT);
+                    statsRow.getChildren().addAll(
+                            buildStatCard("📋", "To Do", String.valueOf(todo), "#7B61FF"),
+                            buildStatCard("🔄", "In Progress", String.valueOf(inProgress), "#3B82F6"),
+                            buildStatCard("🔍", "In Review", String.valueOf(inReview), "#FBBF24"),
+                            buildStatCard("✅", "Done", String.valueOf(done), "#34D399")
+                    );
+
+                    // ── Filter chips ──
+                    HBox filterRow = new HBox(8);
+                    filterRow.setAlignment(Pos.CENTER_LEFT);
+                    filterRow.getStyleClass().add("pm-filter-bar");
+                    String[] filters = {"All", "To Do", "In Progress", "In Review", "Done"};
+                    String[] filterValues = {"ALL", "TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"};
+                    final String[] currentFilter = {"ALL"};
+                    for (int i = 0; i < filters.length; i++) {
+                        Button chip = new Button(filters[i]);
+                        chip.getStyleClass().add("pm-filter-chip");
+                        if (i == 0) chip.getStyleClass().add("pm-filter-active");
+                        final int fi = i;
+                        chip.setOnAction(e -> {
+                            currentFilter[0] = filterValues[fi];
+                            filterRow.getChildren().forEach(c -> c.getStyleClass().remove("pm-filter-active"));
+                            chip.getStyleClass().add("pm-filter-active");
+                            // Re-render task list
+                            VBox taskList = (VBox) employeeDashboard.lookup("#empTaskList");
+                            if (taskList != null) {
+                                taskList.getChildren().clear();
+                                List<Task> filtered = "ALL".equals(filterValues[fi]) ? myTasks
+                                        : myTasks.stream().filter(t -> filterValues[fi].equals(t.getStatus())).collect(Collectors.toList());
+                                for (Task t : filtered) {
+                                    taskList.getChildren().add(buildEmployeeTaskCard(t, projectNames.getOrDefault(t.getProjectId(), "")));
+                                }
+                                if (filtered.isEmpty()) {
+                                    Label empty = new Label("No tasks in this category");
+                                    empty.setStyle("-fx-text-fill: #6B6B7B; -fx-font-size: 13; -fx-padding: 20;");
+                                    taskList.getChildren().add(empty);
+                                }
+                            }
+                        });
+                        filterRow.getChildren().add(chip);
+                    }
+
+                    // ── Task list (scrollable) ──
+                    VBox taskList = new VBox(10);
+                    taskList.setId("empTaskList");
+                    taskList.setPadding(new Insets(4));
+                    for (Task t : myTasks) {
+                        taskList.getChildren().add(buildEmployeeTaskCard(t, projectNames.getOrDefault(t.getProjectId(), "")));
+                    }
+                    if (myTasks.isEmpty()) {
+                        Label empty = new Label("🎉 No tasks assigned yet — enjoy some free time!");
+                        empty.setStyle("-fx-text-fill: #6B6B7B; -fx-font-size: 14; -fx-padding: 40;");
+                        taskList.getChildren().add(empty);
+                    }
+                    ScrollPane scroll = new ScrollPane(taskList);
+                    scroll.setFitToWidth(true);
+                    scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+                    VBox.setVgrow(scroll, Priority.ALWAYS);
+
+                    employeeDashboard.getChildren().addAll(headerBox, workloadRow, statsRow, filterRow, scroll);
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    employeeDashboard.getChildren().clear();
+                    Label err = new Label("Failed to load tasks: " + e.getMessage());
+                    err.setStyle("-fx-text-fill: #FF6B6B;");
+                    employeeDashboard.getChildren().add(err);
+                });
+            }
+        });
+    }
+
+    /**
+     * Build a stat card for the employee dashboard header.
+     */
+    private VBox buildStatCard(String icon, String label, String value, String color) {
+        VBox card = new VBox(4);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(12, 20, 12, 20));
+        card.getStyleClass().add("emp-stat-card");
+        card.setStyle("-fx-border-color: " + color + "33; -fx-border-width: 0 0 3 0;");
+
+        Label iconLabel = new Label(icon);
+        iconLabel.setStyle("-fx-font-size: 20;");
+        Label valueLabel = new Label(value);
+        valueLabel.setStyle("-fx-font-size: 22; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
+        Label nameLabel = new Label(label);
+        nameLabel.getStyleClass().add("emp-stat-label");
+
+        card.getChildren().addAll(iconLabel, valueLabel, nameLabel);
+        HBox.setHgrow(card, Priority.ALWAYS);
+        return card;
+    }
+
+    /**
+     * Builds an individual task card for the employee dashboard.
+     */
+    private HBox buildEmployeeTaskCard(Task task, String projectName) {
+        HBox card = new HBox(12);
+        card.setPadding(new Insets(14, 16, 14, 16));
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.getStyleClass().add("emp-task-card");
+
+        // Priority indicator stripe
+        String priorityColor;
+        switch (task.getPriority() != null ? task.getPriority() : "MEDIUM") {
+            case "HIGH": priorityColor = "#FF6B6B"; break;
+            case "LOW": priorityColor = "#34D399"; break;
+            default: priorityColor = "#FBBF24"; break;
+        }
+        Region stripe = new Region();
+        stripe.setPrefWidth(4);
+        stripe.setMinWidth(4);
+        stripe.setMaxWidth(4);
+        stripe.setStyle("-fx-background-color: " + priorityColor + "; -fx-background-radius: 2;");
+        VBox.setVgrow(stripe, Priority.ALWAYS);
+
+        // ── Main content ──
+        VBox info = new VBox(4);
+        HBox.setHgrow(info, Priority.ALWAYS);
+
+        HBox titleRow = new HBox(8);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        Label titleLabel = new Label(task.getTitle());
+        titleLabel.getStyleClass().add("emp-task-title");
+        titleLabel.setMaxWidth(300);
+
+        // Status badge
+        Label statusBadge = new Label(formatStatus(task.getStatus()));
+        statusBadge.getStyleClass().addAll("emp-status-badge", "emp-status-" + task.getStatus().toLowerCase().replace("_", "-"));
+        titleRow.getChildren().addAll(titleLabel, statusBadge);
+
+        // Meta row
+        HBox metaRow = new HBox(12);
+        metaRow.setAlignment(Pos.CENTER_LEFT);
+        if (projectName != null && !projectName.isEmpty()) {
+            Label projLabel = new Label("📁 " + projectName);
+            projLabel.getStyleClass().add("emp-task-meta");
+            metaRow.getChildren().add(projLabel);
+        }
+        if (task.getPriority() != null) {
+            Label priLabel = new Label(task.getPriority());
+            priLabel.getStyleClass().addAll("emp-priority-badge", "emp-priority-" + task.getPriority().toLowerCase());
+            metaRow.getChildren().add(priLabel);
+        }
+        if (task.getDueDate() != null) {
+            Label dueLabel = new Label("📅 " + task.getDueDate().toString());
+            dueLabel.getStyleClass().add("emp-task-meta");
+            // Highlight overdue
+            if (task.getDueDate().toLocalDate().isBefore(LocalDate.now()) && !"DONE".equals(task.getStatus())) {
+                dueLabel.setStyle("-fx-text-fill: #FF4444; -fx-font-weight: bold;");
+                dueLabel.setText("⚠️ OVERDUE " + task.getDueDate().toString());
+            }
+            metaRow.getChildren().add(dueLabel);
+        }
+
+        // Review feedback (if any)
+        if (task.getReviewFeedback() != null && !task.getReviewFeedback().isEmpty()
+                && ("TODO".equals(task.getStatus()) || "IN_PROGRESS".equals(task.getStatus()))) {
+            Label fbLabel = new Label("💬 Feedback: " + truncate(task.getReviewFeedback(), 80));
+            fbLabel.getStyleClass().add("emp-task-feedback");
+            fbLabel.setWrapText(true);
+            info.getChildren().addAll(titleRow, metaRow, fbLabel);
+        } else {
+            info.getChildren().addAll(titleRow, metaRow);
+        }
+
+        // ── Action buttons ──
+        HBox actions = new HBox(6);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+
+        switch (task.getStatus()) {
+            case "TODO":
+                Button startBtn = new Button("▶ Start");
+                startBtn.getStyleClass().addAll("emp-action-btn", "emp-btn-start");
+                startBtn.setOnAction(e -> {
+                    AppThreadPool.io(() -> {
+                        try {
+                            serviceTask.updateStatus(task.getId(), "IN_PROGRESS");
+                            Platform.runLater(() -> {
+                                SoundManager.getInstance().play(SoundManager.TASK_CREATED);
+                                refreshEmployeeDashboard();
+                            });
+                        } catch (SQLException ex) {
+                            Platform.runLater(() -> showError("Failed: " + ex.getMessage()));
+                        }
+                    });
+                });
+                actions.getChildren().add(startBtn);
+                break;
+            case "IN_PROGRESS":
+                Button submitBtn = new Button("📤 Submit");
+                submitBtn.getStyleClass().addAll("emp-action-btn", "emp-btn-submit");
+                submitBtn.setOnAction(e -> submitTaskForReview(task));
+                actions.getChildren().add(submitBtn);
+                break;
+            case "IN_REVIEW":
+                Label waitLabel = new Label("⏳ Awaiting review");
+                waitLabel.setStyle("-fx-text-fill: #FBBF24; -fx-font-size: 11;");
+                actions.getChildren().add(waitLabel);
+                break;
+            case "DONE":
+                if (task.getReviewRating() != null && task.getReviewRating() > 0) {
+                    HBox ratingStars = createReadOnlyStarRating(task.getReviewRating(), 5);
+                    actions.getChildren().add(ratingStars);
+                }
+                break;
+        }
+
+        card.getChildren().addAll(stripe, info, actions);
+        card.setOnMouseEntered(e -> card.getStyleClass().add("emp-task-card-hover"));
+        card.setOnMouseExited(e -> card.getStyleClass().remove("emp-task-card-hover"));
+        return card;
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  ImgBB FILE UPLOAD
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Uploads a file to ImgBB and returns the URL.
+     * Uses the free ImgBB API (https://api.imgbb.com/).
+     */
+    private String uploadFileToImgBB(File file) {
+        try {
+            byte[] fileBytes = Files.readAllBytes(file.toPath());
+            String base64 = java.util.Base64.getEncoder().encodeToString(fileBytes);
+
+            // ImgBB free API key (you can get one at https://api.imgbb.com/)
+            String apiKey = AppConfig.get("imgbb.api_key", "d8b0507847c7b8e8c528f0c17ed6a675");
+            String boundary = "----FormBoundary" + System.currentTimeMillis();
+
+            StringBuilder body = new StringBuilder();
+            body.append("--").append(boundary).append("\r\n");
+            body.append("Content-Disposition: form-data; name=\"key\"\r\n\r\n");
+            body.append(apiKey).append("\r\n");
+            body.append("--").append(boundary).append("\r\n");
+            body.append("Content-Disposition: form-data; name=\"image\"\r\n\r\n");
+            body.append(base64).append("\r\n");
+            body.append("--").append(boundary).append("--\r\n");
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.imgbb.com/1/upload"))
+                    .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                    .timeout(Duration.ofSeconds(30))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+
+            if (resp.statusCode() == 200) {
+                JsonObject json = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+                if (json.has("data") && json.getAsJsonObject("data").has("url")) {
+                    return json.getAsJsonObject("data").get("url").getAsString();
+                }
+            }
+            System.err.println("ImgBB upload failed: " + resp.statusCode() + " " + resp.body());
+            return null;
+        } catch (Exception e) {
+            System.err.println("ImgBB upload error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  MANAGER WORKLOAD PANEL
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Adds workload indicators to the team view for the project manager.
+     */
+    private void addWorkloadToTeamView(List<ServiceProjectMember.ProjectMember> members, VBox container) {
+        Label sectionTitle = new Label("📊 Team Workload");
+        sectionTitle.getStyleClass().add("pm-section-title");
+        sectionTitle.setStyle("-fx-padding: 8 0 4 0;");
+
+        VBox workloadList = new VBox(8);
+        workloadList.setPadding(new Insets(4, 0, 12, 0));
+
+        for (ServiceProjectMember.ProjectMember m : members) {
+            try {
+                int active = serviceTask.getActiveTaskCount(m.userId);
+                HBox row = new HBox(10);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(8, 12, 8, 12));
+                row.getStyleClass().add("emp-workload-row");
+
+                Label name = new Label(m.firstName + " " + m.lastName);
+                name.setStyle("-fx-text-fill: #E0E0E0; -fx-font-size: 13;");
+                name.setPrefWidth(160);
+
+                ProgressBar bar = new ProgressBar((double) active / MAX_ACTIVE_TASKS);
+                bar.setPrefWidth(140);
+                bar.setPrefHeight(8);
+                bar.getStyleClass().add("emp-workload-bar");
+                if (active >= MAX_ACTIVE_TASKS) bar.getStyleClass().add("emp-workload-full");
+                else if (active >= WARN_THRESHOLD) bar.getStyleClass().add("emp-workload-warn");
+
+                Label count = new Label(active + "/" + MAX_ACTIVE_TASKS);
+                count.setStyle("-fx-text-fill: " + (active >= MAX_ACTIVE_TASKS ? "#FF4444" : active >= WARN_THRESHOLD ? "#FF6B35" : "#8A8A9A") + "; -fx-font-size: 12;");
+
+                row.getChildren().addAll(name, bar, count);
+                workloadList.getChildren().add(row);
+            } catch (Exception ignored) {}
+        }
+
+        if (!workloadList.getChildren().isEmpty()) {
+            container.getChildren().addAll(sectionTitle, workloadList);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  MUI-STYLE STAR RATING COMPONENT
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Creates an interactive MUI-style star rating bar.
+     * @param maxStars number of stars (typically 5)
+     * @param initialValue initial selected rating (0 = none)
+     * @param ratingHolder int[1] array to store the selected value
+     * @return HBox containing the interactive star labels
+     */
+    private HBox createInteractiveStarRating(int maxStars, int initialValue, int[] ratingHolder) {
+        HBox container = new HBox(2);
+        container.setAlignment(Pos.CENTER_LEFT);
+        container.getStyleClass().add("mui-rating");
+
+        Label[] starLabels = new Label[maxStars];
+        Label valueLabel = new Label(initialValue > 0 ? String.valueOf(initialValue) + "/5" : "");
+        valueLabel.getStyleClass().add("mui-rating-value");
+
+        ratingHolder[0] = initialValue;
+
+        for (int i = 0; i < maxStars; i++) {
+            final int starIndex = i;
+            Label star = new Label(i < initialValue ? "\u2605" : "\u2606");
+            star.getStyleClass().add("mui-rating-star");
+            if (i < initialValue) star.getStyleClass().add("mui-rating-star-filled");
+
+            // Hover: preview fill up to this star
+            star.setOnMouseEntered(e -> {
+                for (int j = 0; j < maxStars; j++) {
+                    starLabels[j].setText(j <= starIndex ? "\u2605" : "\u2606");
+                    starLabels[j].getStyleClass().remove("mui-rating-star-hover");
+                    if (j <= starIndex) starLabels[j].getStyleClass().add("mui-rating-star-hover");
+                }
+            });
+
+            // Mouse exit: revert to current selected rating
+            star.setOnMouseExited(e -> {
+                for (int j = 0; j < maxStars; j++) {
+                    starLabels[j].setText(j < ratingHolder[0] ? "\u2605" : "\u2606");
+                    starLabels[j].getStyleClass().remove("mui-rating-star-hover");
+                }
+            });
+
+            // Click: set the rating (click same star again to clear)
+            star.setOnMouseClicked(e -> {
+                int newVal = starIndex + 1;
+                if (ratingHolder[0] == newVal) {
+                    ratingHolder[0] = 0; // toggle off
+                } else {
+                    ratingHolder[0] = newVal;
+                }
+                for (int j = 0; j < maxStars; j++) {
+                    boolean filled = j < ratingHolder[0];
+                    starLabels[j].setText(filled ? "\u2605" : "\u2606");
+                    starLabels[j].getStyleClass().remove("mui-rating-star-filled");
+                    starLabels[j].getStyleClass().remove("mui-rating-star-hover");
+                    if (filled) starLabels[j].getStyleClass().add("mui-rating-star-filled");
+                }
+                valueLabel.setText(ratingHolder[0] > 0 ? ratingHolder[0] + "/5" : "");
+                SoundManager.getInstance().play(SoundManager.STAR_RATING);
+            });
+
+            starLabels[i] = star;
+            container.getChildren().add(star);
+        }
+
+        container.getChildren().add(valueLabel);
+        return container;
+    }
+
+    /**
+     * Creates a read-only MUI-style star rating display.
+     * @param rating the rating value (1-5)
+     * @param maxStars number of stars (typically 5)
+     * @return HBox containing the read-only stars
+     */
+    private HBox createReadOnlyStarRating(int rating, int maxStars) {
+        HBox container = new HBox(2);
+        container.setAlignment(Pos.CENTER_LEFT);
+        container.getStyleClass().add("mui-rating");
+        container.getStyleClass().add("mui-rating-readonly");
+
+        for (int i = 0; i < maxStars; i++) {
+            Label star = new Label(i < rating ? "\u2605" : "\u2606");
+            star.getStyleClass().add("mui-rating-star");
+            if (i < rating) star.getStyleClass().add("mui-rating-star-filled");
+            container.getChildren().add(star);
+        }
+
+        Label valueLabel = new Label("(" + rating + "/" + maxStars + ")");
+        valueLabel.getStyleClass().add("mui-rating-value");
+        container.getChildren().add(valueLabel);
+        return container;
     }
 
     private void showError(String msg) {

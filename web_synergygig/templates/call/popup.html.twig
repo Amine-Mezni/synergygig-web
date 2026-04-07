@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ call.callType == 'VIDEO' ? 'Video' : 'Audio' }} Call — {{ peerName }}</title>
+<style>
+/* ─── Reset ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#fff;overflow:hidden;height:100vh;width:100vw}
+
+/* ─── Main Container ─── */
+.call-popup{display:flex;flex-direction:column;height:100vh;position:relative;background:linear-gradient(135deg,#0a0a14 0%,#0d1117 50%,#0a0f14 100%)}
+
+/* ─── Header ─── */
+.call-header{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:linear-gradient(180deg,rgba(0,0,0,.7) 0%,transparent 100%)}
+.call-header__info{display:flex;align-items:center;gap:12px}
+.call-header__name{font-size:15px;font-weight:600;color:rgba(255,255,255,.95)}
+.call-header__meta{font-size:12px;color:rgba(255,255,255,.5)}
+.call-header__pip-toggle{background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;padding:6px;border-radius:8px;transition:all .2s}
+.call-header__pip-toggle:hover{color:#fff;background:rgba(255,255,255,.1)}
+
+/* ─── Video Area ─── */
+.call-video-area{flex:1;position:relative;display:flex;align-items:center;justify-content:center}
+
+/* Remote video - full screen */
+.call-remote{position:absolute;inset:0;z-index:1}
+.call-remote video{width:100%;height:100%;object-fit:cover}
+.call-remote--hidden video{display:none}
+
+/* Placeholder (shown during audio calls or when video off) */
+.call-placeholder{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:20px;text-align:center}
+.call-avatar{width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#1a3a4a 0%,#2C666E 100%);display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:700;letter-spacing:2px;color:#fff;box-shadow:0 0 60px rgba(44,102,110,.3);animation:pulse-glow 2s ease-in-out infinite}
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 40px rgba(44,102,110,.2)}50%{box-shadow:0 0 80px rgba(44,102,110,.5)}}
+.call-status-text{font-size:16px;color:rgba(255,255,255,.7);letter-spacing:.5px}
+.call-timer{font-size:24px;font-weight:300;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:2px;display:none}
+.call-timer.active{display:block}
+
+/* Ringing animation */
+.call-ringing .call-avatar{animation:ring-bounce 1.5s ease-in-out infinite}
+@keyframes ring-bounce{0%,100%{transform:scale(1)}15%{transform:scale(1.08) rotate(-3deg)}30%{transform:scale(1.08) rotate(3deg)}45%{transform:scale(1)}60%{transform:scale(1.05) rotate(-2deg)}75%{transform:scale(1.05) rotate(2deg)}}
+
+/* ─── Local PiP ─── */
+.call-local{position:absolute;bottom:100px;right:20px;width:160px;height:120px;border-radius:12px;overflow:hidden;border:2px solid rgba(255,255,255,.15);box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:15;transition:all .3s ease;cursor:grab}
+.call-local:hover{border-color:rgba(255,255,255,.3);box-shadow:0 8px 40px rgba(0,0,0,.7)}
+.call-local video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.call-local--audio{display:none}
+.call-local--dragging{cursor:grabbing;transition:none}
+
+/* ─── Screen Share Indicator ─── */
+.screen-share-badge{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:25;background:rgba(44,102,110,.9);color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;display:none;align-items:center;gap:8px;backdrop-filter:blur(10px);animation:fade-in .3s ease}
+.screen-share-badge.active{display:flex}
+.screen-share-badge__dot{width:8px;height:8px;border-radius:50%;background:#ff5555;animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+@keyframes fade-in{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ─── Controls Bar ─── */
+.call-controls{position:absolute;bottom:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:center;gap:12px;padding:20px 24px 28px;background:linear-gradient(0deg,rgba(0,0,0,.8) 0%,transparent 100%)}
+
+.call-btn{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s ease;position:relative}
+.call-btn svg{width:22px;height:22px}
+.call-btn:active{transform:scale(.92)}
+
+/* Default (dark glass) */
+.call-btn--default{background:rgba(255,255,255,.12);color:#fff;backdrop-filter:blur(10px)}
+.call-btn--default:hover{background:rgba(255,255,255,.2)}
+
+/* Muted / toggled state */
+.call-btn--toggled{background:rgba(255,255,255,.95);color:#1a1a2e}
+.call-btn--toggled:hover{background:#fff}
+
+/* End call */
+.call-btn--end{background:#e53e3e;color:#fff;width:60px;height:60px}
+.call-btn--end:hover{background:#c53030}
+.call-btn--end svg{width:26px;height:26px;transform:rotate(135deg)}
+
+/* Accept */
+.call-btn--accept{background:#38a169;color:#fff;width:60px;height:60px;animation:pulse-accept 1.5s ease-in-out infinite}
+.call-btn--accept:hover{background:#2f855a}
+@keyframes pulse-accept{0%,100%{box-shadow:0 0 0 0 rgba(56,161,105,.5)}50%{box-shadow:0 0 0 16px rgba(56,161,105,0)}}
+
+/* Screen share active */
+.call-btn--screen-active{background:rgba(44,102,110,.9);color:#fff}
+.call-btn--screen-active:hover{background:rgba(44,102,110,1)}
+
+/* ─── Incoming Actions (Accept/Reject overlay) ─── */
+.call-incoming-actions{display:flex;gap:24px;margin-top:8px}
+.call-incoming-actions .call-btn{width:64px;height:64px}
+.call-incoming-actions .call-btn svg{width:28px;height:28px}
+
+/* ─── Tooltip ─── */
+.call-btn[title]{position:relative}
+.call-btn::after{content:attr(data-label);position:absolute;bottom:-24px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.5);white-space:nowrap;pointer-events:none}
+
+/* ─── Ended Overlay ─── */
+.call-ended-overlay{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px)}
+.call-ended-overlay.active{display:flex}
+.call-ended-overlay__icon{width:80px;height:80px;border-radius:50%;background:rgba(229,62,62,.15);display:flex;align-items:center;justify-content:center}
+.call-ended-overlay__icon svg{width:36px;height:36px;color:#e53e3e}
+.call-ended-overlay__text{font-size:18px;font-weight:500;color:rgba(255,255,255,.8)}
+.call-ended-overlay__duration{font-size:14px;color:rgba(255,255,255,.4)}
+
+/* ─── Responsive ─── */
+@media(max-width:480px){
+    .call-local{width:100px;height:75px;bottom:90px;right:12px}
+    .call-btn{width:44px;height:44px}
+    .call-btn svg{width:18px;height:18px}
+    .call-btn--end,.call-btn--accept{width:52px;height:52px}
+    .call-btn--end svg,.call-btn--accept svg{width:22px;height:22px}
+    .call-avatar{width:90px;height:90px;font-size:2rem}
+}
+</style>
+</head>
+<body>
+<div class="call-popup" id="callPopup"
+     data-call-id="{{ call.id }}"
+     data-call-type="{{ call.callType }}"
+     data-call-status="{{ call.status }}"
+     data-is-caller="{{ isCaller ? '1' : '0' }}"
+     data-user-id="{{ app.user.id }}"
+     data-csrf="{{ csrfToken }}">
+
+    <!-- Header -->
+    <div class="call-header">
+        <div class="call-header__info">
+            <div class="call-header__name">{{ peerName }}</div>
+            <div class="call-header__meta" id="headerMeta">
+                {{ call.callType == 'VIDEO' ? 'Video Call' : 'Audio Call' }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Area -->
+    <div class="call-video-area">
+        <!-- Remote Video -->
+        <div class="call-remote call-remote--hidden" id="remoteContainer">
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+
+        <!-- Placeholder -->
+        <div class="call-placeholder {{ call.status == 'RINGING' ? 'call-ringing' : '' }}" id="placeholder">
+            <div class="call-avatar" id="peerAvatar">{{ peerInitials }}</div>
+            <div class="call-status-text" id="statusText">
+                {% if call.status == 'RINGING' %}
+                    {% if isCaller %}Calling...{% else %}Incoming {{ call.callType|lower }} call{% endif %}
+                {% elseif call.status == 'CONNECTED' %}
+                    Connected
+                {% else %}
+                    {{ call.status }}
+                {% endif %}
+            </div>
+            <div class="call-timer" id="callTimer">00:00</div>
+
+            {% if not isCaller and call.status == 'RINGING' %}
+            <div class="call-incoming-actions" id="incomingActions">
+                <button class="call-btn call-btn--end" id="btnReject" title="Decline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <button class="call-btn call-btn--accept" id="btnAccept" title="Accept">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Screen Share Badge -->
+    <div class="screen-share-badge" id="screenShareBadge">
+        <span class="screen-share-badge__dot"></span>
+        <span id="screenShareLabel">You are sharing your screen</span>
+    </div>
+
+    <!-- Local PiP -->
+    <div class="call-local {{ call.callType == 'AUDIO' ? 'call-local--audio' : '' }}" id="localContainer">
+        <video id="localVideo" autoplay playsinline muted></video>
+    </div>
+
+    <!-- Controls (shown when connected or caller ringing) -->
+    <div class="call-controls" id="callControls" style="{{ (not isCaller and call.status == 'RINGING') ? 'display:none' : '' }}">
+        <button class="call-btn call-btn--default" id="btnMute" data-label="Mute" title="Mute">
+            <svg id="icMicOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <svg id="icMicOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .58-.08 1.15-.22 1.69"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+
+        {% if call.callType == 'VIDEO' %}
+        <button class="call-btn call-btn--default" id="btnCamera" data-label="Camera" title="Camera">
+            <svg id="icCamOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <svg id="icCamOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+        {% endif %}
+
+        <button class="call-btn call-btn--default" id="btnScreen" data-label="Share" title="Share Screen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </button>
+
+        <button class="call-btn call-btn--end" id="btnEnd" data-label="End" title="End Call">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </button>
+    </div>
+
+    <!-- Ended Overlay -->
+    <div class="call-ended-overlay" id="endedOverlay">
+        <div class="call-ended-overlay__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </div>
+        <div class="call-ended-overlay__text" id="endedText">Call ended</div>
+        <div class="call-ended-overlay__duration" id="endedDuration"></div>
+    </div>
+</div>
+
+<!-- Preload sounds -->
+<audio id="sndRingtone" src="/sounds/ringtone.mp3" loop preload="auto"></audio>
+<audio id="sndOutgoing" src="/sounds/outgoing.mp3" loop preload="auto"></audio>
+<audio id="sndConnected" src="/sounds/connected.mp3" preload="auto"></audio>
+<audio id="sndHangup" src="/sounds/hangup.mp3" preload="auto"></audio>
+<audio id="sndScreenStart" src="/sounds/screenshare_start.mp3" preload="auto"></audio>
+<audio id="sndScreenEnd" src="/sounds/screenshare_end.mp3" preload="auto"></audio>
+
+<script>
+(function() {
+'use strict';
+
+/* ───────────────────────────────────────────
+   CONFIG & DOM REFS
+   ─────────────────────────────────────────── */
+const el = document.getElementById('callPopup');
+const CALL_ID     = parseInt(el.dataset.callId);
+const CALL_TYPE   = el.dataset.callType;          // VIDEO | AUDIO
+const IS_CALLER   = el.dataset.isCaller === '1';
+const USER_ID     = parseInt(el.dataset.userId);
+
+const ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+];
+
+const localVideo      = document.getElementById('localVideo');
+const remoteVideo     = document.getElementById('remoteVideo');
+const remoteContainer = document.getElementById('remoteContainer');
+const localContainer  = document.getElementById('localContainer');
+const placeholder     = document.getElementById('placeholder');
+const statusText      = document.getElementById('statusText');
+const timerEl         = document.getElementById('callTimer');
+const headerMeta      = document.getElementById('headerMeta');
+const screenBadge     = document.getElementById('screenShareBadge');
+const endedOverlay    = document.getElementById('endedOverlay');
+const endedText       = document.getElementById('endedText');
+const endedDuration   = document.getElementById('endedDuration');
+const controls        = document.getElementById('callControls');
+
+const btnMute   = document.getElementById('btnMute');
+const btnCamera = document.getElementById('btnCamera');
+const btnScreen = document.getElementById('btnScreen');
+const btnEnd    = document.getElementById('btnEnd');
+const btnAccept = document.getElementById('btnAccept');
+const btnReject = document.getElementById('btnReject');
+
+/* ─── Sound refs ─── */
+const snd = {
+    ringtone : document.getElementById('sndRingtone'),
+    outgoing : document.getElementById('sndOutgoing'),
+    connected: document.getElementById('sndConnected'),
+    hangup   : document.getElementById('sndHangup'),
+    ssStart  : document.getElementById('sndScreenStart'),
+    ssEnd    : document.getElementById('sndScreenEnd'),
+};
+
+/* ───────────────────────────────────────────
+   STATE
+   ─────────────────────────────────────────── */
+let localStream  = null;
+let screenStream = null;
+let pc           = null;        // RTCPeerConnection
+let pollTimer    = null;
+let lastSignalId = 0;
+let isMuted      = false;
+let isCameraOff  = false;
+let isScreenOn   = false;
+let callState    = el.dataset.callStatus;  // RINGING | CONNECTED | ENDED
+let timerInterval= null;
+let seconds      = 0;
+let callEnded    = false;
+
+/* ───────────────────────────────────────────
+   HELPERS
+   ─────────────────────────────────────────── */
+function playSound(audio) {
+    try { audio.currentTime = 0; audio.play().catch(()=>{}); } catch(e){}
+}
+function stopSound(audio) {
+    try { audio.pause(); audio.currentTime = 0; } catch(e){}
+}
+function stopAllSounds() {
+    Object.values(snd).forEach(a => stopSound(a));
+}
+
+async function apiPost(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    });
+    return res.json();
+}
+async function apiGet(url) {
+    const res = await fetch(url);
+    return res.json();
+}
+
+function fmtTime(s) {
+    const m = String(Math.floor(s / 60)).padStart(2, '0');
+    const sec = String(s % 60).padStart(2, '0');
+    return m + ':' + sec;
+}
+
+/* ───────────────────────────────────────────
+   GET LOCAL MEDIA
+   ─────────────────────────────────────────── */
+async function getLocalMedia() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: CALL_TYPE === 'VIDEO'
+        });
+        localVideo.srcObject = localStream;
+    } catch (err) {
+        console.error('getUserMedia error:', err);
+        statusText.textContent = 'Camera/mic access denied';
+    }
+}
+
+/* ───────────────────────────────────────────
+   WEBRTC PEER CONNECTION
+   ─────────────────────────────────────────── */
+function createPeerConnection() {
+    pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+    // Add local tracks
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+        });
+    }
+
+    // ICE candidates → send to server
+    pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+            sendSignal('ice', ev.candidate.toJSON());
+        }
+    };
+
+    // Remote tracks → display
+    pc.ontrack = (ev) => {
+        if (ev.streams && ev.streams[0]) {
+            remoteVideo.srcObject = ev.streams[0];
+            // Show remote video if it's a video track
+            if (ev.track.kind === 'video') {
+                remoteContainer.classList.remove('call-remote--hidden');
+                if (CALL_TYPE === 'VIDEO') {
+                    placeholder.style.display = 'none';
+                }
+            }
+        }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+            endCall('Connection lost');
+        }
+    };
+}
+
+/* ───────────────────────────────────────────
+   SIGNALING
+   ─────────────────────────────────────────── */
+async function sendSignal(type, payload) {
+    try {
+        await apiPost('/call/signal/send', {
+            callId: CALL_ID,
+            type: type,
+            payload: payload
+        });
+    } catch(e) {
+        console.error('Signal send error:', e);
+    }
+}
+
+async function pollSignals() {
+    if (callEnded) return;
+    try {
+        const data = await apiGet('/call/signal/poll/' + CALL_ID + '?after=' + lastSignalId);
+
+        // Check call status
+        if (data.callStatus === 'ENDED' || data.callStatus === 'REJECTED') {
+            endCall(data.callStatus === 'REJECTED' ? 'Call declined' : 'Call ended');
+            return;
+        }
+
+        // If we were RINGING and now CONNECTED (other side accepted)
+        if (callState === 'RINGING' && data.callStatus === 'CONNECTED') {
+            onCallConnected();
+        }
+
+        // Process signals
+        for (const sig of data.signals) {
+            lastSignalId = Math.max(lastSignalId, sig.id);
+            await handleSignal(sig);
+        }
+    } catch(e) {
+        console.error('Poll error:', e);
+    }
+}
+
+async function handleSignal(sig) {
+    if (!pc) return;
+    try {
+        if (sig.type === 'offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await sendSignal('answer', answer);
+        } else if (sig.type === 'answer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+        } else if (sig.type === 'ice') {
+            await pc.addIceCandidate(new RTCIceCandidate(sig.payload));
+        }
+    } catch(e) {
+        console.error('Handle signal error:', e);
+    }
+}
+
+/* ───────────────────────────────────────────
+   CALL FLOW
+   ─────────────────────────────────────────── */
+async function startCallerFlow() {
+    playSound(snd.outgoing);
+    await getLocalMedia();
+    createPeerConnection();
+
+    // Create offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await sendSignal('offer', offer);
+
+    // Start polling
+    pollTimer = setInterval(pollSignals, 800);
+}
+
+async function startCalleeFlow() {
+    playSound(snd.ringtone);
+    // Don't get media or create PC until accept
+    // Start polling to detect if caller cancels
+    pollTimer = setInterval(pollSignals, 1000);
+}
+
+async function acceptCall() {
+    stopAllSounds();
+
+    // Accept on server
+    await apiPost('/call/' + CALL_ID + '/accept-ajax');
+
+    // Get media and create PC
+    await getLocalMedia();
+    createPeerConnection();
+
+    // Callee starts connected state
+    callState = 'CONNECTED';
+    onCallConnected();
+
+    // Hide accept/reject, show controls
+    const incomingActions = document.getElementById('incomingActions');
+    if (incomingActions) incomingActions.style.display = 'none';
+    controls.style.display = '';
+}
+
+function onCallConnected() {
+    callState = 'CONNECTED';
+    stopAllSounds();
+    playSound(snd.connected);
+
+    // Update UI
+    statusText.textContent = 'Connected';
+    placeholder.classList.remove('call-ringing');
+    timerEl.classList.add('active');
+    headerMeta.textContent = CALL_TYPE === 'VIDEO' ? 'Video Call' : 'Audio Call';
+
+    // Start timer
+    timerInterval = setInterval(() => {
+        seconds++;
+        timerEl.textContent = fmtTime(seconds);
+    }, 1000);
+}
+
+async function endCall(reason) {
+    if (callEnded) return;
+    callEnded = true;
+
+    stopAllSounds();
+    playSound(snd.hangup);
+
+    // Stop polling
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+    // End on server
+    try {
+        await apiPost('/call/' + CALL_ID + '/end-ajax');
+    } catch(e) {}
+
+    // Close media
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+    if (pc) { pc.close(); pc = null; }
+
+    // Show ended overlay
+    endedText.textContent = reason || 'Call ended';
+    if (seconds > 0) {
+        endedDuration.textContent = 'Duration: ' + fmtTime(seconds);
+    }
+    endedOverlay.classList.add('active');
+
+    // Close window after 3 seconds
+    setTimeout(() => {
+        try { window.close(); } catch(e) {}
+        // Fallback: if popup can't close
+        endedText.textContent = 'You can close this window';
+    }, 3000);
+}
+
+async function rejectCall() {
+    if (callEnded) return;
+    callEnded = true;
+    stopAllSounds();
+    playSound(snd.hangup);
+
+    try { await apiPost('/call/' + CALL_ID + '/reject-ajax'); } catch(e) {}
+
+    endedText.textContent = 'Call declined';
+    endedOverlay.classList.add('active');
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+    setTimeout(() => { try { window.close(); } catch(e) {} }, 2000);
+}
+
+/* ───────────────────────────────────────────
+   CONTROLS
+   ─────────────────────────────────────────── */
+if (btnMute) {
+    btnMute.addEventListener('click', () => {
+        if (!localStream) return;
+        isMuted = !isMuted;
+        localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+        document.getElementById('icMicOn').style.display = isMuted ? 'none' : '';
+        document.getElementById('icMicOff').style.display = isMuted ? '' : 'none';
+        btnMute.className = 'call-btn ' + (isMuted ? 'call-btn--toggled' : 'call-btn--default');
+    });
+}
+
+if (btnCamera) {
+    btnCamera.addEventListener('click', () => {
+        if (!localStream) return;
+        isCameraOff = !isCameraOff;
+        localStream.getVideoTracks().forEach(t => t.enabled = !isCameraOff);
+        document.getElementById('icCamOn').style.display = isCameraOff ? 'none' : '';
+        document.getElementById('icCamOff').style.display = isCameraOff ? '' : 'none';
+        btnCamera.className = 'call-btn ' + (isCameraOff ? 'call-btn--toggled' : 'call-btn--default');
+    });
+}
+
+if (btnScreen) {
+    btnScreen.addEventListener('click', async () => {
+        if (isScreenOn) {
+            // Stop screen share
+            if (screenStream) {
+                screenStream.getTracks().forEach(t => t.stop());
+                screenStream = null;
+            }
+            // Revert to camera
+            if (pc && localStream) {
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) sender.replaceTrack(videoTrack);
+                }
+            }
+            localVideo.srcObject = localStream;
+            isScreenOn = false;
+            btnScreen.className = 'call-btn call-btn--default';
+            screenBadge.classList.remove('active');
+            playSound(snd.ssEnd);
+        } else {
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const screenTrack = screenStream.getVideoTracks()[0];
+
+                // Replace video track in peer connection
+                if (pc) {
+                    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(screenTrack);
+                    } else {
+                        pc.addTrack(screenTrack, screenStream);
+                    }
+                }
+
+                localVideo.srcObject = screenStream;
+                isScreenOn = true;
+                btnScreen.className = 'call-btn call-btn--screen-active';
+                screenBadge.classList.add('active');
+                playSound(snd.ssStart);
+
+                // When user stops from browser UI
+                screenTrack.addEventListener('ended', () => {
+                    if (pc && localStream) {
+                        const vidTrack = localStream.getVideoTracks()[0];
+                        if (vidTrack) {
+                            const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                            if (s) s.replaceTrack(vidTrack);
+                        }
+                    }
+                    localVideo.srcObject = localStream;
+                    isScreenOn = false;
+                    screenStream = null;
+                    btnScreen.className = 'call-btn call-btn--default';
+                    screenBadge.classList.remove('active');
+                    playSound(snd.ssEnd);
+                });
+            } catch (err) {
+                console.log('Screen share cancelled');
+            }
+        }
+    });
+}
+
+if (btnEnd) {
+    btnEnd.addEventListener('click', () => endCall());
+}
+if (btnAccept) {
+    btnAccept.addEventListener('click', () => acceptCall());
+}
+if (btnReject) {
+    btnReject.addEventListener('click', () => rejectCall());
+}
+
+/* ───────────────────────────────────────────
+   DRAGGABLE LOCAL PIP
+   ─────────────────────────────────────────── */
+(function() {
+    let isDragging = false, startX, startY, startLeft, startTop;
+    localContainer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        localContainer.classList.add('call-local--dragging');
+        const rect = localContainer.getBoundingClientRect();
+        startX = e.clientX; startY = e.clientY;
+        startLeft = rect.left; startTop = rect.top;
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        localContainer.style.position = 'absolute';
+        localContainer.style.left = (startLeft + dx) + 'px';
+        localContainer.style.top = (startTop + dy) + 'px';
+        localContainer.style.right = 'auto';
+        localContainer.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        localContainer.classList.remove('call-local--dragging');
+    });
+})();
+
+/* ───────────────────────────────────────────
+   WINDOW CLOSE = END CALL
+   ─────────────────────────────────────────── */
+window.addEventListener('beforeunload', () => {
+    if (!callEnded) {
+        // Fire-and-forget end call
+        navigator.sendBeacon('/call/' + CALL_ID + '/end-ajax', '');
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+    }
+});
+
+/* ───────────────────────────────────────────
+   INIT
+   ─────────────────────────────────────────── */
+(async function init() {
+    // If call is already ended/rejected
+    if (callState === 'ENDED' || callState === 'REJECTED' || callState === 'MISSED') {
+        endedText.textContent = callState === 'REJECTED' ? 'Call was declined' : 'Call ended';
+        endedOverlay.classList.add('active');
+        return;
+    }
+
+    if (IS_CALLER) {
+        await startCallerFlow();
+    } else if (callState === 'RINGING') {
+        await startCalleeFlow();
+    } else if (callState === 'CONNECTED') {
+        // Rejoining a connected call
+        await getLocalMedia();
+        createPeerConnection();
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await sendSignal('offer', offer);
+        onCallConnected();
+        pollTimer = setInterval(pollSignals, 800);
+    }
+})();
+
+})();
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import services.ZAIService;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.SoundManager;
 
 public class CodeReviewController implements Stoppable {
@@ -44,8 +45,9 @@ public class CodeReviewController implements Stoppable {
     private void handleReview() {
         String code = codeArea.getText().trim();
         if (code.length() < 10) {
-            new Alert(Alert.AlertType.WARNING, "Please paste at least a few lines of code.", ButtonType.OK)
-                .showAndWait();
+            Alert alert = new Alert(Alert.AlertType.WARNING, "Please paste at least a few lines of code.", ButtonType.OK);
+            DialogHelper.theme(alert);
+            alert.showAndWait();
             return;
         }
         String lang = langCombo.getValue() != null ? langCombo.getValue() : "Unknown";

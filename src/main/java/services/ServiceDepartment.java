@@ -62,9 +62,13 @@ public class ServiceDepartment implements IService<Department> {
             body.put("manager_id", d.getManagerId());
             body.put("allocated_budget", d.getAllocatedBudget());
             JsonElement resp = ApiClient.post("/departments", body);
-            if (resp != null && resp.isJsonObject()) {
+            if (resp == null) {
+                throw new SQLException("API error: failed to create department (server returned error)");
+            }
+            if (resp.isJsonObject()) {
                 d.setId(resp.getAsJsonObject().get("id").getAsInt());
             }
+            InMemoryCache.evictByPrefix("departments:");
             return;
         }
         String sql = "INSERT INTO departments (name, description, manager_id, allocated_budget) VALUES (?, ?, ?, ?)";
@@ -91,7 +95,11 @@ public class ServiceDepartment implements IService<Department> {
             body.put("description", d.getDescription());
             body.put("manager_id", d.getManagerId());
             body.put("allocated_budget", d.getAllocatedBudget());
-            ApiClient.put("/departments/" + d.getId(), body);
+            JsonElement resp = ApiClient.put("/departments/" + d.getId(), body);
+            if (resp == null) {
+                throw new SQLException("API error: failed to update department (server returned error)");
+            }
+            InMemoryCache.evictByPrefix("departments:");
             return;
         }
         String sql = "UPDATE departments SET name=?, description=?, manager_id=?, allocated_budget=? WHERE id=?";
@@ -116,7 +124,7 @@ public class ServiceDepartment implements IService<Department> {
         }
         // Clear department_id from users first
         try (Connection conn = MyDatabase.getInstance().getConnection()) {
-            try (PreparedStatement clearUsers = conn.prepareStatement("UPDATE users SET department_id=NULL WHERE department_id=?")) {
+            try (PreparedStatement clearUsers = conn.prepareStatement("UPDATE user SET department_id=NULL WHERE department_id=?")) {
                 clearUsers.setInt(1, id);
                 clearUsers.executeUpdate();
             }

@@ -19,8 +19,8 @@
     <dependencies>
         <!-- MySQL JDBC Driver -->
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
             <version>8.0.33</version>
         </dependency>
 
@@ -114,6 +114,13 @@
             <version>5.1.0</version>
         </dependency>
 
+        <!-- JSch (SSH tunnel for remote MySQL) -->
+        <dependency>
+            <groupId>com.github.mwiede</groupId>
+            <artifactId>jsch</artifactId>
+            <version>0.2.21</version>
+        </dependency>
+
         <!-- Apache POI (Excel text extraction) -->
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -129,6 +136,17 @@
 
     <build>
         <plugins>
+            <!-- Java compiler settings -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>17</release>
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
+                </configuration>
+            </plugin>
+
             <!-- JavaFX Maven Plugin -->
             <plugin>
                 <groupId>org.openjfx</groupId>
@@ -137,6 +155,7 @@
                 <configuration>
                     <mainClass>mains.MainFX</mainClass>
                     <options>
+                        <option>--enable-native-access=javafx.graphics,javafx.media</option>
                         <option>--add-opens</option>
                         <option>java.base/java.lang=ALL-UNNAMED</option>
                         <option>--add-opens</option>

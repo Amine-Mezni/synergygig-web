@@ -32,7 +32,7 @@ public class ServiceTask implements IService<Task> {
         if (obj.has("assigned_to") && !obj.get("assigned_to").isJsonNull()) {
             assigneeId = obj.get("assigned_to").getAsInt();
         }
-        return new Task(
+        Task t = new Task(
                 obj.get("id").getAsInt(),
                 obj.get("project_id").getAsInt(),
                 assigneeId,
@@ -43,6 +43,22 @@ public class ServiceTask implements IService<Task> {
                 dueDate,
                 createdAt
         );
+        // Submission fields
+        if (obj.has("submission_text") && !obj.get("submission_text").isJsonNull())
+            t.setSubmissionText(obj.get("submission_text").getAsString());
+        if (obj.has("submission_file") && !obj.get("submission_file").isJsonNull())
+            t.setSubmissionFile(obj.get("submission_file").getAsString());
+        // Review fields
+        if (obj.has("review_status") && !obj.get("review_status").isJsonNull())
+            t.setReviewStatus(obj.get("review_status").getAsString());
+        if (obj.has("review_rating") && !obj.get("review_rating").isJsonNull())
+            t.setReviewRating(obj.get("review_rating").getAsInt());
+        if (obj.has("review_feedback") && !obj.get("review_feedback").isJsonNull())
+            t.setReviewFeedback(obj.get("review_feedback").getAsString());
+        if (obj.has("review_date") && !obj.get("review_date").isJsonNull()) {
+            try { t.setReviewDate(Timestamp.valueOf(obj.get("review_date").getAsString().replace("T", " "))); } catch (Exception ignored) {}
+        }
+        return t;
     }
 
     private List<Task> jsonArrayToTasks(JsonElement el) {
@@ -102,6 +118,8 @@ public class ServiceTask implements IService<Task> {
             body.put("status", t.getStatus());
             body.put("priority", t.getPriority());
             body.put("due_date", t.getDueDate() != null ? t.getDueDate().toString() : null);
+            if (t.getSubmissionText() != null) body.put("submission_text", t.getSubmissionText());
+            if (t.getSubmissionFile() != null) body.put("submission_file", t.getSubmissionFile());
             ApiClient.put("/tasks/" + t.getId(), body);
             return;
         }
@@ -230,7 +248,7 @@ public class ServiceTask implements IService<Task> {
     }
 
     private Task rowToTask(ResultSet rs) throws SQLException {
-        return new Task(
+        Task t = new Task(
                 rs.getInt("id"),
                 rs.getInt("project_id"),
                 rs.getInt("assigned_to"),
@@ -241,5 +259,52 @@ public class ServiceTask implements IService<Task> {
                 rs.getDate("due_date"),
                 rs.getTimestamp("created_at")
         );
+        t.setSubmissionText(rs.getString("submission_text"));
+        t.setSubmissionFile(rs.getString("submission_file"));
+        t.setReviewStatus(rs.getString("review_status"));
+        t.setReviewRating(rs.getObject("review_rating") != null ? rs.getInt("review_rating") : null);
+        t.setReviewFeedback(rs.getString("review_feedback"));
+        t.setReviewDate(rs.getTimestamp("review_date"));
+        return t;
+    }
+
+    /** Submit a task for review — sends submission text via API. */
+    public void submitForReview(int taskId, String submissionText) throws SQLException {
+        if (useApi) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", "IN_REVIEW");
+            body.put("submission_text", submissionText);
+            ApiClient.put("/tasks/" + taskId, body);
+            return;
+        }
+        try (Connection conn = MyDatabase.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement("UPDATE tasks SET status='IN_REVIEW', submission_text=? WHERE id=?")) {
+            ps.setString(1, submissionText);
+            ps.setInt(2, taskId);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Get active task count for a user across all projects. */
+    public int getActiveTaskCount(int userId) throws SQLException {
+        if (useApi) {
+            try {
+                JsonElement el = ApiClient.get("/tasks/workload/" + userId);
+                if (el != null && el.isJsonObject()) {
+                    return el.getAsJsonObject().get("active_count").getAsInt();
+                }
+            } catch (Exception e) {
+                System.err.println("Workload API error: " + e.getMessage());
+            }
+            return 0;
+        }
+        try (Connection conn = MyDatabase.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                "SELECT COUNT(*) FROM tasks WHERE assigned_to=? AND status IN ('TODO','IN_PROGRESS','IN_REVIEW')")) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
     }
 }

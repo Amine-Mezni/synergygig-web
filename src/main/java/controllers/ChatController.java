@@ -2097,19 +2097,40 @@ public class ChatController implements Stoppable {
 
     private void showImagePopup(Image img) {
         javafx.stage.Stage popup = new javafx.stage.Stage();
-        popup.initStyle(javafx.stage.StageStyle.UTILITY);
-        popup.setTitle("Image Preview");
+        popup.initStyle(javafx.stage.StageStyle.TRANSPARENT);
 
         ImageView iv = new ImageView(img);
         iv.setPreserveRatio(true);
         iv.setFitWidth(Math.min(img.getWidth(), 800));
         iv.setFitHeight(Math.min(img.getHeight(), 600));
 
-        StackPane root = new StackPane(iv);
         boolean dkPop = SessionManager.getInstance().isDarkTheme();
-        root.setStyle("-fx-background-color: " + (dkPop ? "#0A090C" : "#F0EDED") + "; -fx-padding: 12;");
+        String bg = dkPop ? "#0A090C" : "#F0EDED";
+        String fg = dkPop ? "#E0E0E0" : "#1A1A1A";
 
-        javafx.scene.Scene scene = new javafx.scene.Scene(root);
+        // Custom title bar
+        Label titleLbl = new Label("Image Preview");
+        titleLbl.setStyle("-fx-text-fill: " + fg + "; -fx-font-size: 13; -fx-font-weight: bold;");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+        Button closeBtn = new Button("\u2715");
+        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + fg + "; -fx-font-size: 14; -fx-cursor: hand; -fx-padding: 4 8;");
+        closeBtn.setOnAction(e -> popup.close());
+        HBox titleBar = new HBox(8, titleLbl, spacer, closeBtn);
+        titleBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        titleBar.setStyle("-fx-background-color: " + (dkPop ? "#12111A" : "#E8E4E5") + "; -fx-padding: 8 12; -fx-background-radius: 12 12 0 0;");
+        titleBar.setCursor(javafx.scene.Cursor.MOVE);
+        final double[] offset = new double[2];
+        titleBar.setOnMousePressed(e -> { offset[0] = popup.getX() - e.getScreenX(); offset[1] = popup.getY() - e.getScreenY(); });
+        titleBar.setOnMouseDragged(e -> { popup.setX(e.getScreenX() + offset[0]); popup.setY(e.getScreenY() + offset[1]); });
+
+        StackPane imgPane = new StackPane(iv);
+        imgPane.setStyle("-fx-padding: 12;");
+
+        VBox root = new VBox(titleBar, imgPane);
+        root.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 12; -fx-border-color: " + (dkPop ? "#2A2A3C" : "#D0CDD0") + "; -fx-border-radius: 12; -fx-border-width: 1;");
+
+        javafx.scene.Scene scene = new javafx.scene.Scene(root, javafx.scene.paint.Color.TRANSPARENT);
         popup.setScene(scene);
         popup.show();
     }
@@ -2799,6 +2820,21 @@ public class ChatController implements Stoppable {
 
         topBar.getChildren().addAll(videoCallNameLabel, videoCallTimerLabel, topSpacer, liveBox);
 
+        // Drag support for UNDECORATED video call window
+        final double[] dragDelta = new double[2];
+        topBar.setOnMousePressed(ev -> {
+            if (videoCallStage != null) {
+                dragDelta[0] = videoCallStage.getX() - ev.getScreenX();
+                dragDelta[1] = videoCallStage.getY() - ev.getScreenY();
+            }
+        });
+        topBar.setOnMouseDragged(ev -> {
+            if (videoCallStage != null) {
+                videoCallStage.setX(ev.getScreenX() + dragDelta[0]);
+                videoCallStage.setY(ev.getScreenY() + dragDelta[1]);
+            }
+        });
+
         // ─── Center: video stream area ───
         StackPane videoArea = new StackPane(remoteVideoView);
         videoArea.getStyleClass().add("video-stream-area");
@@ -3012,7 +3048,7 @@ public class ChatController implements Stoppable {
 
         videoCallStage = new javafx.stage.Stage();
         videoCallStage.setTitle("Video Call — " + otherName);
-        videoCallStage.initStyle(javafx.stage.StageStyle.DECORATED);
+        videoCallStage.initStyle(javafx.stage.StageStyle.UNDECORATED);
         videoCallStage.setScene(scene);
         videoCallStage.setMinWidth(480);
         videoCallStage.setMinHeight(360);

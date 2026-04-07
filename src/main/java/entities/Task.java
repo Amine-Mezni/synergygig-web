@@ -10,10 +10,20 @@ public class Task {
     private int assigneeId;       // DB column: assigned_to  (0 = unassigned)
     private String title;
     private String description;
-    private String status;        // TODO, IN_PROGRESS, DONE
+    private String status;        // TODO, IN_PROGRESS, IN_REVIEW, DONE
     private String priority;      // LOW, MEDIUM, HIGH
     private Date dueDate;
     private Timestamp createdAt;
+
+    // ── Submission fields (employee fills when submitting for review) ──
+    private String submissionText;
+    private String submissionFile;   // URL/path to uploaded file
+
+    // ── Review fields (manager fills during review) ──
+    private String reviewStatus;     // APPROVED, NEEDS_REVISION, REJECTED
+    private Integer reviewRating;    // 1-5 stars
+    private String reviewFeedback;
+    private Timestamp reviewDate;
 
     public Task() {}
 
@@ -71,6 +81,24 @@ public class Task {
 
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
+
+    public String getSubmissionText() { return submissionText; }
+    public void setSubmissionText(String submissionText) { this.submissionText = submissionText; }
+
+    public String getSubmissionFile() { return submissionFile; }
+    public void setSubmissionFile(String submissionFile) { this.submissionFile = submissionFile; }
+
+    public String getReviewStatus() { return reviewStatus; }
+    public void setReviewStatus(String reviewStatus) { this.reviewStatus = reviewStatus; }
+
+    public Integer getReviewRating() { return reviewRating; }
+    public void setReviewRating(Integer reviewRating) { this.reviewRating = reviewRating; }
+
+    public String getReviewFeedback() { return reviewFeedback; }
+    public void setReviewFeedback(String reviewFeedback) { this.reviewFeedback = reviewFeedback; }
+
+    public Timestamp getReviewDate() { return reviewDate; }
+    public void setReviewDate(Timestamp reviewDate) { this.reviewDate = reviewDate; }
 
     @Override
     public String toString() {

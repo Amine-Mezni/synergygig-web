@@ -43,8 +43,10 @@ import services.ServiceChatRoom;
 import services.ServiceChatRoomMember;
 import entities.ChatRoom;
 import utils.AnimatedButton;
+import utils.ApiClient;
 import utils.AppThreadPool;
 import utils.BadWordsService;
+import utils.DialogHelper;
 import utils.SessionManager;
 import utils.SoundManager;
 import services.ZAIService;
@@ -932,7 +934,18 @@ public class CommunityController implements Stoppable {
             commentBtn.setOpacity(0.6);
         }
 
-        footer.getChildren().add(commentBtn);
+        // ── Share button ──
+        ImageView shareIcon = twemojiIcon("1f4e4", 14); // 📤 outbox tray
+        Label shareLabel = new Label(" Share");
+        shareLabel.setStyle("-fx-text-fill: #b0b0b0; -fx-font-size: 12;");
+        HBox shareContent = new HBox(4, shareIcon, shareLabel);
+        shareContent.setAlignment(Pos.CENTER);
+        Button shareBtn = new Button();
+        shareBtn.setGraphic(shareContent);
+        shareBtn.getStyleClass().add("community-react-btn");
+        shareBtn.setOnAction(e -> showSharePopup(post, shareBtn));
+
+        footer.getChildren().addAll(commentBtn, shareBtn);
 
         card.getChildren().addAll(header, body, sep, footer);
 
@@ -1063,6 +1076,341 @@ public class CommunityController implements Stoppable {
                     size, size, true, true, true));
         }
         return iv;
+    }
+
+    // ═══════════════════════════════════════════
+    //  SOCIAL SHARING (Facebook / Instagram)
+    // ═══════════════════════════════════════════
+
+    private void showSharePopup(Post post, Node anchor) {
+        Popup popup = new Popup();
+        popup.setAutoHide(true);
+        popup.setAutoFix(true);
+
+        VBox card = new VBox(0);
+        card.getStyleClass().add("share-popup-card");
+        card.setPrefWidth(310);
+        card.setMaxWidth(310);
+
+        // ── Header ──
+        HBox header = new HBox(8);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(14, 16, 10, 16));
+        header.setStyle("-fx-border-color: transparent transparent #1C1B22 transparent; -fx-border-width: 0 0 1 0;");
+
+        ImageView headerIcon = twemojiIcon("1f4e4", 18);
+        Label title = new Label("Share Post");
+        title.setStyle("-fx-text-fill: #F0EDEE; -fx-font-size: 15; -fx-font-weight: bold;");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button closeBtn = new Button("\u2715");
+        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #6B6B78; -fx-font-size: 14; -fx-cursor: hand; -fx-padding: 2 6;");
+        closeBtn.setOnAction(e -> popup.hide());
+
+        header.getChildren().addAll(headerIcon, title, spacer, closeBtn);
+
+        // ── Post preview ──
+        VBox previewBox = new VBox(6);
+        previewBox.setPadding(new Insets(10, 16, 10, 16));
+        previewBox.setStyle("-fx-background-color: #0E0D14; -fx-background-radius: 8;");
+        VBox.setMargin(previewBox, new Insets(10, 12, 6, 12));
+
+        if (post.getContent() != null && !post.getContent().trim().isEmpty()) {
+            String preview = post.getContent().length() > 120
+                    ? post.getContent().substring(0, 120) + "..."
+                    : post.getContent();
+            Label previewText = new Label(preview);
+            previewText.setWrapText(true);
+            previewText.setMaxWidth(270);
+            previewText.setStyle("-fx-text-fill: #9E9EA8; -fx-font-size: 12;");
+            previewBox.getChildren().add(previewText);
+        }
+
+        if (post.getImageBase64() != null && !post.getImageBase64().isEmpty()) {
+            try {
+                Image img = postImageCache.get(post.getId());
+                if (img == null) {
+                    byte[] imgBytes = Base64.getDecoder().decode(post.getImageBase64());
+                    img = new Image(new ByteArrayInputStream(imgBytes));
+                }
+                ImageView thumb = new ImageView(img);
+                thumb.setFitWidth(120);
+                thumb.setPreserveRatio(true);
+                thumb.setSmooth(true);
+                Rectangle clip = new Rectangle(120, 80);
+                clip.setArcWidth(8);
+                clip.setArcHeight(8);
+                thumb.setClip(clip);
+                previewBox.getChildren().add(thumb);
+            } catch (Exception ignored) {}
+        }
+
+        // ── Share buttons ──
+        VBox buttonsBox = new VBox(6);
+        buttonsBox.setPadding(new Insets(8, 12, 14, 12));
+
+        // Facebook
+        Button fbBtn = createShareButton("📘", "Share to Facebook",
+                "Share post content on your Facebook timeline",
+                "#1877F2", "#1565C0");
+        fbBtn.setOnAction(e -> {
+            shareToFacebook(post);
+            popup.hide();
+        });
+
+        // Instagram
+        Button igBtn = createShareButton("📷", "Share to Instagram",
+                "Save image & copy text for Instagram",
+                "#E1306C", "#C13584");
+        igBtn.setOnAction(e -> {
+            shareToInstagram(post);
+            popup.hide();
+        });
+
+        // Copy to Clipboard
+        Button copyBtn = createShareButton("📋", "Copy to Clipboard",
+                "Copy post text to paste anywhere",
+                "#2C666E", "#1E4D54");
+        copyBtn.setOnAction(e -> {
+            copyPostToClipboard(post);
+            popup.hide();
+        });
+
+        // Save Image (only if post has image)
+        if (post.getImageBase64() != null && !post.getImageBase64().isEmpty()) {
+            Button saveImgBtn = createShareButton("💾", "Save Image",
+                    "Download the post image to your computer",
+                    "#7C3AED", "#6D28D9");
+            saveImgBtn.setOnAction(e -> {
+                savePostImage(post);
+                popup.hide();
+            });
+            buttonsBox.getChildren().addAll(fbBtn, igBtn, copyBtn, saveImgBtn);
+        } else {
+            buttonsBox.getChildren().addAll(fbBtn, igBtn, copyBtn);
+        }
+
+        card.getChildren().addAll(header, previewBox, buttonsBox);
+
+        // Drop shadow effect
+        card.setEffect(new javafx.scene.effect.DropShadow(20, 0, 4,
+                Color.rgb(0, 0, 0, 0.55)));
+
+        popup.getContent().add(card);
+
+        // Position near the share button
+        Window win = anchor.getScene().getWindow();
+        javafx.geometry.Bounds bounds = anchor.localToScreen(anchor.getBoundsInLocal());
+        if (bounds != null) {
+            popup.show(win, bounds.getMinX() - 100, bounds.getMaxY() + 6);
+        } else {
+            popup.show(win);
+        }
+    }
+
+    private Button createShareButton(String emoji, String label, String description,
+                                      String color1, String color2) {
+        HBox content = new HBox(12);
+        content.setAlignment(Pos.CENTER_LEFT);
+
+        Label emojiLabel = new Label(emoji);
+        emojiLabel.setStyle("-fx-font-size: 22;");
+
+        VBox textCol = new VBox(1);
+        Label nameLabel = new Label(label);
+        nameLabel.setStyle("-fx-text-fill: #F0EDEE; -fx-font-size: 13; -fx-font-weight: bold;");
+        Label descLabel = new Label(description);
+        descLabel.setStyle("-fx-text-fill: #6B6B78; -fx-font-size: 10.5;");
+        textCol.getChildren().addAll(nameLabel, descLabel);
+
+        content.getChildren().addAll(emojiLabel, textCol);
+
+        Button btn = new Button();
+        btn.setGraphic(content);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.getStyleClass().add("share-option-btn");
+        btn.setStyle("-fx-background-color: linear-gradient(to right, " + color1 + "15, " + color2 + "08);"
+                + "-fx-border-color: " + color1 + "30; -fx-border-width: 1; -fx-border-radius: 10;"
+                + "-fx-background-radius: 10; -fx-padding: 10 14; -fx-cursor: hand;");
+
+        btn.setOnMouseEntered(e -> btn.setStyle(
+                "-fx-background-color: linear-gradient(to right, " + color1 + "30, " + color2 + "18);"
+                + "-fx-border-color: " + color1 + "60; -fx-border-width: 1; -fx-border-radius: 10;"
+                + "-fx-background-radius: 10; -fx-padding: 10 14; -fx-cursor: hand;"));
+        btn.setOnMouseExited(e -> btn.setStyle(
+                "-fx-background-color: linear-gradient(to right, " + color1 + "15, " + color2 + "08);"
+                + "-fx-border-color: " + color1 + "30; -fx-border-width: 1; -fx-border-radius: 10;"
+                + "-fx-background-radius: 10; -fx-padding: 10 14; -fx-cursor: hand;"));
+
+        return btn;
+    }
+
+    private void shareToFacebook(Post post) {
+        try {
+            String text = post.getContent() != null ? post.getContent() : "";
+            String appName = "SynergyGig";
+            String shareText = text + "\n\n— Shared from " + appName;
+
+            // Copy content (text + image) to clipboard so user can paste
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+            cc.putString(shareText);
+            if (post.getImageBase64() != null && !post.getImageBase64().isEmpty()) {
+                Image img = postImageCache.get(post.getId());
+                if (img == null) {
+                    byte[] imgBytes = Base64.getDecoder().decode(post.getImageBase64());
+                    img = new Image(new ByteArrayInputStream(imgBytes));
+                }
+                cc.putImage(img);
+                saveImageToTemp(post); // Save for reference
+            }
+            clipboard.setContent(cc);
+
+            // Open Facebook — go straight to the main feed where user can "Create Post"
+            java.awt.Desktop.getDesktop().browse(new URI("https://www.facebook.com/"));
+
+            incrementShareCount(post);
+            showToast("\u2705 Content copied! Click \"What's on your mind?\" on Facebook and paste (Ctrl+V)", false);
+        } catch (Exception ex) {
+            showToast("Could not open Facebook: " + ex.getMessage(), true);
+        }
+    }
+
+    private void shareToInstagram(Post post) {
+        try {
+            String text = post.getContent() != null ? post.getContent() : "";
+            String appName = "SynergyGig";
+            String shareText = text + "\n\n— Shared from " + appName;
+
+            // Copy caption text to clipboard
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+            cc.putString(shareText);
+
+            if (post.getImageBase64() != null && !post.getImageBase64().isEmpty()) {
+                // Save image to temp + put on clipboard
+                File tempImg = saveImageToTemp(post);
+                Image img = postImageCache.get(post.getId());
+                if (img == null) {
+                    byte[] imgBytes = Base64.getDecoder().decode(post.getImageBase64());
+                    img = new Image(new ByteArrayInputStream(imgBytes));
+                }
+                cc.putImage(img);
+                clipboard.setContent(cc);
+
+                // Open the saved image so user can drag/upload it
+                if (tempImg != null) {
+                    java.awt.Desktop.getDesktop().open(tempImg);
+                }
+
+                // Open Instagram's create post page
+                java.awt.Desktop.getDesktop().browse(new URI("https://www.instagram.com/create/select/"));
+
+                showToast("\u2705 Image opened & caption copied! Upload the image on Instagram, then paste caption (Ctrl+V)", false);
+            } else {
+                clipboard.setContent(cc);
+                // Open Instagram's create page for text-only
+                java.awt.Desktop.getDesktop().browse(new URI("https://www.instagram.com/create/select/"));
+                showToast("\u2705 Caption copied! Create a post on Instagram and paste (Ctrl+V)", false);
+            }
+
+            incrementShareCount(post);
+        } catch (Exception ex) {
+            showToast("Could not open Instagram: " + ex.getMessage(), true);
+        }
+    }
+
+    private void copyPostToClipboard(Post post) {
+        try {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+
+            String text = post.getContent() != null ? post.getContent() : "";
+            cc.putString(text);
+
+            // Also copy image if present
+            if (post.getImageBase64() != null && !post.getImageBase64().isEmpty()) {
+                Image img = postImageCache.get(post.getId());
+                if (img == null) {
+                    byte[] imgBytes = Base64.getDecoder().decode(post.getImageBase64());
+                    img = new Image(new ByteArrayInputStream(imgBytes));
+                }
+                cc.putImage(img);
+            }
+
+            clipboard.setContent(cc);
+            SoundManager.getInstance().play(SoundManager.MESSAGE_SENT);
+            showToast("Post copied to clipboard!", false);
+            incrementShareCount(post);
+        } catch (Exception ex) {
+            showToast("Could not copy to clipboard: " + ex.getMessage(), true);
+        }
+    }
+
+    private void savePostImage(Post post) {
+        if (post.getImageBase64() == null || post.getImageBase64().isEmpty()) return;
+        try {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Save Post Image");
+            fc.setInitialFileName("synergygig_post_" + post.getId() + ".png");
+            fc.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("PNG Image", "*.png"),
+                    new FileChooser.ExtensionFilter("JPEG Image", "*.jpg", "*.jpeg"),
+                    new FileChooser.ExtensionFilter("All Files", "*.*")
+            );
+            File file = fc.showSaveDialog(ownerWindow());
+            if (file != null) {
+                byte[] imgBytes = Base64.getDecoder().decode(post.getImageBase64());
+
+                // Convert to BufferedImage for proper format saving
+                java.awt.image.BufferedImage bImg = javax.imageio.ImageIO.read(new ByteArrayInputStream(imgBytes));
+                String ext = file.getName().contains(".") ?
+                        file.getName().substring(file.getName().lastIndexOf('.') + 1).toLowerCase() : "png";
+                if ("jpg".equals(ext)) ext = "jpeg";
+                javax.imageio.ImageIO.write(bImg, ext, file);
+
+                showToast("Image saved to " + file.getName(), false);
+                incrementShareCount(post);
+            }
+        } catch (Exception ex) {
+            showToast("Could not save image: " + ex.getMessage(), true);
+        }
+    }
+
+    private File saveImageToTemp(Post post) {
+        try {
+            byte[] imgBytes = Base64.getDecoder().decode(post.getImageBase64());
+            File tempDir = new File(System.getProperty("java.io.tmpdir"), "synergygig_shares");
+            tempDir.mkdirs();
+            File tempFile = new File(tempDir, "post_" + post.getId() + ".png");
+
+            java.awt.image.BufferedImage bImg = javax.imageio.ImageIO.read(new ByteArrayInputStream(imgBytes));
+            javax.imageio.ImageIO.write(bImg, "png", tempFile);
+            return tempFile;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private void incrementShareCount(Post post) {
+        AppThreadPool.io(() -> {
+            try {
+                post.setSharesCount(post.getSharesCount() + 1);
+                // Update via dedicated share endpoint or direct DB
+                if (utils.AppConfig.isApiMode()) {
+                    ApiClient.post("/posts/" + post.getId() + "/share", new HashMap<>());
+                } else {
+                    try (java.sql.Connection conn = utils.MyDatabase.getInstance().getConnection();
+                         java.sql.PreparedStatement ps = conn.prepareStatement(
+                                 "UPDATE posts SET shares_count = shares_count + 1 WHERE id = ?")) {
+                        ps.setInt(1, post.getId());
+                        ps.executeUpdate();
+                    }
+                }
+                utils.InMemoryCache.evictByPrefix("posts:");
+            } catch (Exception ignored) {}
+        });
     }
 
     // ═══════════════════════════════════════════
@@ -1396,6 +1744,7 @@ public class CommunityController implements Stoppable {
 
     private void showEditPostDialog(Post post) {
         Dialog<String> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Edit Post");
         dialog.initOwner(ownerWindow());
 
@@ -1469,6 +1818,7 @@ public class CommunityController implements Stoppable {
 
     private void showEditCommentDialog(Comment comment) {
         Dialog<String> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Edit Comment");
         dialog.initOwner(ownerWindow());
 
@@ -1958,6 +2308,7 @@ public class CommunityController implements Stoppable {
     @FXML
     private void handleCreateGroup() {
         Dialog<CommunityGroup> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Create Group");
         dialog.initOwner(feedScroll.getScene().getWindow());
 
@@ -2751,6 +3102,7 @@ public class CommunityController implements Stoppable {
     /** Dialog for editing own bio. */
     private void showEditProfileDialog(User user) {
         Dialog<String> dialog = new Dialog<>();
+        DialogHelper.theme(dialog);
         dialog.setTitle("Edit Profile");
         dialog.initOwner(ownerWindow());
 
@@ -2885,6 +3237,7 @@ public class CommunityController implements Stoppable {
                     String titleIcon = "friends".equals(type) ? "\uD83E\uDD1D" : "followers".equals(type) ? "\uD83D\uDC65" : "\uD83D\uDC64";
 
                     Dialog<Void> dialog = new Dialog<>();
+                    DialogHelper.theme(dialog);
                     dialog.setTitle(title);
                     dialog.setHeaderText(null);
 
@@ -3400,6 +3753,7 @@ public class CommunityController implements Stoppable {
                     SoundManager.getInstance().play(SoundManager.AI_COMPLETE);
 
                     Alert info = new Alert(Alert.AlertType.INFORMATION);
+                    DialogHelper.theme(info);
                     info.setTitle("Tone Analysis");
                     info.setHeaderText("🔍 Post Tone Analysis");
                     info.setContentText(msg);

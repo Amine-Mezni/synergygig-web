@@ -57,6 +57,7 @@ public class HRModuleController {
     private User currentUser;
     private boolean isHrOrAdmin;
     private Button activeTab;
+    private Region ambienceIndicator;
 
     // Leave table sort/search state
     private String leaveSortColumn = "";
@@ -105,6 +106,7 @@ public class HRModuleController {
         for (String[] tab : tabs) {
             Button btn = new Button(tab[0] + "  " + tab[1]);
             btn.getStyleClass().add("hr-tab-btn");
+            btn.setUserData(tab[1]);
             btn.setOnAction(e -> {
                 SoundManager.getInstance().play(SoundManager.TAB_SWITCH);
                 switchTab(btn, tab[1]);
@@ -112,11 +114,21 @@ public class HRModuleController {
             tabBar.getChildren().add(btn);
         }
 
+        // === Spotlight Pill Navbar ===
+        setupSpotlightTabBar();
+
         // Select first tab
         if (!tabBar.getChildren().isEmpty()) {
             Button first = (Button) tabBar.getChildren().get(0);
             switchTab(first, "Overview");
         }
+
+        // Register auto-payroll callback to refresh payroll list when scheduled generation runs
+        utils.PayrollScheduler.getInstance().setOnPayrollGenerated(() -> {
+            if (activeTab != null && activeTab.getText().contains("Payroll")) {
+                showPayroll();
+            }
+        });
     }
 
     private void loadUserNames() {
@@ -131,6 +143,7 @@ public class HRModuleController {
         if (activeTab != null) activeTab.getStyleClass().remove("hr-tab-active");
         btn.getStyleClass().add("hr-tab-active");
         activeTab = btn;
+        animateAmbienceToTab(btn);
 
         switch (tabName) {
             case "Overview":     showOverview(); break;
@@ -150,6 +163,104 @@ public class HRModuleController {
             case "Employee of Month":
                 DashboardController.getInstance().navigateTo("/fxml/EmployeeOfMonth.fxml"); break;
         }
+    }
+
+    // ==================== SPOTLIGHT PILL NAVBAR ====================
+
+    private Region spotlightGlow;
+
+    private void setupSpotlightTabBar() {
+        VBox topBar = (VBox) tabBar.getParent();
+        int tabBarIdx = topBar.getChildren().indexOf(tabBar);
+        topBar.getChildren().remove(tabBar);
+
+        // Outer container centers the pill
+        StackPane navContainer = new StackPane();
+        navContainer.getStyleClass().add("hr-nav-container");
+
+        // The pill-shaped navbar
+        StackPane pill = new StackPane();
+        pill.getStyleClass().add("hr-nav-pill");
+
+        // Set the tabBar as contents inside the pill
+        tabBar.getStyleClass().remove("hr-tab-bar");
+        tabBar.getStyleClass().add("hr-pill-tabs");
+        tabBar.setAlignment(Pos.CENTER);
+
+        // Spotlight glow (follows mouse - radial gradient from bottom)
+        spotlightGlow = new Region();
+        spotlightGlow.setMouseTransparent(true);
+        spotlightGlow.setOpacity(0);
+        spotlightGlow.getStyleClass().add("hr-spotlight-glow");
+
+        // Active ambience line (animated under active tab)
+        ambienceIndicator = new Region();
+        ambienceIndicator.setManaged(false);
+        ambienceIndicator.setPrefHeight(2);
+        ambienceIndicator.setMaxHeight(2);
+        ambienceIndicator.setPrefWidth(50);
+        ambienceIndicator.setMaxWidth(50);
+        ambienceIndicator.getStyleClass().add("hr-ambience-line");
+
+        // Bottom track line inside pill
+        Region trackLine = new Region();
+        trackLine.setManaged(false);
+        trackLine.setPrefHeight(1);
+        trackLine.setMaxHeight(1);
+        trackLine.getStyleClass().add("hr-track-line");
+
+        pill.getChildren().addAll(tabBar, spotlightGlow, trackLine, ambienceIndicator);
+        navContainer.getChildren().add(pill);
+        topBar.getChildren().add(tabBarIdx, navContainer);
+
+        // Position unmanaged layers when pill resizes
+        pill.layoutBoundsProperty().addListener((obs, ov, nv) -> {
+            double h = nv.getHeight();
+            double w = nv.getWidth();
+            trackLine.setLayoutY(h - 1);
+            trackLine.setPrefWidth(w - 16); // inset from edges
+            trackLine.setLayoutX(8);
+            ambienceIndicator.setLayoutY(h - 2);
+        });
+
+        // Mouse spotlight: radial gradient follows cursor along the bottom
+        tabBar.setOnMouseMoved(e -> {
+            double xInPill = e.getX() + tabBar.getLayoutX();
+            double pillW = pill.getWidth();
+            if (pillW <= 0) return;
+            double pct = Math.max(0, Math.min(100, (xInPill / pillW) * 100.0));
+            spotlightGlow.setOpacity(1.0);
+            spotlightGlow.setStyle(String.format(
+                    "-fx-background-color: radial-gradient(center %.1f%% 100%%, radius 25%%, rgba(138,138,255,0.12), transparent);",
+                    pct));
+        });
+
+        tabBar.setOnMouseExited(e -> {
+            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(
+                    javafx.util.Duration.millis(400), spotlightGlow);
+            ft.setToValue(0);
+            ft.play();
+        });
+    }
+
+    /** Slide the ambience indicator to the active tab. */
+    private void animateAmbienceToTab(Button btn) {
+        if (ambienceIndicator == null) return;
+        Platform.runLater(() -> {
+            javafx.geometry.Bounds tabBounds = btn.getBoundsInParent();
+            if (tabBounds.getWidth() == 0) return;
+            // Offset for tabBar position inside pill
+            double pillOffset = tabBar.getLayoutX();
+            double targetX = pillOffset + tabBounds.getMinX() + tabBounds.getWidth() / 2
+                    - ambienceIndicator.getPrefWidth() / 2;
+            javafx.animation.KeyValue kv = new javafx.animation.KeyValue(
+                    ambienceIndicator.layoutXProperty(), targetX,
+                    javafx.animation.Interpolator.SPLINE(0.25, 0.1, 0.25, 1.0));
+            javafx.animation.KeyFrame kf = new javafx.animation.KeyFrame(
+                    javafx.util.Duration.millis(350), kv);
+            javafx.animation.Timeline tl = new javafx.animation.Timeline(kf);
+            tl.play();
+        });
     }
 
     // ==================== OVERVIEW TAB ====================
@@ -497,25 +608,32 @@ public class HRModuleController {
         section.setPadding(new Insets(16));
         section.setMinWidth(320);
 
-        Label titleLbl = new Label("\uD83C\uDDF9\uD83C\uDDF3 Upcoming Public Holidays");
+        Label titleLbl = new Label("\uD83C\uDF10 Upcoming Public Holidays");
         titleLbl.getStyleClass().add("hr-section-title");
 
         VBox listBox = new VBox(6);
-        Label loading = new Label("Loading holidays...");
+        Label loading = new Label("Detecting location...");
         loading.getStyleClass().add("hr-api-loading");
         listBox.getChildren().add(loading);
 
         section.getChildren().addAll(titleLbl, listBox);
 
-        // Fetch holidays async
+        // Detect country from IP, then fetch holidays for that country
         int year = LocalDate.now().getYear();
-        String url = "https://date.nager.at/api/v3/PublicHolidays/" + year + "/TN";
-
-        httpClient.sendAsync(
-                HttpRequest.newBuilder().uri(URI.create(url)).GET()
-                        .timeout(Duration.ofSeconds(8)).build(),
-                HttpResponse.BodyHandlers.ofString()
-        ).thenAccept(resp -> {
+        utils.GeoLocationService.resolveCountry().thenCompose(countryCode -> {
+            String countryName = utils.GeoLocationService.getCountryName();
+            String flag = utils.GeoLocationService.countryCodeToFlag(countryCode);
+            Platform.runLater(() -> {
+                titleLbl.setText(flag + " Upcoming Public Holidays");
+                loading.setText("Loading holidays for " + countryName + "...");
+            });
+            String url = "https://date.nager.at/api/v3/PublicHolidays/" + year + "/" + countryCode;
+            return httpClient.sendAsync(
+                    HttpRequest.newBuilder().uri(URI.create(url)).GET()
+                            .timeout(Duration.ofSeconds(8)).build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        }).thenAccept(resp -> {
             if (resp.statusCode() == 200) {
                 JsonArray holidays = gson.fromJson(resp.body(), JsonArray.class);
                 Platform.runLater(() -> {
@@ -766,7 +884,7 @@ public class HRModuleController {
                 card.getChildren().addAll(info, actions);
 
                 // ── Team panel (toggle) ──
-                VBox teamPanel = buildTeamPanel(dept, container);
+                VBox teamPanel = buildTeamPanel(dept, container, empLabel);
                 teamPanel.setVisible(false);
                 teamPanel.setManaged(false);
 
@@ -792,7 +910,7 @@ public class HRModuleController {
         return "EMPLOYEE".equals(role) || "PROJECT_OWNER".equals(role);
     }
 
-    private VBox buildTeamPanel(Department dept, VBox parentContainer) {
+    private VBox buildTeamPanel(Department dept, VBox parentContainer, Label empLabel) {
         VBox panel = new VBox(10);
         panel.getStyleClass().add("hr-team-panel");
         panel.setPadding(new Insets(12, 16, 16, 16));
@@ -813,11 +931,11 @@ public class HRModuleController {
 
         panel.getChildren().addAll(assignedTitle, assignedList, unassignedTitle, unassignedList);
 
-        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer);
+        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer, empLabel);
         return panel;
     }
 
-    private void refreshTeamPanel(Department dept, VBox assignedList, VBox unassignedList, VBox parentContainer) {
+    private void refreshTeamPanel(Department dept, VBox assignedList, VBox unassignedList, VBox parentContainer, Label empLabel) {
         assignedList.getChildren().clear();
         unassignedList.getChildren().clear();
 
@@ -826,9 +944,10 @@ public class HRModuleController {
                 .filter(u -> u.getDepartmentId() != null && u.getDepartmentId() == dept.getId())
                 .collect(Collectors.toList());
 
+        // Only show employees with NO department as assignable (prevents cross-department moves)
         List<User> unassigned = allUsers.stream()
                 .filter(this::isTeamEligible)
-                .filter(u -> u.getDepartmentId() == null)
+                .filter(u -> u.getDepartmentId() == null || u.getDepartmentId() == 0)
                 .collect(Collectors.toList());
 
         if (assigned.isEmpty()) {
@@ -869,7 +988,10 @@ public class HRModuleController {
                                     u.getFirstName() + " " + u.getLastName() + " has been removed from your department.",
                                     dept.getId(), "DEPARTMENT");
                         }
-                        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer);
+                        // Force refresh user cache & update panel in-place
+                        allUsers = utils.UserNameCache.forceRefresh();
+                        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer, empLabel);
+                        updateEmpCount(dept, empLabel);
                     } catch (SQLException ex) {
                         showError("Failed to remove: " + ex.getMessage());
                     }
@@ -903,6 +1025,19 @@ public class HRModuleController {
                 addBtn.getStyleClass().addAll("hr-action-btn", "hr-success-btn");
                 addBtn.setOnAction(e -> {
                     SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);
+                    // Guard: prevent assigning if already in a department
+                    if (u.getDepartmentId() != null && u.getDepartmentId() != 0) {
+                        String currentDeptName = "another department";
+                        try {
+                            for (Department d : serviceDepartment.recuperer()) {
+                                if (d.getId() == u.getDepartmentId()) { currentDeptName = d.getName(); break; }
+                            }
+                        } catch (SQLException ignored) {}
+                        showError(u.getFirstName() + " " + u.getLastName() +
+                                " is already assigned to \"" + currentDeptName + "\".\n" +
+                                "An employee cannot belong to multiple departments.");
+                        return;
+                    }
                     try {
                         serviceUser.updateDepartmentId(u.getId(), dept.getId());
                         u.setDepartmentId(dept.getId());
@@ -918,7 +1053,10 @@ public class HRModuleController {
                                     u.getFirstName() + " " + u.getLastName() + " has been assigned to your department.",
                                     dept.getId(), "DEPARTMENT");
                         }
-                        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer);
+                        // Force refresh user cache & update panel in-place
+                        allUsers = utils.UserNameCache.forceRefresh();
+                        refreshTeamPanel(dept, assignedList, unassignedList, parentContainer, empLabel);
+                        updateEmpCount(dept, empLabel);
                     } catch (SQLException ex) {
                         showError("Failed to assign: " + ex.getMessage());
                     }
@@ -928,6 +1066,14 @@ public class HRModuleController {
                 unassignedList.getChildren().add(row);
             }
         }
+    }
+
+    /** Update employee count label for a department card. */
+    private void updateEmpCount(Department dept, Label empLabel) {
+        long count = allUsers.stream()
+                .filter(u -> u.getDepartmentId() != null && u.getDepartmentId() == dept.getId())
+                .count();
+        empLabel.setText("👥 " + count + " employees");
     }
 
     private void showDepartmentDialog(Department existing) {
@@ -962,7 +1108,23 @@ public class HRModuleController {
 
         ComboBox<String> managerCombo = new ComboBox<>();
         managerCombo.getItems().add("None");
+
+        // Collect manager IDs already assigned to other departments
+        Set<Integer> takenManagerIds = new java.util.HashSet<>();
+        try {
+            for (Department dept : serviceDepartment.recuperer()) {
+                if (dept.getManagerId() != null) {
+                    // Allow the current department's manager to still appear
+                    if (existing == null || existing.getId() != dept.getId()) {
+                        takenManagerIds.add(dept.getManagerId());
+                    }
+                }
+            }
+        } catch (SQLException ignored) {}
+
         for (User u : allUsers) {
+            // Skip users already managing another department
+            if (takenManagerIds.contains(u.getId())) continue;
             managerCombo.getItems().add(u.getId() + " - " + u.getFirstName() + " " + u.getLastName());
         }
         if (existing != null && existing.getManagerId() != null) {
@@ -973,19 +1135,125 @@ public class HRModuleController {
         }
         managerCombo.getStyleClass().add("hr-form-control");
 
-        TextField budgetField = new TextField(existing != null ? String.valueOf(existing.getAllocatedBudget()) : "0.0");
-        budgetField.setPromptText("Budget (TND)");
-        budgetField.getStyleClass().add("hr-form-control");
+        // Budget slider with live value display
+        double initBudget = existing != null ? existing.getAllocatedBudget() : 0;
+        Slider budgetSlider = new Slider(0, 2000000, initBudget);
+        budgetSlider.setBlockIncrement(10000);
+        budgetSlider.setMajorTickUnit(500000);
+        budgetSlider.setMinorTickCount(4);
+        budgetSlider.setShowTickLabels(true);
+        budgetSlider.setShowTickMarks(true);
+        budgetSlider.setSnapToTicks(false);
+        budgetSlider.getStyleClass().add("hr-budget-slider");
+        budgetSlider.setLabelFormatter(new javafx.util.StringConverter<Double>() {
+            @Override public String toString(Double v) {
+                if (v >= 1000000) return String.format("%.1fM", v / 1000000);
+                if (v >= 1000) return String.format("%.0fK", v / 1000);
+                return String.format("%.0f", v);
+            }
+            @Override public Double fromString(String s) { return 0.0; }
+        });
+
+        Label budgetValueLabel = new Label(String.format("%.0f TND", initBudget));
+        budgetValueLabel.getStyleClass().add("hr-budget-value");
+
+        TextField budgetInput = new TextField(String.format("%.0f", initBudget));
+        budgetInput.setPrefWidth(110);
+        budgetInput.getStyleClass().add("hr-form-control");
+
+        budgetSlider.valueProperty().addListener((o, oldVal, newVal) -> {
+            budgetValueLabel.setText(String.format("%.0f TND", newVal.doubleValue()));
+            if (!budgetInput.isFocused()) {
+                budgetInput.setText(String.format("%.0f", newVal.doubleValue()));
+            }
+        });
+        budgetInput.textProperty().addListener((o, oldVal, newVal) -> {
+            try {
+                double val = Double.parseDouble(newVal.trim());
+                if (val >= 0 && val <= 2000000) budgetSlider.setValue(val);
+            } catch (NumberFormatException ignored) {}
+        });
+
+        HBox budgetRow = new HBox(10, budgetSlider, budgetInput);
+        budgetRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(budgetSlider, Priority.ALWAYS);
+
+        Label descSub = new Label(existing == null
+                ? "Create a new department with its team and budget."
+                : "Update department details.");
+        descSub.getStyleClass().add("hr-dialog-desc");
 
         content.getChildren().addAll(
-                header,
+                header, descSub,
+                new Separator() {{ getStyleClass().add("hr-dialog-sep"); }},
                 new Label("Name") {{ getStyleClass().add("hr-form-label"); }}, nameField,
                 new Label("Description") {{ getStyleClass().add("hr-form-label"); }}, descField,
                 new Label("Manager") {{ getStyleClass().add("hr-form-label"); }}, managerCombo,
-                new Label("Budget (TND)") {{ getStyleClass().add("hr-form-label"); }}, budgetField
+                new Separator() {{ getStyleClass().add("hr-dialog-sep"); }},
+                new Label("Budget") {{ getStyleClass().add("hr-form-label"); }}, budgetValueLabel, budgetRow
         );
 
-        dp.setContent(content);
+        // Wrap in ScrollPane for taller dialogs
+        ScrollPane scrollContent = new ScrollPane(content);
+        scrollContent.setFitToWidth(true);
+        scrollContent.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        scrollContent.setMaxHeight(500);
+        dp.setContent(scrollContent);
+        dp.setPrefWidth(480);
+
+        // Validation error label
+        Label validationError = new Label();
+        validationError.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 12; -fx-padding: 4 0 0 0;");
+        validationError.setWrapText(true);
+        validationError.setVisible(false);
+        validationError.setManaged(false);
+        content.getChildren().add(validationError);
+
+        // Disable OK button when name is empty
+        okBtn.setDisable(nameField.getText().trim().isEmpty());
+        nameField.textProperty().addListener((obs, ov, nv) -> {
+            okBtn.setDisable(nv == null || nv.trim().isEmpty());
+            validationError.setVisible(false);
+            validationError.setManaged(false);
+        });
+
+        // Intercept OK button to validate before closing
+        okBtn.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            String name = nameField.getText().trim();
+
+            // 1. Name required
+            if (name.isEmpty()) {
+                validationError.setText("⚠ Department name is required.");
+                validationError.setVisible(true);
+                validationError.setManaged(true);
+                event.consume();
+                return;
+            }
+
+            // 2. Name length check
+            if (name.length() < 2 || name.length() > 100) {
+                validationError.setText("⚠ Department name must be between 2 and 100 characters.");
+                validationError.setVisible(true);
+                validationError.setManaged(true);
+                event.consume();
+                return;
+            }
+
+            // 3. Duplicate name check
+            try {
+                for (Department dept : serviceDepartment.recuperer()) {
+                    if (dept.getName().equalsIgnoreCase(name) &&
+                            (existing == null || existing.getId() != dept.getId())) {
+                        validationError.setText("⚠ A department named \"" + dept.getName() + "\" already exists.");
+                        validationError.setVisible(true);
+                        validationError.setManaged(true);
+                        event.consume();
+                        return;
+                    }
+                }
+            } catch (SQLException ignored) {}
+
+        });
 
         dialog.setResultConverter(bt -> {
             if (bt == ButtonType.OK) {
@@ -998,11 +1266,7 @@ public class HRModuleController {
                 } else {
                     d.setManagerId(null);
                 }
-                try {
-                    d.setAllocatedBudget(Double.parseDouble(budgetField.getText().trim()));
-                } catch (NumberFormatException ex) {
-                    d.setAllocatedBudget(0.0);
-                }
+                d.setAllocatedBudget(budgetSlider.getValue());
                 return d;
             }
             return null;
@@ -1692,14 +1956,35 @@ public class HRModuleController {
         header.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label("Payroll Management");
         title.getStyleClass().add("hr-view-title");
+
+        // Auto-payroll status badge
+        java.time.LocalDate nextFirst = java.time.LocalDate.now().withDayOfMonth(1).plusMonths(1);
+        Label autoLabel = new Label("🔄 Auto-payroll active — next run: 1st " +
+                nextFirst.getMonth().toString().substring(0, 1) +
+                nextFirst.getMonth().toString().substring(1).toLowerCase() +
+                " " + nextFirst.getYear());
+        autoLabel.getStyleClass().add("hr-badge");
+        autoLabel.setStyle(autoLabel.getStyle() + "-fx-background-color: rgba(34,197,94,0.15); " +
+                "-fx-text-fill: #22c55e; -fx-font-size: 11; -fx-padding: 4 10; " +
+                "-fx-background-radius: 12;");
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button generateBtn = new Button("⚡ Generate Payroll");
+        Button generateBtn = new Button("🔄 Generate Now");
         generateBtn.getStyleClass().add("hr-primary-btn");
+        generateBtn.setTooltip(new Tooltip("Generate payroll for last month immediately"));
         generateBtn.setOnAction(e -> {
             SoundManager.getInstance().play(SoundManager.PAYROLL_GENERATED);
-            showGeneratePayrollDialog();
+            java.time.LocalDate prevMonth = java.time.LocalDate.now().minusMonths(1).withDayOfMonth(1);
+            utils.PayrollScheduler.getInstance().setOnPayrollGenerated(() -> {
+                showInfo("Payroll auto-generated for " +
+                        prevMonth.getMonth().toString().substring(0, 1) +
+                        prevMonth.getMonth().toString().substring(1).toLowerCase() +
+                        " " + prevMonth.getYear());
+                showPayroll();
+            });
+            utils.PayrollScheduler.getInstance().generateForMonth(prevMonth);
         });
 
         Button exportAllBtn = new Button("📄 Export All PDF");
@@ -1716,7 +2001,7 @@ public class HRModuleController {
             showPayrollDialog(null);
         });
 
-        header.getChildren().addAll(title, spacer, generateBtn, exportAllBtn, addBtn);
+        header.getChildren().addAll(title, autoLabel, spacer, generateBtn, exportAllBtn, addBtn);
 
         // ── Filter & Column Toggle Row ──
         HBox filterRow = new HBox(12);
@@ -1839,22 +2124,6 @@ public class HRModuleController {
                 if (colVis[8]) {
                     HBox actions = new HBox(4);
                     actions.setPrefWidth(130);
-
-                    if ("PENDING".equals(p.getStatus())) {
-                        Button payBtn = new Button("💵");
-                        payBtn.getStyleClass().addAll("hr-icon-btn", "hr-success-btn");
-                        payBtn.setOnAction(e -> {
-                            SoundManager.getInstance().play(SoundManager.PAYROLL_GENERATED);
-                            p.setStatus("PAID");
-                            try {
-                                servicePayroll.modifier(p);
-                                refreshPayrollList(container, nameFilter, statusFilter, colVis);
-                            } catch (SQLException ex) {
-                                showError("Failed to mark paid: " + ex.getMessage());
-                            }
-                        });
-                        actions.getChildren().add(payBtn);
-                    }
 
                     Button pdfBtn = new Button("📄");
                     pdfBtn.getStyleClass().addAll("hr-icon-btn");

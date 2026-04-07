@@ -12,9 +12,10 @@ import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.chart.PieChart;
 import javafx.scene.control.*;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.*;
 import services.*;
 import utils.ApiClient;
+import utils.DialogHelper;
 import utils.SessionManager;
 import utils.SoundManager;
 
@@ -53,6 +54,8 @@ public class HRBacklogController implements Stoppable {
     // Charts
     @FXML private PieChart deptChart;
     @FXML private PieChart leaveChart;
+    @FXML private VBox deptLegendBox;
+    @FXML private VBox leaveLegendBox;
 
     // Leave table
     @FXML private TableView<Leave> leaveTable;
@@ -120,14 +123,21 @@ public class HRBacklogController implements Stoppable {
         });
         colStatus.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().isActive() ? "Active" : "Frozen"));
         colStatus.setCellFactory(col -> new TableCell<>() {
+            private final Label badge = new Label();
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) { setText(null); setStyle(""); return; }
-                setText(item);
-                setStyle("Active".equals(item)
-                        ? "-fx-text-fill: #27ae60; -fx-font-weight: bold;"
-                        : "-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                if (empty || item == null) { setGraphic(null); setText(null); return; }
+                badge.setText(item);
+                if ("Active".equals(item)) {
+                    badge.setStyle("-fx-background-color: rgba(34,197,94,0.12); -fx-text-fill: #22C55E; " +
+                        "-fx-padding: 2 10; -fx-background-radius: 100; -fx-font-size: 11; -fx-font-weight: 600;");
+                } else {
+                    badge.setStyle("-fx-background-color: rgba(239,68,68,0.12); -fx-text-fill: #EF4444; " +
+                        "-fx-padding: 2 10; -fx-background-radius: 100; -fx-font-size: 11; -fx-font-weight: 600;");
+                }
+                setGraphic(badge);
+                setText(null);
             }
         });
     }
@@ -142,15 +152,13 @@ public class HRBacklogController implements Stoppable {
                 d.getValue().getEndDate() != null ? d.getValue().getEndDate().toString() : "—"));
         colLeaveReason.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getReason()));
         colLeaveActions.setCellFactory(col -> new TableCell<>() {
-            private final Button btnApprove = new Button("✅ Approve");
-            private final Button btnReject = new Button("❌ Reject");
+            private final Button btnApprove = new Button("Approve");
+            private final Button btnReject = new Button("Reject");
             private final HBox box = new HBox(8, btnApprove, btnReject);
             {
                 box.setAlignment(Pos.CENTER);
-                btnApprove.getStyleClass().add("btn-primary");
-                btnReject.getStyleClass().add("btn-danger");
-                btnApprove.setStyle("-fx-font-size:11;");
-                btnReject.setStyle("-fx-font-size:11;");
+                btnApprove.getStyleClass().add("hrb-btn-approve");
+                btnReject.getStyleClass().add("hrb-btn-reject");
                 btnApprove.setOnAction(e -> handleLeaveAction(getTableRow().getItem(), "APPROVED"));
                 btnReject.setOnAction(e -> handleLeaveAction(getTableRow().getItem(), "REJECTED"));
             }
@@ -168,35 +176,44 @@ public class HRBacklogController implements Stoppable {
                 userNames.getOrDefault(d.getValue().getAssigneeId(), "Unassigned")));
         colTaskStatus.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStatus()));
         colTaskStatus.setCellFactory(col -> new TableCell<>() {
+            private final Label badge = new Label();
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) { setText(null); setStyle(""); return; }
-                setText(item);
-                String color = switch (item) {
-                    case "TODO" -> "#e67e22";
-                    case "IN_PROGRESS" -> "#3498db";
-                    case "IN_REVIEW" -> "#9b59b6";
-                    case "DONE" -> "#27ae60";
-                    default -> "#95a5a6";
+                if (empty || item == null) { setGraphic(null); setText(null); return; }
+                String display = item.replace("_", " ");
+                badge.setText(display);
+                String[] colors = switch (item) {
+                    case "TODO" -> new String[]{"#F59E0B", "rgba(245,158,11,0.12)"};
+                    case "IN_PROGRESS" -> new String[]{"#3B82F6", "rgba(59,130,246,0.12)"};
+                    case "IN_REVIEW" -> new String[]{"#A855F7", "rgba(168,85,247,0.12)"};
+                    case "DONE" -> new String[]{"#22C55E", "rgba(34,197,94,0.12)"};
+                    default -> new String[]{"#71717A", "rgba(113,113,122,0.12)"};
                 };
-                setStyle("-fx-text-fill: " + color + "; -fx-font-weight: bold;");
+                badge.setStyle("-fx-text-fill: " + colors[0] + "; -fx-background-color: " + colors[1] + "; " +
+                    "-fx-padding: 2 10; -fx-background-radius: 100; -fx-font-size: 11; -fx-font-weight: 600;");
+                setGraphic(badge);
+                setText(null);
             }
         });
         colTaskPriority.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getPriority()));
         colTaskPriority.setCellFactory(col -> new TableCell<>() {
+            private final Label badge = new Label();
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) { setText(null); setStyle(""); return; }
-                setText(item);
-                String color = switch (item) {
-                    case "HIGH" -> "#e74c3c";
-                    case "MEDIUM" -> "#e67e22";
-                    case "LOW" -> "#27ae60";
-                    default -> "";
+                if (empty || item == null) { setGraphic(null); setText(null); return; }
+                badge.setText(item);
+                String[] colors = switch (item) {
+                    case "HIGH" -> new String[]{"#EF4444", "rgba(239,68,68,0.12)"};
+                    case "MEDIUM" -> new String[]{"#F59E0B", "rgba(245,158,11,0.12)"};
+                    case "LOW" -> new String[]{"#22C55E", "rgba(34,197,94,0.12)"};
+                    default -> new String[]{"#71717A", "rgba(113,113,122,0.12)"};
                 };
-                setStyle("-fx-text-fill: " + color + "; -fx-font-weight: bold;");
+                badge.setStyle("-fx-text-fill: " + colors[0] + "; -fx-background-color: " + colors[1] + "; " +
+                    "-fx-padding: 2 10; -fx-background-radius: 100; -fx-font-size: 11; -fx-font-weight: 600;");
+                setGraphic(badge);
+                setText(null);
             }
         });
         colTaskDue.setCellValueFactory(d -> new SimpleStringProperty(
@@ -212,19 +229,23 @@ public class HRBacklogController implements Stoppable {
                 d.getValue().getCheckOut() != null ? d.getValue().getCheckOut().toString() : "—"));
         colAttStatus.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStatus()));
         colAttStatus.setCellFactory(col -> new TableCell<>() {
+            private final Label badge = new Label();
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) { setText(null); setStyle(""); return; }
-                setText(item);
-                String color = switch (item) {
-                    case "PRESENT" -> "#27ae60";
-                    case "LATE" -> "#e67e22";
-                    case "ABSENT" -> "#e74c3c";
-                    case "EXCUSED" -> "#3498db";
-                    default -> "";
+                if (empty || item == null) { setGraphic(null); setText(null); return; }
+                badge.setText(item);
+                String[] colors = switch (item) {
+                    case "PRESENT" -> new String[]{"#22C55E", "rgba(34,197,94,0.12)"};
+                    case "LATE" -> new String[]{"#F59E0B", "rgba(245,158,11,0.12)"};
+                    case "ABSENT" -> new String[]{"#EF4444", "rgba(239,68,68,0.12)"};
+                    case "EXCUSED" -> new String[]{"#3B82F6", "rgba(59,130,246,0.12)"};
+                    default -> new String[]{"#71717A", "rgba(113,113,122,0.12)"};
                 };
-                setStyle("-fx-text-fill: " + color + "; -fx-font-weight: bold;");
+                badge.setStyle("-fx-text-fill: " + colors[0] + "; -fx-background-color: " + colors[1] + "; " +
+                    "-fx-padding: 2 10; -fx-background-radius: 100; -fx-font-size: 11; -fx-font-weight: 600;");
+                setGraphic(badge);
+                setText(null);
             }
         });
     }
@@ -392,6 +413,10 @@ public class HRBacklogController implements Stoppable {
 
     /* ═══════════════ Charts ═══════════════ */
 
+    private static final String[] CHART_COLORS = {
+        "#3B82F6", "#22C55E", "#F59E0B", "#EF4444", "#A855F7", "#EC4899", "#06B6D4", "#F97316"
+    };
+
     private void buildDeptChart(List<User> users) {
         Map<String, Long> counts = users.stream()
                 .collect(Collectors.groupingBy(
@@ -402,6 +427,8 @@ public class HRBacklogController implements Stoppable {
                 counts.entrySet().stream()
                         .map(e -> new PieChart.Data(e.getKey() + " (" + e.getValue() + ")", e.getValue()))
                         .collect(Collectors.toList())));
+        deptChart.setLabelsVisible(false);
+        Platform.runLater(() -> applyChartColors(deptChart, deptLegendBox));
     }
 
     private void buildLeaveChart(List<Leave> leaves) {
@@ -411,6 +438,30 @@ public class HRBacklogController implements Stoppable {
                 counts.entrySet().stream()
                         .map(e -> new PieChart.Data(e.getKey() + " (" + e.getValue() + ")", e.getValue()))
                         .collect(Collectors.toList())));
+        leaveChart.setLabelsVisible(false);
+        Platform.runLater(() -> applyChartColors(leaveChart, leaveLegendBox));
+    }
+
+    private void applyChartColors(PieChart chart, VBox legendBox) {
+        legendBox.getChildren().clear();
+        int i = 0;
+        for (PieChart.Data d : chart.getData()) {
+            String color = CHART_COLORS[i % CHART_COLORS.length];
+            if (d.getNode() != null) {
+                d.getNode().setStyle("-fx-pie-color: " + color + ";");
+            }
+            HBox row = new HBox(8);
+            row.setAlignment(Pos.CENTER_LEFT);
+            Region dot = new Region();
+            dot.setMinSize(10, 10);
+            dot.setMaxSize(10, 10);
+            dot.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 2;");
+            Label lbl = new Label(d.getName());
+            lbl.getStyleClass().add("hrb-legend-label");
+            row.getChildren().addAll(dot, lbl);
+            legendBox.getChildren().add(row);
+            i++;
+        }
     }
 
     /* ═══════════════ Leave approve/reject ═══════════════ */
@@ -424,6 +475,7 @@ public class HRBacklogController implements Stoppable {
                 dlg.setTitle("Rejection Reason");
                 dlg.setHeaderText("Why is this leave request being rejected?");
                 dlg.setContentText("Reason:");
+                DialogHelper.theme(dlg);
                 Optional<String> reason = dlg.showAndWait();
                 if (reason.isEmpty()) return; // cancelled
                 leave.setRejectionReason(reason.get());
@@ -433,7 +485,9 @@ public class HRBacklogController implements Stoppable {
             loadData(); // refresh
         } catch (Exception e) {
             e.printStackTrace();
-            new Alert(Alert.AlertType.ERROR, "Failed to update leave: " + e.getMessage()).show();
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Failed to update leave: " + e.getMessage());
+            DialogHelper.theme(alert);
+            alert.show();
         }
     }
 

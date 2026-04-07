@@ -190,12 +190,23 @@ public class AdminUsersController {
         applyBtn.setOnAction(e -> {
             String newRole = roleCombo.getValue();
             if (newRole != null && !newRole.equals(user.getRole())) {
-                try {
-                    serviceUser.updateRole(user.getId(), newRole);
-                    refreshUsers();
-                } catch (SQLException ex) {
-                    showAlert("Error", ex.getMessage());
-                }
+                applyBtn.setDisable(true);
+                applyBtn.setText("...");
+                AppThreadPool.io(() -> {
+                    try {
+                        serviceUser.updateRole(user.getId(), newRole);
+                        Platform.runLater(() -> {
+                            applyBtn.setText("✓");
+                            refreshUsers();
+                        });
+                    } catch (SQLException ex) {
+                        Platform.runLater(() -> {
+                            applyBtn.setDisable(false);
+                            applyBtn.setText("Apply");
+                            showAlert("Error", "Failed to update role: " + ex.getMessage());
+                        });
+                    }
+                });
             }
         });
 

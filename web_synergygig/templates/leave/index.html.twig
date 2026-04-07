@@ -1,0 +1,95 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block page_title %}Leave Requests{% endblock %}
+
+{% block header_actions %}
+    {% if is_granted('ROLE_HR') %}
+    <a href="{{ path('app_export_leave_csv') }}" class="btn btn-ghost btn-sm" title="Export CSV">📥 CSV</a>
+    <a href="{{ path('app_leave_new') }}" class="btn btn-primary btn-sm">+ New Request</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+{# Filter bar #}
+<div class="card" style="padding:var(--space-md) var(--space-lg);margin-bottom:var(--space-lg);display:flex;align-items:center;gap:var(--space-md)">
+    <form method="get" action="{{ path('app_leave_index') }}" style="flex:1;display:flex;align-items:center;gap:var(--space-md)">
+        <select name="status" class="form-control form-select" style="width:auto;min-width:120px">
+            <option value="">All Status</option>
+            <option value="PENDING" {{ app.request.query.get('status') == 'PENDING' ? 'selected' }}>Pending</option>
+            <option value="APPROVED" {{ app.request.query.get('status') == 'APPROVED' ? 'selected' }}>Approved</option>
+            <option value="REJECTED" {{ app.request.query.get('status') == 'REJECTED' ? 'selected' }}>Rejected</option>
+        </select>
+        <select name="type" class="form-control form-select" style="width:auto;min-width:120px">
+            <option value="">All Types</option>
+            <option value="VACATION" {{ app.request.query.get('type') == 'VACATION' ? 'selected' }}>Vacation</option>
+            <option value="SICK" {{ app.request.query.get('type') == 'SICK' ? 'selected' }}>Sick</option>
+            <option value="UNPAID" {{ app.request.query.get('type') == 'UNPAID' ? 'selected' }}>Unpaid</option>
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    </form>
+</div>
+
+<div class="card">
+    {% if leaves|length > 0 %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Employee</th>
+                    <th>Type</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in leaves %}
+                <tr>
+                    <td class="text-muted">{{ l.id }}</td>
+                    <td>
+                        {% if l.user %}
+                            <div style="display:flex;align-items:center;gap:0.5rem">
+                                <div class="avatar avatar--sm">{{ l.user.firstName|first }}{{ l.user.lastName|first }}</div>
+                                {{ l.user.firstName }} {{ l.user.lastName }}
+                            </div>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td><span class="badge badge--purple">{{ l.type ?? '—' }}</span></td>
+                    <td>{{ l.startDate ? l.startDate|date('M d, Y') : '—' }}</td>
+                    <td>{{ l.endDate ? l.endDate|date('M d, Y') : '—' }}</td>
+                    <td>
+                        {% set sc = {'PENDING': 'orange', 'APPROVED': 'green', 'REJECTED': 'red'} %}
+                        <span class="badge badge--{{ sc[l.status] ?? 'blue' }}">{{ l.status ?? 'N/A' }}</span>
+                    </td>
+                    <td>
+                        <details class="crud-actions-menu">
+                            <summary class="btn btn-ghost btn-sm" title="Actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></summary>
+                            <div class="crud-actions-dropdown">
+                                <a href="{{ path('app_leave_show', {id: l.id}) }}" class="crud-action-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View</a>
+                                {% if is_granted('ROLE_HR') %}
+                                <a href="{{ path('app_leave_edit', {id: l.id}) }}" class="crud-action-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</a>
+                                <form method="post" action="{{ path('app_leave_delete', {id: l.id}) }}" onsubmit="return confirm('Delete this leave request?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ l.id) }}">
+                                    <button type="submit" class="crud-action-item crud-action-danger"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </details>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:3rem">
+        <p class="text-muted">No leave requests yet.</p>
+        <a href="{{ path('app_leave_new') }}" class="btn btn-primary" style="margin-top:1rem">+ Submit Request</a>
+    </div>
+    {% endif %}
+</div>
+
+{% if pagination is defined %}{% include 'components/_pagination.html.twig' %}{% endif %}
+{% endblock %}

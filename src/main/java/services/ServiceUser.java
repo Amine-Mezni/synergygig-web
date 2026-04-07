@@ -119,7 +119,7 @@ public class ServiceUser implements IService<User> {
             }
             return;
         }
-        String req = "INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)";
+        String req = "INSERT INTO user (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, user.getEmail());
@@ -162,7 +162,7 @@ public class ServiceUser implements IService<User> {
             pw = BCrypt.hashpw(pw, BCrypt.gensalt());
             user.setPassword(pw);
         }
-        String req = "UPDATE users SET email=?, password=?, first_name=?, last_name=?, role=?, avatar_path=?, bio=?, cover_base64=? WHERE id=?";
+        String req = "UPDATE user SET email=?, password=?, first_name=?, last_name=?, role=?, avatar_path=?, bio=?, cover_base64=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, user.getEmail());
@@ -188,7 +188,7 @@ public class ServiceUser implements IService<User> {
             System.out.println("✅ Avatar updated via API for user id=" + userId);
             return;
         }
-        String req = "UPDATE users SET avatar_path=? WHERE id=?";
+        String req = "UPDATE user SET avatar_path=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, avatarPath);
@@ -206,7 +206,7 @@ public class ServiceUser implements IService<User> {
             System.out.println("✅ User deleted via API: id=" + id);
             return;
         }
-        String req = "DELETE FROM users WHERE id=?";
+        String req = "DELETE FROM user WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setInt(1, id);
@@ -229,7 +229,7 @@ public class ServiceUser implements IService<User> {
     /** Direct DB fetch (bypasses cache). */
     private List<User> recupererFromDb() throws SQLException {
         List<User> users = new ArrayList<>();
-        String req = "SELECT * FROM users";
+        String req = "SELECT * FROM user";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req);
              ResultSet rs = ps.executeQuery()) {
@@ -262,7 +262,7 @@ public class ServiceUser implements IService<User> {
             }
             return null;
         }
-        String req = "SELECT * FROM users WHERE email=?";
+        String req = "SELECT * FROM user WHERE email=?";
         User user = null;
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
@@ -279,7 +279,7 @@ public class ServiceUser implements IService<User> {
                         if (match) {
                             String upgraded = BCrypt.hashpw(password, BCrypt.gensalt());
                             try (PreparedStatement up = conn.prepareStatement(
-                                    "UPDATE users SET password=? WHERE email=?")) {
+                                    "UPDATE user SET password=? WHERE email=?")) {
                                 up.setString(1, upgraded);
                                 up.setString(2, email);
                                 up.executeUpdate();
@@ -314,7 +314,7 @@ public class ServiceUser implements IService<User> {
             }
             return false;
         }
-        String req = "SELECT COUNT(*) FROM users WHERE email=?";
+        String req = "SELECT COUNT(*) FROM user WHERE email=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, email);
@@ -332,31 +332,57 @@ public class ServiceUser implements IService<User> {
             Map<String, Object> body = new HashMap<>();
             body.put("role", newRole);
             ApiClient.put("/users/" + userId + "/role", body);
+            InMemoryCache.evict(CACHE_KEY);
             System.out.println("✅ Role updated via API for user id=" + userId + " → " + newRole);
             return;
         }
-        String req = "UPDATE users SET role=? WHERE id=?";
+        String req = "UPDATE user SET role=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, newRole);
             ps.setInt(2, userId);
             ps.executeUpdate();
         }
+        InMemoryCache.evict(CACHE_KEY);
         System.out.println("✅ Role updated for user id=" + userId + " → " + newRole);
     }
 
     /**
      * Update a user's department assignment. Pass null to unassign.
+     * In API mode, fetches the full user first to send a complete PUT body
+     * (the server's PUT /users/{id} requires all fields).
      */
     public void updateDepartmentId(int userId, Integer departmentId) throws SQLException {
         if (useApi) {
+            // Fetch the full user to build a complete PUT body (API requires all fields)
+            JsonElement resp = ApiClient.get("/users/" + userId);
+            if (resp == null || !resp.isJsonObject()) {
+                throw new SQLException("Failed to fetch user " + userId + " from API for department update.");
+            }
+            JsonObject userObj = resp.getAsJsonObject();
             Map<String, Object> body = new HashMap<>();
+            body.put("email", userObj.get("email").getAsString());
+            body.put("password", userObj.has("password") && !userObj.get("password").isJsonNull()
+                    ? userObj.get("password").getAsString() : "");
+            body.put("first_name", userObj.get("first_name").getAsString());
+            body.put("last_name", userObj.get("last_name").getAsString());
+            body.put("role", userObj.get("role").getAsString());
+            if (userObj.has("avatar_path") && !userObj.get("avatar_path").isJsonNull())
+                body.put("avatar_path", userObj.get("avatar_path").getAsString());
+            if (userObj.has("bio") && !userObj.get("bio").isJsonNull())
+                body.put("bio", userObj.get("bio").getAsString());
+            if (userObj.has("cover_base64") && !userObj.get("cover_base64").isJsonNull())
+                body.put("cover_base64", userObj.get("cover_base64").getAsString());
             body.put("department_id", departmentId);
-            ApiClient.put("/users/" + userId, body);
-            System.out.println("✅ Department updated via API for user id=" + userId);
+            JsonElement putResp = ApiClient.put("/users/" + userId, body);
+            if (putResp == null) {
+                throw new SQLException("API failed to update department for user " + userId + ". Check server logs.");
+            }
+            System.out.println("✅ Department updated via API for user id=" + userId + " → " + departmentId);
+            InMemoryCache.evictByPrefix("users:");
             return;
         }
-        String req = "UPDATE users SET department_id=? WHERE id=?";
+        String req = "UPDATE user SET department_id=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             if (departmentId != null) {
@@ -367,6 +393,7 @@ public class ServiceUser implements IService<User> {
             ps.setInt(2, userId);
             ps.executeUpdate();
         }
+        InMemoryCache.evictByPrefix("users:");
         System.out.println("✅ Department updated for user id=" + userId + " → " + departmentId);
     }
 
@@ -378,16 +405,18 @@ public class ServiceUser implements IService<User> {
             Map<String, Object> body = new HashMap<>();
             body.put("is_active", active);
             ApiClient.put("/users/" + userId + "/active", body);
+            InMemoryCache.evict(CACHE_KEY);
             System.out.println("✅ User " + (active ? "activated" : "frozen") + " via API: id=" + userId);
             return;
         }
-        String req = "UPDATE users SET is_active=? WHERE id=?";
+        String req = "UPDATE user SET is_active=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setBoolean(1, active);
             ps.setInt(2, userId);
             ps.executeUpdate();
         }
+        InMemoryCache.evict(CACHE_KEY);
         System.out.println("✅ User " + (active ? "activated" : "frozen") + ": id=" + userId);
     }
 
@@ -401,7 +430,7 @@ public class ServiceUser implements IService<User> {
             ApiClient.put("/users/" + userId + "/online", body);
             return;
         }
-        String req = "UPDATE users SET is_online=? WHERE id=?";
+        String req = "UPDATE user SET is_online=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setBoolean(1, online);
@@ -415,7 +444,7 @@ public class ServiceUser implements IService<User> {
             return jsonArrayToUsers(ApiClient.get("/users/role/" + role));
         }
         List<User> users = new ArrayList<>();
-        String req = "SELECT * FROM users WHERE role=?";
+        String req = "SELECT * FROM user WHERE role=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, role);
@@ -447,7 +476,7 @@ public class ServiceUser implements IService<User> {
             System.out.println("✅ Face encoding updated via API for user id=" + userId);
             return;
         }
-        String req = "UPDATE users SET face_encoding=? WHERE id=?";
+        String req = "UPDATE user SET face_encoding=? WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, faceEncoding);
@@ -465,7 +494,7 @@ public class ServiceUser implements IService<User> {
             }
             return null;
         }
-        String req = "SELECT * FROM users WHERE id=?";
+        String req = "SELECT * FROM user WHERE id=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setInt(1, userId);
@@ -527,7 +556,7 @@ public class ServiceUser implements IService<User> {
             return null;
         }
         // JDBC mode: check email exists, generate OTP locally
-        String req = "SELECT first_name FROM users WHERE email=?";
+        String req = "SELECT first_name FROM user WHERE email=?";
         String firstName;
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
@@ -595,7 +624,7 @@ public class ServiceUser implements IService<User> {
             return resp != null && resp.isJsonObject();
         }
         // JDBC mode: update password
-        String req = "UPDATE users SET password=? WHERE email=?";
+        String req = "UPDATE user SET password=? WHERE email=?";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, hashed);

@@ -70,6 +70,7 @@ public class EmployeeOfMonthController {
             try {
                 List<Task> allTasks = serviceTask.recuperer();
                 List<User> allUsers = serviceUser.recuperer();
+                System.out.println("[EOM] Tasks fetched: " + allTasks.size() + ", Users: " + allUsers.size());
 
                 Map<Integer, User> userMap = new HashMap<>();
                 for (User u : allUsers) userMap.put(u.getId(), u);
@@ -86,13 +87,6 @@ public class EmployeeOfMonthController {
                     if (!"DONE".equalsIgnoreCase(t.getStatus())) continue;
                     if (t.getAssigneeId() == 0) continue;
 
-                    // Check if created/completed this month (use createdAt as proxy)
-                    if (t.getCreatedAt() != null) {
-                        LocalDate taskDate = t.getCreatedAt().toLocalDateTime().toLocalDate();
-                        if (taskDate.getMonthValue() != thisMonth || taskDate.getYear() != thisYear)
-                            continue;
-                    }
-
                     int uid = t.getAssigneeId();
                     stats.computeIfAbsent(uid, k -> new int[3]);
                     int[] s = stats.get(uid);
@@ -107,12 +101,17 @@ public class EmployeeOfMonthController {
                     s[2] += w; // score
                 }
 
+                System.out.println("[EOM] DONE tasks with assignees: " + stats.size() + " employees");
+                for (var entry : stats.entrySet()) {
+                    System.out.println("[EOM]   User " + entry.getKey() + " -> done=" + entry.getValue()[0] + " score=" + entry.getValue()[2]);
+                }
+
                 // Build ranked list
                 List<RankedEmployee> ranked = new ArrayList<>();
                 for (var entry : stats.entrySet()) {
                     User u = userMap.get(entry.getKey());
                     String name = u != null ? (u.getFirstName() + " " + u.getLastName()) : "User #" + entry.getKey();
-                    String dept = u != null && u.getDepartmentId() > 0 ? "Dept #" + u.getDepartmentId() : "";
+                    String dept = u != null && u.getDepartmentId() != null && u.getDepartmentId() > 0 ? "Dept #" + u.getDepartmentId() : "";
                     int[] s = entry.getValue();
                     ranked.add(new RankedEmployee(0, name, dept, s[0], s[1], s[2]));
                 }
@@ -161,8 +160,12 @@ public class EmployeeOfMonthController {
                 });
 
             } catch (Exception ex) {
+                ex.printStackTrace();
                 Platform.runLater(() -> {
                     btnCalculate.setDisable(false);
+                    loadingPane.setVisible(false);
+                    resultPane.setVisible(true);
+                    resultPane.setManaged(true);
                     lblWinnerName.setText("Error: " + ex.getMessage());
                 });
             }

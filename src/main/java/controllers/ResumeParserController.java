@@ -10,6 +10,7 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import services.ZAIService;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.DocumentExtractor;
 import utils.SoundManager;
 
@@ -215,6 +216,7 @@ public class ResumeParserController implements Stoppable {
         SoundManager.getInstance().play(SoundManager.ERROR);
         Alert alert = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
         alert.setHeaderText("Parse Error");
+        DialogHelper.theme(alert);
         alert.showAndWait();
     }
 

@@ -2,6 +2,7 @@ package utils;
 
 import entities.User;
 import services.ServiceUser;
+import utils.InMemoryCache;
 
 import java.sql.SQLException;
 import java.util.*;
@@ -39,22 +40,23 @@ public final class UserNameCache {
         if (now - lastRefreshTime < CACHE_TTL_MS && !allUsers.isEmpty()) {
             return allUsers;
         }
-        return doRefresh();
+        return doRefresh(false);
     }
 
     /**
      * Forces a reload regardless of cache age.
      */
     public static List<User> forceRefresh() {
-        return doRefresh();
+        return doRefresh(true);
     }
 
-    private static synchronized List<User> doRefresh() {
+    private static synchronized List<User> doRefresh(boolean force) {
         // Double-check inside sync in case another thread refreshed while we waited
         long now = System.currentTimeMillis();
-        if (now - lastRefreshTime < CACHE_TTL_MS && !allUsers.isEmpty()) {
+        if (!force && now - lastRefreshTime < CACHE_TTL_MS && !allUsers.isEmpty()) {
             return allUsers;
         }
+        InMemoryCache.evictByPrefix("users:");
         try {
             ServiceUser svc = new ServiceUser();
             List<User> users = svc.recuperer();

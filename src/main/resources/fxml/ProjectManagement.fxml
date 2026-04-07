@@ -102,7 +102,7 @@
                     onAction="#toggleTeamView"/>
             <Button fx:id="btnFunFact" text="🎲 Fun Fact" styleClass="pm-btn-ghost"
                     onAction="#fetchFunFact"/>
-            <Button fx:id="btnDailyTip" text="💡 Daily Tip" styleClass="pm-btn-ghost"
+            <Button fx:id="btnDailyTip" text="� Rates" styleClass="pm-btn-ghost"
                     onAction="#fetchDailyTip"/>
             <Button fx:id="btnAiPlan" text="🤖 Plan with AI" styleClass="pm-btn-secondary"
                     onAction="#aiPlanTasks" managed="false" visible="false"/>
@@ -156,22 +156,6 @@
                 </ScrollPane>
             </VBox>
 
-            <!-- DONE column -->
-            <VBox styleClass="pm-kanban-column" HBox.hgrow="ALWAYS" spacing="0">
-                <HBox styleClass="pm-kanban-header,pm-kanban-done" alignment="CENTER_LEFT" spacing="8">
-                    <Label text="●" styleClass="pm-kanban-dot"/>
-                    <Label text="Done" styleClass="pm-kanban-title"/>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="countDone" text="0" styleClass="pm-kanban-count"/>
-                </HBox>
-                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS"
-                            style="-fx-background-color: transparent; -fx-border-color: transparent;">
-                    <VBox fx:id="colDone" spacing="8" styleClass="pm-kanban-cards">
-                        <padding><Insets top="8" right="8" bottom="8" left="8"/></padding>
-                    </VBox>
-                </ScrollPane>
-            </VBox>
-
             <!-- IN REVIEW column -->
             <VBox styleClass="pm-kanban-column" HBox.hgrow="ALWAYS" spacing="0">
                 <HBox styleClass="pm-kanban-header,pm-kanban-review" alignment="CENTER_LEFT" spacing="8">
@@ -188,7 +172,28 @@
                 </ScrollPane>
             </VBox>
 
+            <!-- DONE column -->
+            <VBox styleClass="pm-kanban-column" HBox.hgrow="ALWAYS" spacing="0">
+                <HBox styleClass="pm-kanban-header,pm-kanban-done" alignment="CENTER_LEFT" spacing="8">
+                    <Label text="●" styleClass="pm-kanban-dot"/>
+                    <Label text="Done" styleClass="pm-kanban-title"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Label fx:id="countDone" text="0" styleClass="pm-kanban-count"/>
+                </HBox>
+                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS"
+                            style="-fx-background-color: transparent; -fx-border-color: transparent;">
+                    <VBox fx:id="colDone" spacing="8" styleClass="pm-kanban-cards">
+                        <padding><Insets top="8" right="8" bottom="8" left="8"/></padding>
+                    </VBox>
+                </ScrollPane>
+            </VBox>
+
         </HBox>
+    </VBox>
+
+    <!-- ═══════════════ VIEW 3: EMPLOYEE DASHBOARD (task-centric) ═══════════════ -->
+    <VBox fx:id="employeeDashboard" spacing="16" visible="false" managed="false">
+        <padding><Insets top="4" right="0" bottom="0" left="0"/></padding>
     </VBox>
 
 </StackPane>

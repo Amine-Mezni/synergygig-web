@@ -1,0 +1,59 @@
+{% extends 'layouts/auth.html.twig' %}
+
+{% block title %}Apply Now | SynergyGig{% endblock %}
+
+{% block auth_body %}
+    <h2 style="font-family: var(--font-heading); margin: 0 0 var(--space-xs); text-align: center;">Join SynergyGig</h2>
+    <p style="text-align: center; color: var(--text-secondary); margin-bottom: var(--space-2xl); font-size: 0.875rem;">Create your workforce account</p>
+
+    {{ form_start(form, {'action': path('app_signup'), 'attr': {'novalidate': 'novalidate'}}) }}
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
+            <div class="form-group">
+                {{ form_label(form.first_name) }}
+                {{ form_widget(form.first_name) }}
+                {% if form.first_name.vars.errors|length > 0 %}
+                    <div class="field-error">{{ form_errors(form.first_name) }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form_label(form.last_name) }}
+                {{ form_widget(form.last_name) }}
+                {% if form.last_name.vars.errors|length > 0 %}
+                    <div class="field-error">{{ form_errors(form.last_name) }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-group">
+            {{ form_label(form.email) }}
+            {{ form_widget(form.email) }}
+            {% if form.email.vars.errors|length > 0 %}
+                <div class="field-error">{{ form_errors(form.email) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form_label(form.password.first) }}
+            {{ form_widget(form.password.first) }}
+            {% if form.password.vars.errors|length > 0 %}
+                <div class="field-error">{{ form_errors(form.password) }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form_label(form.password.second) }}
+            {{ form_widget(form.password.second) }}
+        </div>
+
+        <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:var(--space-md)">
+            Min 8 chars &bull; 1 uppercase &bull; 1 lowercase &bull; 1 digit
+        </p>
+
+        <button type="submit" class="btn btn-primary">Create Account</button>
+    {{ form_end(form) }}
+{% endblock %}
+
+{% block footer_links %}
+    Already have an account? <a href="{{ path('app_login') }}">Sign In</a>
+{% endblock %}

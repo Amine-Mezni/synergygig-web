@@ -9,6 +9,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import services.ZAIService;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.SoundManager;
 
 import java.time.LocalDate;
@@ -45,8 +46,9 @@ public class AutoSchedulerController implements Stoppable {
     private void handleSchedule() {
         String tasks = tasksArea.getText().trim();
         if (tasks.length() < 10) {
-            new Alert(Alert.AlertType.WARNING, "Please describe your tasks and constraints.", ButtonType.OK)
-                .showAndWait();
+            Alert alert = new Alert(Alert.AlertType.WARNING, "Please describe your tasks and constraints.", ButtonType.OK);
+            DialogHelper.theme(alert);
+            alert.showAndWait();
             return;
         }
         SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);

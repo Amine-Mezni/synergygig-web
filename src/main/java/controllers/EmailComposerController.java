@@ -9,6 +9,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import services.ZAIService;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.SoundManager;
 
 public class EmailComposerController implements Stoppable {
@@ -39,7 +40,9 @@ public class EmailComposerController implements Stoppable {
         String recipient = recipientField.getText().trim();
         String purpose = purposeField.getText().trim();
         if (purpose.isEmpty()) {
-            new Alert(Alert.AlertType.WARNING, "Please describe the email purpose.", ButtonType.OK).showAndWait();
+            Alert alert = new Alert(Alert.AlertType.WARNING, "Please describe the email purpose.", ButtonType.OK);
+            DialogHelper.theme(alert);
+            alert.showAndWait();
             return;
         }
         doCompose(recipient, purpose);

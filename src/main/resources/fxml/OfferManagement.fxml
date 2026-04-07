@@ -100,6 +100,7 @@
                 <HBox alignment="CENTER_LEFT" spacing="12">
                     <Label text="Applications" styleClass="oc-section-title"/>
                     <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="🤖 Score All" styleClass="oc-btn-primary" onAction="#scoreAllApplications"/>
                     <ComboBox fx:id="filterAppStatus" promptText="Status" styleClass="oc-combo" prefWidth="140"
                               onAction="#onAppStatusFilterChanged"/>
                 </HBox>

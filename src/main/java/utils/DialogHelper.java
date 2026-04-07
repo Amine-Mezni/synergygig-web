@@ -4,6 +4,8 @@ import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ButtonType;
@@ -93,6 +95,67 @@ public final class DialogHelper {
         theme(dialog);
         hideCloseButton(dialog.getDialogPane());
         return dialog;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       PUBLIC: theme a raw Stage (UNDECORATED + custom title bar)
+       Call AFTER setScene() but BEFORE show().
+       ═══════════════════════════════════════════════════════ */
+
+    public static void themeStage(Stage stage) {
+        try { stage.initStyle(StageStyle.UNDECORATED); } catch (Exception ignored) {}
+
+        Scene scene = stage.getScene();
+        if (scene == null) return;
+
+        // Apply CSS
+        try {
+            String darkCss = DialogHelper.class.getResource(STYLE_CSS).toExternalForm();
+            if (!scene.getStylesheets().contains(darkCss)) scene.getStylesheets().add(darkCss);
+            if (!SessionManager.getInstance().isDarkTheme()) {
+                String lightCss = DialogHelper.class.getResource(LIGHT_CSS).toExternalForm();
+                if (!scene.getStylesheets().contains(lightCss)) scene.getStylesheets().add(lightCss);
+            }
+        } catch (Exception ignored) {}
+
+        // Build title bar
+        String title = stage.getTitle() != null ? stage.getTitle() : "";
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("dialog-title-text");
+        titleLabel.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(titleLabel, Priority.ALWAYS);
+
+        Button btnMin   = windowBtn("\u2013", "dialog-window-btn-min");
+        Button btnMax   = windowBtn("\u25A1", "dialog-window-btn-max");
+        Button btnClose = windowBtn("\u2715", "dialog-window-btn-close");
+
+        btnMin.setOnAction(e -> stage.setIconified(true));
+        btnMax.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
+        btnClose.setOnAction(e -> stage.close());
+
+        HBox titleBar = new HBox(8, titleLabel, btnMin, btnMax, btnClose);
+        titleBar.getStyleClass().add("dialog-title-bar");
+        titleBar.setAlignment(Pos.CENTER_LEFT);
+
+        // Drag support
+        final double[] offset = new double[2];
+        titleBar.setOnMousePressed(ev -> {
+            offset[0] = stage.getX() - ev.getScreenX();
+            offset[1] = stage.getY() - ev.getScreenY();
+        });
+        titleBar.setOnMouseDragged(ev -> {
+            stage.setX(ev.getScreenX() + offset[0]);
+            stage.setY(ev.getScreenY() + offset[1]);
+        });
+        titleBar.setCursor(Cursor.MOVE);
+
+        // Wrap original root in VBox with title bar on top
+        Parent currentRoot = scene.getRoot();
+        VBox wrapper = new VBox(titleBar, currentRoot);
+        VBox.setVgrow(currentRoot, Priority.ALWAYS);
+        wrapper.getStyleClass().add("stage-with-titlebar");
+
+        scene.setRoot(wrapper);
     }
 
     /* ════════════════════════════════════════════════════════

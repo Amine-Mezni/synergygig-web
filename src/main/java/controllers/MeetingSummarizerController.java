@@ -8,6 +8,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import services.ZAIService;
 import utils.AppThreadPool;
+import utils.DialogHelper;
 import utils.SoundManager;
 
 public class MeetingSummarizerController implements Stoppable {
@@ -34,8 +35,9 @@ public class MeetingSummarizerController implements Stoppable {
     private void handleSummarize() {
         String text = transcriptArea.getText().trim();
         if (text.length() < 30) {
-            new Alert(Alert.AlertType.WARNING, "Please enter at least 30 characters of meeting content.", ButtonType.OK)
-                .showAndWait();
+            Alert alert = new Alert(Alert.AlertType.WARNING, "Please enter at least 30 characters of meeting content.", ButtonType.OK);
+            DialogHelper.theme(alert);
+            alert.showAndWait();
             return;
         }
         SoundManager.getInstance().play(SoundManager.BUTTON_CLICK);

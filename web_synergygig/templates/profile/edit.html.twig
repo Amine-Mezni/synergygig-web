@@ -1,0 +1,59 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block title %}Edit Profile | SynergyGig{% endblock %}
+{% block page_title %}Edit Profile{% endblock %}
+
+{% block header_actions %}
+    <a href="{{ path('app_profile') }}" class="btn btn-ghost btn-sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Back to Profile
+    </a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto">
+    <div class="card" style="padding:var(--space-xl)">
+        <h2 style="font-size:1.125rem;color:var(--text-primary);margin:0 0 var(--space-xl)">Personal Information</h2>
+
+        {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-lg)">
+            {% if form.firstName is defined %}
+            <div class="form-group">
+                {{ form_label(form.firstName, 'First Name', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.firstName, {'attr': {'class': 'form-control'}}) }}
+            </div>
+            {% endif %}
+            {% if form.lastName is defined %}
+            <div class="form-group">
+                {{ form_label(form.lastName, 'Last Name', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.lastName, {'attr': {'class': 'form-control'}}) }}
+            </div>
+            {% endif %}
+        </div>
+        {% if form.email is defined %}
+        <div class="form-group" style="margin-top:var(--space-lg)">
+            {{ form_label(form.email, 'Email', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.email, {'attr': {'class': 'form-control'}}) }}
+        </div>
+        {% endif %}
+        {% if form.phone is defined %}
+        <div class="form-group" style="margin-top:var(--space-lg)">
+            {{ form_label(form.phone, 'Phone', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.phone, {'attr': {'class': 'form-control'}}) }}
+        </div>
+        {% endif %}
+        {% if form.address is defined %}
+        <div class="form-group" style="margin-top:var(--space-lg)">
+            {{ form_label(form.address, 'Address', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.address, {'attr': {'class': 'form-control'}}) }}
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:var(--space-sm);margin-top:var(--space-xl)">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ path('app_profile') }}" class="btn btn-ghost">Cancel</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+</div>
+{% endblock %}

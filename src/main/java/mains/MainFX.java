@@ -45,6 +45,9 @@ public class MainFX extends Application {
         utils.ResizeHelper.addResizeListener(primaryStage);
 
         primaryStage.show();
+
+        // Start automatic payroll scheduler (generates payroll on the 1st of each month)
+        utils.PayrollScheduler.getInstance().start();
     }
 
     /** Launch python/hr_assistant.py as a background process. */
@@ -84,6 +87,8 @@ public class MainFX extends Application {
 
     @Override
     public void stop() {
+        // Stop automatic payroll scheduler
+        utils.PayrollScheduler.getInstance().stop();
         // Shut down HikariCP connection pool (only if it was initialised)
         if (!utils.AppConfig.isApiMode()) {
             utils.MyDatabase.getInstance().shutdown();
