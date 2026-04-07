@@ -77,9 +77,12 @@ class Interview
         return $this;
     }
 
-    public function setDateTime(\DateTimeInterface $date_time): self
+    public function setDateTime(?\DateTimeInterface $date_time): self
     {
-        return $this->setDate_time($date_time);
+        if ($date_time !== null) {
+            $this->date_time = $date_time;
+        }
+        return $this;
     }
 
     #[ORM\Column(type: 'string', nullable: true)]

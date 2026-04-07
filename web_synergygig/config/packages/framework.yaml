@@ -5,7 +5,7 @@ framework:
     csrf_protection: true
     http_method_override: false
     trusted_hosts: ~
-    trusted_proxies: '127.0.0.1'
+    trusted_proxies: '127.0.0.1,172.16.0.0/12'
     default_locale: en
     session:
         handler_id: null

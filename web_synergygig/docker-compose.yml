@@ -18,7 +18,7 @@ services:
     environment:
       - APP_ENV=dev
       - APP_DEBUG=1
-      - DATABASE_URL=mysql://seji:MORTALkombat9pd6S##E@db.benzaitsue.work.gd:3306/finale_synergygig
+      - DATABASE_URL=mysql://synergygig:synergygig_pass@mysql:3306/finale_synergygig
       - REDIS_URL=redis://redis:6379
 
   redis:
@@ -51,10 +51,10 @@ services:
     container_name: synergygig_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: "MORTALkombat9pd6S##E"
+      MYSQL_ROOT_PASSWORD: "root_change_me"
       MYSQL_DATABASE: "finale_synergygig"
       MYSQL_USER: "seji"
-      MYSQL_PASSWORD: "MORTALkombat9pd6S##E"
+      MYSQL_PASSWORD: "synergygig_pass"
     ports:
       - "3306:3306"
     volumes:
@@ -71,7 +71,7 @@ services:
     environment:
       PMA_HOST: mysql
       PMA_USER: seji
-      PMA_PASSWORD: "MORTALkombat9pd6S##E"
+      PMA_PASSWORD: "synergygig_pass"
       UPLOAD_LIMIT: 300M
     networks:
       - synergygig_network
