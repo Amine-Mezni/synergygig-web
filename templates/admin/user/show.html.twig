@@ -4,77 +4,171 @@
 
 {% block admin_content %}
 <div class="container-fluid pt-4 px-4">
-    <div class="bg-secondary rounded p-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="bg-secondary rounded-4 p-4 p-md-5">
+
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
             <div>
-                <h2 class="text-white mb-1">Détail utilisateur</h2>
-                <p class="text-light mb-0">Informations complètes du compte sélectionné</p>
+                <h2 class="text-white mb-1 fw-bold">Détail utilisateur</h2>
+                <p class="text-light mb-0">Consultez les informations complètes et les actions disponibles.</p>
             </div>
 
-            <a href="{{ path('app_admin_user_list') }}" class="btn btn-outline-light rounded-pill px-4">
-                Retour
+            <a href="{{ path('app_admin_user_list') }}" class="btn btn-outline-light rounded-pill px-4 py-2">
+                <i class="bi bi-arrow-left me-2"></i>Retour
             </a>
         </div>
 
         <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="bg-dark rounded p-4 h-100">
-                    <h5 class="text-white mb-4">Informations principales</h5>
+            <div class="col-lg-7">
+                <div class="bg-dark rounded-4 p-4 h-100 shadow-sm border border-secondary-subtle">
 
-                    <div class="mb-3">
-                        <label class="text-light small">ID</label>
-                        <div class="text-white fw-bold">{{ userItem.id }}</div>
-                    </div>
+                    <div class="d-flex flex-column flex-md-row align-items-md-center gap-4 mb-4">
+                        <div class="user-avatar-box">
+                            {{ userItem.full_name|slice(0, 1)|upper }}
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="text-light small">Nom complet</label>
-                        <div class="text-white fw-bold">{{ userItem.full_name }}</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="text-light small">Email</label>
-                        <div class="text-white fw-bold">{{ userItem.email }}</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="text-light small">Rôle</label>
                         <div>
+                            <h3 class="text-white mb-1 fw-bold">{{ userItem.full_name }}</h3>
+                            <p class="text-light mb-2">{{ userItem.email }}</p>
+
                             {% if userItem.role == 'ADMIN' %}
-                                <span class="badge bg-danger">Admin</span>
+                                <span class="badge rounded-pill bg-danger px-3 py-2">Administrateur</span>
                             {% elseif userItem.role == 'HR' %}
-                                <span class="badge bg-primary">HR</span>
+                                <span class="badge rounded-pill bg-primary px-3 py-2">HR Manager</span>
                             {% elseif userItem.role == 'EMPLOYEE' %}
-                                <span class="badge bg-secondary">Employee</span>
+                                <span class="badge rounded-pill bg-secondary px-3 py-2">Employé</span>
                             {% elseif userItem.role == 'GIG_WORKER' %}
-                                <span class="badge bg-success">Gig Worker</span>
+                                <span class="badge rounded-pill bg-success px-3 py-2">Gig Worker</span>
                             {% else %}
-                                <span class="badge bg-dark">{{ userItem.role }}</span>
+                                <span class="badge rounded-pill bg-dark px-3 py-2">{{ userItem.role }}</span>
                             {% endif %}
                         </div>
                     </div>
 
-                    <div class="mb-0">
-                        <label class="text-light small">Date de création</label>
-                        <div class="text-white fw-bold">{{ userItem.created_at|date('d/m/Y H:i') }}</div>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <span class="info-label">ID utilisateur</span>
+                                <div class="info-value">#{{ userItem.id }}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <span class="info-label">Date de création</span>
+                                <div class="info-value">{{ userItem.created_at|date('d/m/Y H:i') }}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <span class="info-label">Adresse email</span>
+                                <div class="info-value">{{ userItem.email }}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <span class="info-label">Rôle système</span>
+                                <div class="info-value">{{ userItem.role }}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-lg-6">
-                <div class="bg-dark rounded p-4 h-100">
-                    <h5 class="text-white mb-4">Actions admin</h5>
+            <div class="col-lg-5">
+                <div class="bg-dark rounded-4 p-4 h-100 shadow-sm border border-secondary-subtle">
+                    <h4 class="text-white fw-bold mb-3">Actions administrateur</h4>
+                    <p class="text-light mb-4">
+                        Gérez le statut du compte utilisateur et appliquez les actions d’administration.
+                    </p>
 
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="#" class="btn btn-warning rounded-pill px-4">Désactiver</a>
-                        <a href="#" class="btn btn-danger rounded-pill px-4">Supprimer</a>
+                    <div class="d-grid gap-3">
+                       
+
+                       <form method="post"
+      action="{{ path('app_admin_user_delete', {'id': userItem.id}) }}"
+      onsubmit="return confirm('Voulez-vous vraiment supprimer cet utilisateur ?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete_user_' ~ userItem.id) }}">
+
+    {% if userItem.role == 'ADMIN' %}
+        <button class="btn btn-secondary rounded-pill py-3 fw-semibold" disabled>
+            <i class="bi bi-shield-lock me-2"></i>Suppression interdite
+        </button>
+    {% else %}
+        <button type="submit" class="btn btn-danger rounded-pill py-3 fw-semibold">
+            <i class="bi bi-trash me-2"></i>Supprimer
+        </button>
+    {% endif %}
+</form>
                     </div>
 
-                    <p class="text-light mt-4 mb-0">
-                        Les actions d’activation, désactivation et suppression seront branchées dans l’étape suivante.
-                    </p>
+                    <div class="admin-note-box mt-4">
+                        <h6 class="text-white mb-2">Note</h6>
+                        <p class="text-light mb-0">
+                            Les actions de désactivation et suppression seront connectées dans l’étape suivante.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
+
+<style>
+.user-avatar-box {
+    width: 90px;
+    height: 90px;
+    min-width: 90px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #ff003c, #ff4d4d);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 800;
+    box-shadow: 0 14px 30px rgba(255, 0, 60, 0.25);
+}
+
+.info-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 18px;
+    height: 100%;
+}
+
+.info-label {
+    display: block;
+    color: rgba(255,255,255,0.60);
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.info-value {
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.admin-note-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 18px;
+}
+
+@media (max-width: 768px) {
+    .user-avatar-box {
+        width: 74px;
+        height: 74px;
+        min-width: 74px;
+        font-size: 1.6rem;
+        border-radius: 20px;
+    }
+}
+</style>
 {% endblock %}

@@ -7,6 +7,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\Request;
 
 #[Route('/admin/users')]
 class UserController extends AbstractController
@@ -28,5 +29,25 @@ public function show(Users $user): Response
     return $this->render('admin/user/show.html.twig', [
         'userItem' => $user,
     ]);
+}
+#[Route('/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+public function delete(Users $user, Request $request, EntityManagerInterface $entityManager): Response
+{
+    if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_token'))) {
+        $this->addFlash('error', 'Jeton CSRF invalide.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
+    if ($user->getRole() === 'ADMIN') {
+        $this->addFlash('error', 'La suppression d’un compte administrateur est interdite.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
+    $entityManager->remove($user);
+    $entityManager->flush();
+
+    $this->addFlash('success', 'Utilisateur supprimé avec succès.');
+
+    return $this->redirectToRoute('app_admin_user_list');
 }
 }
