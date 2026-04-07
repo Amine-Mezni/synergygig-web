@@ -7,6 +7,7 @@ use App\Entity\Users;
 use App\Entity\Applications;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\Common\Collections\ArrayCollection;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 class Offers
@@ -17,15 +18,37 @@ class Offers
     private ?int $id = null;
 
     #[ORM\Column(type: "string", length: 150)]
+    #[Assert\NotBlank(message: "Le titre est obligatoire.")]
+    #[Assert\Length(
+        min: 3,
+        minMessage: "Minimum 3 caractères.",
+        max: 150,
+        maxMessage: "Le titre ne doit pas dépasser 150 caractères."
+    )]
     private ?string $title = null;
 
     #[ORM\Column(type: "text")]
+    #[Assert\NotBlank(message: "La description est obligatoire.")]
+    #[Assert\Length(
+        min: 10,
+        minMessage: "Minimum 10 caractères."
+    )]
     private ?string $description = null;
 
     #[ORM\Column(type: "string")]
+    #[Assert\NotBlank(message: "Le type est obligatoire.")]
+    #[Assert\Choice(
+        choices: ['INTERNAL', 'GIG'],
+        message: "Le type sélectionné est invalide."
+    )]
     private ?string $type = null;
 
     #[ORM\Column(type: "string")]
+    #[Assert\NotBlank(message: "Le statut est obligatoire.")]
+    #[Assert\Choice(
+        choices: ['DRAFT', 'PUBLISHED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+        message: "Le statut sélectionné est invalide."
+    )]
     private ?string $status = null;
 
     #[ORM\ManyToOne(targetEntity: Users::class, inversedBy: "offerss")]
@@ -39,6 +62,8 @@ class Offers
     private ?string $image_url = null;
 
     #[ORM\Column(type: "float")]
+    #[Assert\NotNull(message: "Le montant est obligatoire.")]
+    #[Assert\PositiveOrZero(message: "Le montant doit être positif.")]
     private ?float $amount = null;
 
     #[ORM\OneToMany(mappedBy: "offer_id", targetEntity: Applications::class)]

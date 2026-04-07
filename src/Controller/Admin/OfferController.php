@@ -35,14 +35,7 @@ class OfferController extends AbstractController
         return $this->redirectToRoute('app_admin_offers');
     }
 
-    #[Route('/admin/offers/{id}/cancel', name: 'app_admin_offer_cancel')]
-    public function cancel(Offers $offer, EntityManagerInterface $entityManager): RedirectResponse
-    {
-        $offer->setStatus('CANCELLED');
-        $entityManager->flush();
-
-        return $this->redirectToRoute('app_admin_offers');
-    }
+   
 
    #[Route('/admin/offers/{id}/edit', name: 'app_admin_offer_edit')]
 public function edit(
