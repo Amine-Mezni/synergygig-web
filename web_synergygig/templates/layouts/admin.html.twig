@@ -65,6 +65,7 @@
                         HR Backlog
                     </a>
                     {% endif %}
+                    {% if is_granted('ROLE_EMPLOYEE') %}
                     <a href="{{ path('app_attendance_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_attendance' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                         Attendance
@@ -73,14 +74,19 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                         Leaves
                     </a>
+                    {% endif %}
+                    {% if is_granted('ROLE_HR') %}
                     <a href="{{ path('app_payroll_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_payroll' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                         Payroll
                     </a>
+                    {% endif %}
+                    {% if is_granted('ROLE_EMPLOYEE') %}
                     <a href="{{ path('app_training_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_training' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
                         Training
                     </a>
+                    {% endif %}
                     {% if is_granted('ROLE_HR') %}
                     <a href="{{ path('app_employee_of_month') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_employee_of_month' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
@@ -99,25 +105,30 @@
                         <span class="nav-section-dot" style="background:var(--accent-green,#10b981)"></span>
                         Recruitment
                     </div>
+                    {% if is_granted('ROLE_HR') or is_granted('ROLE_GIG_WORKER') %}
                     <a href="{{ path('app_interview_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_interview' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         Interviews
                     </a>
+                    {% endif %}
                     <a href="{{ path('app_offer_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_offer' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
                         Offers
                     </a>
+                    {% if is_granted('ROLE_HR') or is_granted('ROLE_PROJECT_OWNER') %}
                     <a href="{{ path('app_application_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_application' and app.request.attributes.get('_route') != 'app_my_applications' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         Applications
                     </a>
+                    {% endif %}
                     <a href="{{ path('app_my_applications') }}" class="nav-item {{ app.request.attributes.get('_route') == 'app_my_applications' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                         My Applications
                     </a>
                 </div>
 
-                {# ── Project Owner ── #}
+                {# ── Project Owner (PROJECT_OWNER only) ── #}
+                {% if is_granted('ROLE_PROJECT_OWNER') %}
                 <div class="nav-section" style="--section-i:3.5">
                     <div class="nav-section-title">
                         <span class="nav-section-dot" style="background:var(--accent-emerald,#34d399)"></span>
@@ -128,6 +139,7 @@
                         My Offers
                     </a>
                 </div>
+                {% endif %}
 
                 {# ── Work ── #}
                 <div class="nav-section" style="--section-i:4">
@@ -143,10 +155,12 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                         Tasks
                     </a>
+                    {% if is_granted('ROLE_HR') or is_granted('ROLE_PROJECT_OWNER') %}
                     <a href="{{ path('app_contract_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_contract' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                         Contracts
                     </a>
+                    {% endif %}
                 </div>
 
                 {# ── Communication ── #}
@@ -179,14 +193,18 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         AI Tools
                     </a>
+                    {% if is_granted('ROLE_GIG_WORKER') or is_granted('ROLE_PROJECT_OWNER') %}
                     <a href="{{ path('app_job_scanner') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_job_scanner' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         Job Scanner
                     </a>
+                    {% endif %}
+                    {% if is_granted('ROLE_HR') %}
                     <a href="{{ path('app_hr_chatbot') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_hr_chatbot' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg>
                         HR Chatbot
                     </a>
+                    {% endif %}
                     {% if is_granted('ROLE_HR') %}
                     <a href="{{ path('app_export_payroll_csv') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_export' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
