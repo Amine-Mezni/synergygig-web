@@ -11,9 +11,6 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\File;
-use Symfony\Component\Validator\Constraints\Length;
-use Symfony\Component\Validator\Constraints\NotBlank;
-use Symfony\Component\Validator\Constraints\PositiveOrZero;
 
 class ProjectOwnerOfferType extends AbstractType
 {
@@ -22,30 +19,11 @@ class ProjectOwnerOfferType extends AbstractType
         $builder
             ->add('title', null, [
                 'label' => 'Titre',
-                'constraints' => [
-                    new NotBlank([
-                        'message' => 'Le titre est obligatoire.',
-                    ]),
-                    new Length([
-                        'min' => 3,
-                        'minMessage' => 'Le titre doit contenir au moins 3 caractères.',
-                        'max' => 150,
-                        'maxMessage' => 'Le titre ne doit pas dépasser 150 caractères.',
-                    ]),
-                ],
+                'trim' => true
             ])
 
             ->add('description', TextareaType::class, [
                 'label' => 'Description',
-                'constraints' => [
-                    new NotBlank([
-                        'message' => 'La description est obligatoire.',
-                    ]),
-                    new Length([
-                        'min' => 10,
-                        'minMessage' => 'La description doit contenir au moins 10 caractères.',
-                    ]),
-                ],
             ])
 
             ->add('type', ChoiceType::class, [
@@ -55,24 +33,11 @@ class ProjectOwnerOfferType extends AbstractType
                     'Gig' => 'GIG',
                 ],
                 'placeholder' => 'Choisir un type',
-                'constraints' => [
-                    new NotBlank([
-                        'message' => 'Le type est obligatoire.',
-                    ]),
-                ],
             ])
 
             ->add('amount', MoneyType::class, [
                 'label' => 'Montant',
                 'currency' => 'USD',
-                'constraints' => [
-                    new NotBlank([
-                        'message' => 'Le montant est obligatoire.',
-                    ]),
-                    new PositiveOrZero([
-                        'message' => 'Le montant doit être positif ou nul.',
-                    ]),
-                ],
             ])
 
             ->add('imageFile', FileType::class, [
@@ -88,7 +53,7 @@ class ProjectOwnerOfferType extends AbstractType
                             'image/webp',
                             'image/jpg',
                         ],
-                        'mimeTypesMessage' => 'Veuillez uploader une image valide (JPG, PNG ou WEBP).',
+                        'mimeTypesMessage' => 'Image invalide (JPG, PNG ou WEBP).',
                     ]),
                 ],
             ]);

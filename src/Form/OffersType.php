@@ -1,73 +1,76 @@
 <?php
 
-namespace App\Form;
+namespace App\Entity;
 
-use App\Entity\Offers;
-use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\MoneyType;
-use Symfony\Component\Form\Extension\Core\Type\TextareaType;
-use Symfony\Component\Form\Extension\Core\Type\FileType;
-use Symfony\Component\Form\FormBuilderInterface;
-use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Validator\Constraints\File;
+use Doctrine\ORM\Mapping as ORM;
+use App\Entity\Users;
+use App\Entity\Applications;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\ArrayCollection;
+use Symfony\Component\Validator\Constraints as Assert;
 
-class OffersType extends AbstractType
+#[ORM\Entity]
+class Offers
 {
-    public function buildForm(FormBuilderInterface $builder, array $options): void
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: "integer")]
+    private ?int $id = null;
+
+    #[ORM\Column(type: "string", length: 150)]
+    #[Assert\NotBlank(message: "Le titre est obligatoire.")]
+    #[Assert\Length(
+        min: 3,
+        max: 150,
+        minMessage: "Minimum 3 caractères.",
+        maxMessage: "Maximum 150 caractères."
+    )]
+    private ?string $title = null;
+
+    #[ORM\Column(type: "text")]
+    #[Assert\NotBlank(message: "La description est obligatoire.")]
+    #[Assert\Length(
+        min: 10,
+        max: 2000,
+        minMessage: "Minimum 10 caractères.",
+        maxMessage: "Maximum 2000 caractères."
+    )]
+    private ?string $description = null;
+
+    #[ORM\Column(type: "string")]
+    #[Assert\NotBlank(message: "Le type est obligatoire.")]
+    #[Assert\Choice(
+        choices: ['INTERNAL', 'GIG'],
+        message: "Type invalide."
+    )]
+    private ?string $type = null;
+
+    #[ORM\Column(type: "string")]
+    #[Assert\NotBlank(message: "Le statut est obligatoire.")]
+    private ?string $status = null;
+
+    #[ORM\ManyToOne(targetEntity: Users::class, inversedBy: "offerss")]
+    #[ORM\JoinColumn(name: "created_by", referencedColumnName: "id", nullable: false, onDelete: "CASCADE")]
+    private ?Users $created_by = null;
+
+    #[ORM\Column(type: "datetime")]
+    private ?\DateTimeInterface $created_at = null;
+
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
+    private ?string $image_url = null;
+
+    #[ORM\Column(type: "float")]
+    #[Assert\NotNull(message: "Le montant est obligatoire.")]
+    #[Assert\PositiveOrZero(message: "Le montant doit être positif.")]
+    private ?float $amount = null;
+
+    #[ORM\OneToMany(mappedBy: "offer_id", targetEntity: Applications::class)]
+    private Collection $applicationss;
+
+    public function __construct()
     {
-        $builder
-            ->add('title', null, [
-                'label' => 'Titre',
-            ])
-
-            ->add('description', TextareaType::class, [
-                'label' => 'Description',
-            ])
-
-            ->add('type', ChoiceType::class, [
-                'label' => 'Type',
-                'choices' => [
-                    'Internal' => 'INTERNAL',
-                    'Gig' => 'GIG',
-                ],
-                'placeholder' => 'Choisir un type',
-            ])
-
-            ->add('status', ChoiceType::class, [
-                'label' => 'Statut',
-                'choices' => [
-                    'Draft' => 'DRAFT',
-                    'Published' => 'PUBLISHED',
-                    'In progress' => 'IN_PROGRESS',
-                    'Completed' => 'COMPLETED',
-                    'Cancelled' => 'CANCELLED',
-                ],
-            ])
-
-            ->add('amount', MoneyType::class, [
-                'label' => 'Montant',
-                'currency' => false,
-            ])
-
-            ->add('imageFile', FileType::class, [
-                'label' => 'Image de l’offre',
-                'mapped' => false,
-                'required' => false,
-                'constraints' => [
-                    new File([
-                        'maxSize' => '4M',
-                        'mimeTypes' => ['image/jpeg', 'image/png', 'image/webp'],
-                        'mimeTypesMessage' => 'Image invalide.',
-                    ]),
-                ],
-            ]);
+        $this->applicationss = new ArrayCollection();
     }
 
-    public function configureOptions(OptionsResolver $resolver): void
-    {
-        $resolver->setDefaults([
-            'data_class' => Offers::class,
-        ]);
-    }
+    // getters setters inchangés
 }

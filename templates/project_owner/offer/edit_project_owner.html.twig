@@ -1,13 +1,13 @@
 {% extends 'project_owner/base_project_owner.html.twig' %}
 
-{% block title %}Créer une offre{% endblock %}
+{% block title %}Modifier une offre{% endblock %}
 
 {% block body %}
 <div class="container py-4">
 
 {% if not form.vars.valid and form.vars.submitted %}
     <div class="alert alert-danger">
-        Veuillez corriger les erreurs ci-dessous.
+        Veuillez corriger les erreurs.
     </div>
 {% endif %}
 
@@ -53,14 +53,7 @@
     </div>
 </div>
 
-<div class="mb-3">
-    {{ form_label(form.imageFile) }}
-    {{ form_widget(form.imageFile, {
-        'attr': {'class': 'form-control'}
-    }) }}
-</div>
-
-<button class="btn btn-primary">Créer</button>
+<button class="btn btn-warning">Modifier</button>
 
 {{ form_end(form) }}
 

@@ -141,9 +141,9 @@ class OfferController extends AbstractController
             return $this->redirectToRoute('app_project_owner_offer_list');
         }
 
-        return $this->render('project_owner/offer/edit.html.twig', [
-            'form' => $form->createView(),
-            'offer' => $offer,
-        ]);
+       return $this->render('project_owner/offer/edit_project_owner.html.twig', [
+    'form' => $form->createView(),
+    'offer' => $offer,
+]);
     }
 }
