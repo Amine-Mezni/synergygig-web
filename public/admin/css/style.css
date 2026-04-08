@@ -1,9 +1,9 @@
 /********** Template CSS **********/
 :root {
-    --primary: #EB1616;
-    --secondary: #191C24;
-    --light: #6C7293;
-    --dark: #000000;
+    --primary: #7c3aed;
+    --secondary: #0f172a;
+    --light: #94a3b8;
+    --dark: #020617;
 }
 
 .back-to-top {
@@ -287,6 +287,7 @@
     background: var(--dark);
     border-color: var(--primary);
 }
+
 .admin-logo {
     height: 40px;
     margin-right: 10px;
@@ -296,6 +297,7 @@
     font-weight: 700;
     letter-spacing: 0.5px;
 }
+
 /* =========================
    EDIT OFFER - PREMIUM UI
    ========================= */
@@ -332,8 +334,8 @@
 }
 
 .premium-input:focus {
-    border-color: rgba(255, 50, 80, 0.7) !important;
-    box-shadow: 0 0 0 0.22rem rgba(255, 0, 60, 0.16) !important;
+    border-color: rgba(124, 58, 237, 0.70) !important;
+    box-shadow: 0 0 0 0.22rem rgba(124, 58, 237, 0.18) !important;
     background: rgba(255, 255, 255, 0.08) !important;
     color: #fff !important;
 }
@@ -363,7 +365,7 @@ select.premium-input option,
 .offer-edit-panel .invalid-feedback,
 .offer-edit-panel .form-error-icon,
 .offer-edit-panel ul {
-    color: #ff9aa9 !important;
+    color: #c4b5fd !important;
     margin-top: 6px;
     font-size: 0.9rem;
 }
@@ -389,7 +391,7 @@ select.premium-input option,
     width: 820px;
     height: 820px;
     background:
-        radial-gradient(circle, rgba(255, 0, 60, 0.15) 0%, rgba(255, 0, 60, 0.06) 28%, rgba(255, 0, 60, 0.015) 48%, transparent 70%);
+        radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, rgba(124, 58, 237, 0.06) 28%, rgba(124, 58, 237, 0.015) 48%, transparent 70%);
 }
 
 /* Animation un peu plus fluide pour edit */
@@ -437,6 +439,7 @@ select.premium-input option,
         min-height: 140px !important;
     }
 }
+
 /* =========================
    OFFERS TABLE - PREMIUM UI
    ========================= */
@@ -472,9 +475,10 @@ h6 {
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 20% 20%, rgba(255, 0, 60, 0.18), transparent 30%),
-                radial-gradient(circle at 80% 30%, rgba(255, 80, 80, 0.12), transparent 28%),
-                radial-gradient(circle at 50% 90%, rgba(180, 0, 50, 0.14), transparent 25%);
+    background:
+        radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.18), transparent 30%),
+        radial-gradient(circle at 80% 30%, rgba(99, 102, 241, 0.12), transparent 28%),
+        radial-gradient(circle at 50% 90%, rgba(79, 70, 229, 0.14), transparent 25%);
     pointer-events: none;
     z-index: 0;
 }
@@ -564,27 +568,27 @@ h6 {
 }
 
 .offer-status.published {
-    background: linear-gradient(135deg, #ff2d55, #c4002f);
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
     color: #fff;
-    box-shadow: 0 10px 24px rgba(255, 0, 70, 0.28);
+    box-shadow: 0 10px 24px rgba(99, 102, 241, 0.28);
 }
 
 .offer-status.cancelled {
-    background: linear-gradient(135deg, #7a0a22, #3d0612);
-    color: #ffd6df;
-    box-shadow: 0 10px 24px rgba(90, 0, 30, 0.2);
+    background: linear-gradient(135deg, #1e293b, #020617);
+    color: #cbd5e1;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
 }
 
 .offer-status.draft {
-    background: linear-gradient(135deg, #ff6b6b, #d81b60);
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #fff;
-    box-shadow: 0 10px 24px rgba(255, 90, 90, 0.22);
+    box-shadow: 0 10px 24px rgba(124, 58, 237, 0.22);
 }
 
 .offer-status.progress {
-    background: linear-gradient(135deg, #ff416c, #ff1744);
+    background: linear-gradient(135deg, #7c3aed, #6366f1);
     color: #fff;
-    box-shadow: 0 10px 24px rgba(255, 30, 70, 0.25);
+    box-shadow: 0 10px 24px rgba(124, 58, 237, 0.25);
 }
 
 .offer-status.default {
@@ -592,7 +596,7 @@ h6 {
     color: #fff;
 }
 
-/* Boutons premium rouges différents */
+/* Boutons premium */
 .action-buttons {
     display: flex;
     gap: 10px;
@@ -618,15 +622,15 @@ h6 {
 }
 
 .btn-publish {
-    background: linear-gradient(135deg, #ff4d4d, #ff003c);
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
 }
 
 .btn-edit {
-    background: linear-gradient(135deg, #d1003f, #8b0000);
+    background: linear-gradient(135deg, #6366f1, #7c3aed);
 }
 
 .btn-cancel {
-    background: linear-gradient(135deg, #ff7a7a, #b3002d);
+    background: linear-gradient(135deg, #334155, #0f172a);
 }
 
 .btn-disabled {
@@ -657,6 +661,7 @@ h6 {
         flex-direction: column;
     }
 }
+
 /* =========================
    LOGO BACKGROUND ANIMATION
    ========================= */
@@ -681,7 +686,7 @@ h6 {
     left: 50%;
     transform: translate(-50%, -50%);
     animation: logoFloat 6s ease-in-out infinite, logoRotate 18s linear infinite;
-    filter: drop-shadow(0 0 45px rgba(255, 0, 60, 0.28));
+    filter: drop-shadow(0 0 45px rgba(124, 58, 237, 0.28));
 }
 
 .offers-panel-logo-bg::after {
@@ -693,9 +698,10 @@ h6 {
     left: 50%;
     transform: translate(-50%, -50%);
     background:
-        radial-gradient(circle, rgba(255, 0, 60, 0.16) 0%, rgba(255, 0, 60, 0.07) 28%, rgba(255, 0, 60, 0.02) 45%, transparent 70%);
+        radial-gradient(circle, rgba(124, 58, 237, 0.16) 0%, rgba(124, 58, 237, 0.07) 28%, rgba(124, 58, 237, 0.02) 45%, transparent 70%);
     animation: pulseGlow 3.8s ease-in-out infinite;
 }
+
 @keyframes logoFloat {
     0% {
         transform: translate(-50%, -50%) scale(1) rotate(0deg);
@@ -713,6 +719,7 @@ h6 {
     50% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); }
     100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
 }
+
 @keyframes logoRotate {
     0% {
         transform: translate(-50%, -50%) scale(1) rotate(0deg);
@@ -735,8 +742,8 @@ h6 {
     100% {
         opacity: 0.10;
     }
-    
 }
+
 .offer-applied-badge {
     position: absolute;
     bottom: 16px;

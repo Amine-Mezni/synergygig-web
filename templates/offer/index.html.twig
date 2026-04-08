@@ -3,7 +3,7 @@
 {% block title %}Offres disponibles{% endblock %}
 
 {% block body %}
-<section class="offers-hero">
+<section class="offers-hero" id="hero">
     <div class="container text-center">
         <span class="offers-badge">SynergyGig Marketplace</span>
         <h1>Offres disponibles</h1>
@@ -14,61 +14,61 @@
 <section class="offers-list-section">
     <div class="container">
 
-        <div class="offers-toolbar-card mb-5">
-            <div class="row align-items-center g-4">
-                <div class="col-lg-8">
-                    <form method="get" action="{{ path('app_front_offers') }}" class="offers-filter-form">
-                        <div class="row g-3">
-                            <div class="col-md-5">
-                                <input
-                                    type="text"
-                                    name="q"
-                                    class="form-control offers-filter-input"
-                                    placeholder="Rechercher une offre, une mission, une compétence..."
-                                    value="{{ currentSearch|default('') }}"
-                                >
-                            </div>
-
-                            <div class="col-md-3">
-                                <select name="type" class="form-select offers-filter-input" onchange="this.form.submit()">
-                                    <option value="">Tous les types</option>
-                                    <option value="GIG" {{ currentType is defined and currentType == 'GIG' ? 'selected' : '' }}>Gig</option>
-                                    <option value="INTERNAL" {{ currentType is defined and currentType == 'INTERNAL' ? 'selected' : '' }}>Internal</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-4">
-                                <select name="sort" class="form-select offers-filter-input" onchange="this.form.submit()">
-                                    <option value="recent" {{ currentSort is defined and currentSort == 'recent' ? 'selected' : '' }}>Plus récentes</option>
-                                    <option value="oldest" {{ currentSort is defined and currentSort == 'oldest' ? 'selected' : '' }}>Plus anciennes</option>
-                                    <option value="budget_asc" {{ currentSort is defined and currentSort == 'budget_asc' ? 'selected' : '' }}>Budget croissant</option>
-                                    <option value="budget_desc" {{ currentSort is defined and currentSort == 'budget_desc' ? 'selected' : '' }}>Budget décroissant</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="offers-filter-actions mt-3">
-                            <button type="submit" class="offers-filter-btn">
-                                <i class="bi bi-search me-2"></i>
-                                Rechercher
-                            </button>
-
-                            <a href="{{ path('app_front_offers') }}" class="offers-reset-btn">
-                                Réinitialiser
-                            </a>
-                        </div>
-                    </form>
+     <div class="offers-toolbar-card mb-5">
+    <div class="offers-toolbar-layout">
+        <div class="offers-toolbar-main">
+            <form method="get" action="{{ path('app_front_offers') }}" class="offers-filter-form">
+                <div class="offers-search-row">
+                    <input
+                        type="text"
+                        name="q"
+                        class="form-control offers-filter-input offers-search-input"
+                        placeholder="Rechercher une offre, une mission, une compétence..."
+                        value="{{ currentSearch|default('') }}"
+                    >
                 </div>
 
-                <div class="col-lg-4">
-                    <div class="offers-results-box">
-                        <span class="offers-results-label">Résultats trouvés</span>
-                        <strong>{{ offersCount|default(offers|length) }}</strong>
-                        <p class="mb-0">Offres publiées correspondant à vos critères actuels.</p>
+                <div class="offers-filter-row">
+                    <div class="offers-filter-col">
+                        <select name="type" class="form-select offers-filter-input">
+                            <option value="">Tous les types</option>
+                            <option value="GIG" {{ currentType is defined and currentType == 'GIG' ? 'selected' : '' }}>Gig</option>
+                            <option value="INTERNAL" {{ currentType is defined and currentType == 'INTERNAL' ? 'selected' : '' }}>Internal</option>
+                        </select>
+                    </div>
+
+                    <div class="offers-filter-col">
+                        <select name="sort" class="form-select offers-filter-input">
+                            <option value="recent" {{ currentSort is defined and currentSort == 'recent' ? 'selected' : '' }}>Plus récentes</option>
+                            <option value="oldest" {{ currentSort is defined and currentSort == 'oldest' ? 'selected' : '' }}>Plus anciennes</option>
+                            <option value="budget_asc" {{ currentSort is defined and currentSort == 'budget_asc' ? 'selected' : '' }}>Budget croissant</option>
+                            <option value="budget_desc" {{ currentSort is defined and currentSort == 'budget_desc' ? 'selected' : '' }}>Budget décroissant</option>
+                        </select>
+                    </div>
+
+                    <div class="offers-actions-col">
+                        <button type="submit" class="offers-filter-btn">
+                            <i class="bi bi-search me-2"></i>
+                            Rechercher
+                        </button>
+
+                        <a href="{{ path('app_front_offers') }}" class="offers-reset-btn">
+                            Réinitialiser
+                        </a>
                     </div>
                 </div>
+            </form>
+        </div>
+
+        <div class="offers-toolbar-side">
+            <div class="offers-results-box">
+                <span class="offers-results-label">Résultats trouvés</span>
+                <strong>{{ offersCount|default(offers|length) }}</strong>
+                <p class="mb-0">Offres publiées correspondant à vos critères actuels.</p>
             </div>
         </div>
+    </div>
+</div>
 
         <div class="offers-top-tags mb-4">
             <span class="top-tag">Web Development</span>
@@ -79,9 +79,9 @@
             <span class="top-tag">SEO / Analytics</span>
         </div>
 
-        <div class="row gy-4">
-            {% for offer in offers %}
-                <div class="col-lg-4 col-md-6">
+        {% if offers is not empty %}
+            <div class="offers-grid">
+                {% for offer in offers %}
                     <article class="offer-card h-100 d-flex flex-column">
                         <div class="offer-card-image">
                             {% if loop.index <= 2 %}
@@ -126,19 +126,18 @@
                             </div>
                         </div>
                     </article>
-                </div>
-            {% else %}
-                <div class="col-12">
-                    <div class="offers-empty text-center">
-                        <h3>Aucune offre publiée pour le moment</h3>
-                        <p>Aucun résultat ne correspond à vos critères. Essayez avec une autre recherche ou un autre filtre.</p>
-                        <a href="{{ path('app_front_offers') }}" class="offers-reset-btn mt-3 d-inline-flex">
-                            Réinitialiser les filtres
-                        </a>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="offers-empty text-center">
+                <h3>Aucune offre publiée pour le moment</h3>
+                <p>Aucun résultat ne correspond à vos critères. Essayez avec une autre recherche ou un autre filtre.</p>
+                <a href="{{ path('app_front_offers') }}" class="offers-reset-btn mt-3 d-inline-flex">
+                    Réinitialiser les filtres
+                </a>
+            </div>
+        {% endif %}
+
     </div>
 </section>
 {% endblock %}
@@ -149,9 +148,9 @@
 .offers-hero {
     padding: 150px 0 70px;
     background:
-        radial-gradient(circle at top left, rgba(255, 0, 76, 0.15), transparent 28%),
-        radial-gradient(circle at bottom right, rgba(255, 50, 50, 0.12), transparent 30%),
-        linear-gradient(135deg, #050505 0%, #090910 45%, #18070d 100%);
+        radial-gradient(circle at top left, rgba(14, 165, 164, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.10), transparent 30%),
+        linear-gradient(135deg, #020617 0%, #081120 45%, #0f172a 100%);
     text-align: center;
 }
 
@@ -159,9 +158,9 @@
     display: inline-block;
     padding: 8px 18px;
     border-radius: 999px;
-    background: rgba(255, 0, 76, 0.12);
-    border: 1px solid rgba(255, 0, 76, 0.28);
-    color: #ff4d6d;
+    background: rgba(14, 165, 164, 0.12);
+    border: 1px solid rgba(14, 165, 164, 0.28);
+    color: #67e8f9;
     font-weight: 600;
     margin-bottom: 16px;
 }
@@ -181,13 +180,20 @@
 
 .offers-list-section {
     padding: 70px 0 90px;
-    background: linear-gradient(180deg, #09090d 0%, #0d0d12 100%);
+    background: linear-gradient(180deg, #020617 0%, #0b1220 100%);
+}
+
+.container {
+    max-width: 1200px !important;
+    margin: 0 auto !important;
+    padding-left: 16px;
+    padding-right: 16px;
 }
 
 .offers-toolbar-card {
     padding: 26px;
     border-radius: 26px;
-    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
+    background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(2,6,23,0.96));
     border: 1px solid rgba(255,255,255,0.06);
     box-shadow: 0 18px 40px rgba(0,0,0,0.28);
 }
@@ -197,7 +203,7 @@
 }
 
 .offers-filter-input {
-    background: linear-gradient(145deg, rgba(20,20,28,0.96), rgba(12,12,18,0.96)) !important;
+    background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96)) !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     color: #fff !important;
     border-radius: 16px !important;
@@ -210,20 +216,13 @@
 }
 
 .offers-filter-input:focus {
-    border-color: rgba(255, 0, 76, 0.60) !important;
-    box-shadow: 0 0 0 0.2rem rgba(255, 0, 76, 0.12) !important;
+    border-color: rgba(14, 165, 164, 0.60) !important;
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 164, 0.12) !important;
     background: rgba(255, 255, 255, 0.08) !important;
 }
 
-select.offers-filter-input {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    cursor: pointer;
-}
-
 select.offers-filter-input option {
-    background: #16161f;
+    background: #0f172a;
     color: #ffffff;
 }
 
@@ -248,15 +247,9 @@ select.offers-filter-input option {
 }
 
 .offers-filter-btn {
-    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    background: linear-gradient(90deg, #0ea5a4, #22d3ee);
     color: #fff;
-    box-shadow: 0 10px 24px rgba(255, 0, 76, 0.22);
-}
-
-.offers-filter-btn:hover,
-.offers-reset-btn:hover {
-    transform: translateY(-2px);
-    color: #fff;
+    box-shadow: 0 10px 24px rgba(14, 165, 164, 0.22);
 }
 
 .offers-reset-btn {
@@ -299,6 +292,7 @@ select.offers-filter-input option {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+    margin-bottom: 24px;
 }
 
 .top-tag {
@@ -311,9 +305,15 @@ select.offers-filter-input option {
     font-weight: 600;
 }
 
+.offers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
 .offer-card {
-    background: linear-gradient(145deg, rgba(18,18,24,0.98), rgba(10,10,14,0.96));
-    border: 1px solid rgba(255, 0, 76, 0.10);
+    background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(2,6,23,0.96));
+    border: 1px solid rgba(14, 165, 164, 0.10);
     border-radius: 24px;
     overflow: hidden;
     box-shadow: 0 15px 40px rgba(0,0,0,0.35);
@@ -321,22 +321,22 @@ select.offers-filter-input option {
 }
 
 .offer-card:hover {
-    transform: translateY(-6px) scale(1.01);
+    transform: translateY(-6px);
     box-shadow: 0 22px 50px rgba(0,0,0,0.42);
 }
 
 .offer-card-image {
     position: relative;
-    height: 240px;
+    height: 220px;
     overflow: hidden;
-    background: #111;
+    background: #111827;
 }
 
 .offer-card-image::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(255,0,76,0.08), rgba(0,0,0,0.15));
+    background: linear-gradient(180deg, rgba(14,165,164,0.08), rgba(0,0,0,0.15));
     z-index: 1;
     pointer-events: none;
 }
@@ -355,8 +355,6 @@ select.offers-filter-input option {
     height: 100%;
     object-fit: cover;
     display: block;
-    position: relative;
-    z-index: 0;
     transition: transform 0.4s ease;
 }
 
@@ -383,9 +381,9 @@ select.offers-filter-input option {
     left: 16px;
     bottom: 16px;
     z-index: 3;
-    background: rgba(25, 135, 84, 0.20);
-    color: #7ef0aa;
-    border: 1px solid rgba(25, 135, 84, 0.35);
+    background: rgba(14, 165, 164, 0.18);
+    color: #99f6e4;
+    border: 1px solid rgba(14, 165, 164, 0.35);
     padding: 7px 12px;
     border-radius: 999px;
     font-size: 0.78rem;
@@ -397,7 +395,7 @@ select.offers-filter-input option {
     top: 16px;
     right: 16px;
     z-index: 3;
-    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    background: linear-gradient(90deg, #0ea5a4, #22d3ee);
     color: #fff;
     padding: 8px 14px;
     border-radius: 999px;
@@ -419,7 +417,7 @@ select.offers-filter-input option {
 }
 
 .offer-meta i {
-    color: #ff335c;
+    color: #22d3ee;
     margin-right: 6px;
 }
 
@@ -452,9 +450,9 @@ select.offers-filter-input option {
 }
 
 .badge-ai {
-    background: rgba(139, 92, 246, 0.16);
-    color: #d7b8ff;
-    border: 1px solid rgba(139, 92, 246, 0.30);
+    background: rgba(34, 211, 238, 0.14);
+    color: #a5f3fc;
+    border: 1px solid rgba(34, 211, 238, 0.30);
 }
 
 .offer-card-description {
@@ -472,26 +470,18 @@ select.offers-filter-input option {
     padding: 14px 22px;
     border-radius: 14px;
     background: transparent;
-    border: 1px solid rgba(255, 0, 76, 0.30);
+    border: 1px solid rgba(14, 165, 164, 0.30);
     color: #ffffff;
     text-decoration: none;
     font-weight: 700;
     transition: all 0.25s ease;
 }
 
-.offer-apply-btn i {
-    transition: transform 0.25s ease;
-}
-
 .offer-apply-btn:hover {
-    background: linear-gradient(90deg, #ff003c, #ff4d4d);
+    background: linear-gradient(90deg, #0ea5a4, #22d3ee);
     border-color: transparent;
     color: #fff;
-    box-shadow: 0 10px 24px rgba(255, 0, 76, 0.22);
-}
-
-.offer-apply-btn:hover i {
-    transform: translateX(4px);
+    box-shadow: 0 10px 24px rgba(14, 165, 164, 0.22);
 }
 
 .offers-empty {
@@ -500,6 +490,12 @@ select.offers-filter-input option {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.06);
     color: #fff;
+}
+
+@media (max-width: 992px) {
+    .offers-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 @media (max-width: 768px) {
@@ -517,6 +513,12 @@ select.offers-filter-input option {
 
     .offers-toolbar-card {
         padding: 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .offers-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>
