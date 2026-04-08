@@ -1,0 +1,117 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block title %}My Profile | SynergyGig{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block header_actions %}
+    <a href="{{ path('app_profile_edit') }}" class="btn btn-primary btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit Profile
+    </a>
+{% endblock %}
+
+{% block content %}
+<p class="text-muted" style="margin-bottom:var(--space-xl)">Manage your personal information and account settings</p>
+
+{% if user %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-xl);margin-bottom:var(--space-xl)">
+    {# ── Profile Card ── #}
+    <div class="card" style="text-align:center;padding:var(--space-2xl)">
+        <div style="font-weight:600;color:var(--text-primary);font-size:1rem;margin-bottom:2px;text-align:left">Profile</div>
+        <div class="text-muted" style="font-size:.75rem;margin-bottom:var(--space-xl);text-align:left">Your identity at a glance</div>
+
+        {# Avatar with ring #}
+        <div style="display:inline-block;padding:3px;border-radius:50%;background:linear-gradient(135deg,var(--accent-primary),var(--accent-secondary));margin-bottom:var(--space-md)">
+            <div class="avatar" style="width:96px;height:96px;font-size:2.5rem;border:3px solid var(--bg-primary)">{{ user.firstName|first|upper }}{{ user.lastName|first|upper }}</div>
+        </div>
+
+        <div class="text-muted" style="font-size:.8125rem;margin-bottom:var(--space-md)">71% profile complete</div>
+
+        <div style="margin-bottom:var(--space-lg)">
+            <a href="{{ path('app_profile_edit') }}" class="btn btn-secondary btn-sm">Upload Photo</a>
+        </div>
+
+        <div style="font-weight:600;color:var(--text-primary);font-size:1.125rem">{{ user.firstName }} {{ user.lastName }}</div>
+        <div class="text-muted" style="font-size:.875rem;margin-bottom:var(--space-sm)">{{ user.email }}</div>
+        {% set rc = { 'ADMIN': 'red', 'HR': 'purple', 'MANAGER': 'blue', 'EMPLOYEE': 'green', 'FREELANCER': 'orange' } %}
+        <span class="badge badge--{{ rc[user.role] ?? 'blue' }}">{{ user.role ?? 'EMPLOYEE' }}</span>
+    </div>
+
+    {# ── Account Details ── #}
+    <div class="card" style="padding:var(--space-xl)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-lg)">
+            <div>
+                <div style="font-weight:600;color:var(--accent-primary)">Account Details</div>
+                <div class="text-muted" style="font-size:.75rem">Your account information</div>
+            </div>
+            <a href="{{ path('app_profile_edit') }}" class="btn btn-ghost btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </a>
+        </div>
+
+        {% set fields = [
+            { icon: 'user', label: 'First Name', value: user.firstName },
+            { icon: 'user', label: 'Last Name', value: user.lastName },
+            { icon: 'mail', label: 'Email Address', value: user.email },
+            { icon: 'shield', label: 'Role', value: user.role ?? 'EMPLOYEE' },
+            { icon: 'calendar', label: 'Member Since', value: user.createdAt ? user.createdAt|date('F d, Y') : '—' },
+        ] %}
+
+        {% for field in fields %}
+        <div style="padding:var(--space-md) 0;{% if not loop.last %}border-bottom:1px solid var(--border-primary);{% endif %}">
+            <div class="text-muted" style="font-size:.75rem;margin-bottom:4px;display:flex;align-items:center;gap:.35rem">
+                {% if field.icon == 'user' %}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                {% elseif field.icon == 'mail' %}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                {% elseif field.icon == 'shield' %}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                {% elseif field.icon == 'calendar' %}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {% endif %}
+                {{ field.label }}
+            </div>
+            <div style="color:var(--text-primary);font-weight:500">{{ field.value }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{# ── Biometric Authentication (matching Java) ── #}
+<div class="card" style="padding:var(--space-xl)">
+    <div style="font-weight:600;color:var(--text-primary);margin-bottom:2px">Biometric Authentication</div>
+    <div class="text-muted" style="font-size:.75rem;margin-bottom:var(--space-lg)">Use your face to log in securely</div>
+
+    <div style="display:flex;align-items:center;gap:var(--space-lg);margin-bottom:var(--space-lg)">
+        <div style="width:40px;height:40px;border-radius:var(--radius-md);border:1px solid var(--border-primary);display:flex;align-items:center;justify-content:center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+        <div style="flex:1">
+            <div style="font-weight:500;color:var(--text-primary)">
+                {% if user.faceEncoding %}Face ID enrolled{% else %}Face ID not enrolled{% endif %}
+            </div>
+            <div class="text-muted" style="font-size:.8125rem">
+                {% if user.faceEncoding %}Your face is registered for secure login{% else %}Enroll your face for biometric login{% endif %}
+            </div>
+        </div>
+        <span class="badge badge--{{ user.faceEncoding ? 'green' : 'red' }}">{{ user.faceEncoding ? 'ON' : 'OFF' }}</span>
+    </div>
+
+    <div style="display:flex;gap:var(--space-sm)">
+        <a href="{{ path('app_face_enroll') }}" class="btn btn-primary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            {{ user.faceEncoding ? 'Re-enroll Face' : 'Enroll Face' }}
+        </a>
+        {% if user.faceEncoding %}
+            <form method="post" action="{{ path('app_face_remove') }}" style="display:inline">
+                <input type="hidden" name="_token" value="{{ csrf_token('face_remove') }}">
+                <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Remove Face ID?')">Remove</button>
+            </form>
+        {% endif %}
+        <a href="{{ path('app_face_enroll') }}" class="btn btn-secondary btn-sm" style="margin-left:auto">Test Setup</a>
+    </div>
+</div>
+{% else %}
+<div class="card"><div class="empty-state"><h3>No user data available</h3></div></div>
+{% endif %}
+{% endblock %}
