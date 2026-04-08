@@ -14,11 +14,10 @@
 <section class="offers-list-section">
     <div class="container">
 
-     <div class="offers-toolbar-card mb-5">
-    <div class="offers-toolbar-layout">
-        <div class="offers-toolbar-main">
-            <form method="get" action="{{ path('app_front_offers') }}" class="offers-filter-form">
-                <div class="offers-search-row">
+        <div class="offers-toolbar-card mb-5">
+            <form method="get" action="{{ path('app_front_offers') }}" class="offers-toolbar-form">
+
+                <div class="offers-toolbar-top">
                     <input
                         type="text"
                         name="q"
@@ -28,47 +27,48 @@
                     >
                 </div>
 
-                <div class="offers-filter-row">
-                    <div class="offers-filter-col">
-                        <select name="type" class="form-select offers-filter-input">
-                            <option value="">Tous les types</option>
-                            <option value="GIG" {{ currentType is defined and currentType == 'GIG' ? 'selected' : '' }}>Gig</option>
-                            <option value="INTERNAL" {{ currentType is defined and currentType == 'INTERNAL' ? 'selected' : '' }}>Internal</option>
-                        </select>
+                <div class="offers-toolbar-bottom">
+                    <div class="offers-toolbar-filters">
+
+                        <div class="offers-filter-group">
+                            <label class="offers-filter-label">Type</label>
+                            <select name="type" class="form-select offers-filter-input">
+                                <option value="">Tous les types</option>
+                                <option value="GIG" {{ currentType is defined and currentType == 'GIG' ? 'selected' : '' }}>Gig</option>
+                                <option value="INTERNAL" {{ currentType is defined and currentType == 'INTERNAL' ? 'selected' : '' }}>Internal</option>
+                            </select>
+                        </div>
+
+                        <div class="offers-filter-group">
+                            <label class="offers-filter-label">Tri</label>
+                            <select name="sort" class="form-select offers-filter-input">
+                                <option value="recent" {{ currentSort is defined and currentSort == 'recent' ? 'selected' : '' }}>Plus récentes</option>
+                                <option value="oldest" {{ currentSort is defined and currentSort == 'oldest' ? 'selected' : '' }}>Plus anciennes</option>
+                                <option value="budget_asc" {{ currentSort is defined and currentSort == 'budget_asc' ? 'selected' : '' }}>Budget croissant</option>
+                                <option value="budget_desc" {{ currentSort is defined and currentSort == 'budget_desc' ? 'selected' : '' }}>Budget décroissant</option>
+                            </select>
+                        </div>
+
+                        <div class="offers-filter-actions">
+                            <button type="submit" class="offers-filter-btn">
+                                <i class="bi bi-search me-2"></i>
+                                Rechercher
+                            </button>
+
+                            <a href="{{ path('app_front_offers') }}" class="offers-reset-btn">
+                                Réinitialiser
+                            </a>
+                        </div>
                     </div>
 
-                    <div class="offers-filter-col">
-                        <select name="sort" class="form-select offers-filter-input">
-                            <option value="recent" {{ currentSort is defined and currentSort == 'recent' ? 'selected' : '' }}>Plus récentes</option>
-                            <option value="oldest" {{ currentSort is defined and currentSort == 'oldest' ? 'selected' : '' }}>Plus anciennes</option>
-                            <option value="budget_asc" {{ currentSort is defined and currentSort == 'budget_asc' ? 'selected' : '' }}>Budget croissant</option>
-                            <option value="budget_desc" {{ currentSort is defined and currentSort == 'budget_desc' ? 'selected' : '' }}>Budget décroissant</option>
-                        </select>
-                    </div>
-
-                    <div class="offers-actions-col">
-                        <button type="submit" class="offers-filter-btn">
-                            <i class="bi bi-search me-2"></i>
-                            Rechercher
-                        </button>
-
-                        <a href="{{ path('app_front_offers') }}" class="offers-reset-btn">
-                            Réinitialiser
-                        </a>
+                    <div class="offers-results-box">
+                        <span class="offers-results-label">Résultats trouvés</span>
+                        <strong>{{ offersCount|default(offers|length) }}</strong>
+                        <p class="mb-0">Offres publiées correspondant à vos critères actuels.</p>
                     </div>
                 </div>
             </form>
         </div>
-
-        <div class="offers-toolbar-side">
-            <div class="offers-results-box">
-                <span class="offers-results-label">Résultats trouvés</span>
-                <strong>{{ offersCount|default(offers|length) }}</strong>
-                <p class="mb-0">Offres publiées correspondant à vos critères actuels.</p>
-            </div>
-        </div>
-    </div>
-</div>
 
         <div class="offers-top-tags mb-4">
             <span class="top-tag">Web Development</span>
@@ -145,6 +145,13 @@
 {% block stylesheets %}
 {{ parent() }}
 <style>
+.container {
+    max-width: 1200px !important;
+    margin: 0 auto !important;
+    padding-left: 18px;
+    padding-right: 18px;
+}
+
 .offers-hero {
     padding: 150px 0 70px;
     background:
@@ -183,31 +190,65 @@
     background: linear-gradient(180deg, #020617 0%, #0b1220 100%);
 }
 
-.container {
-    max-width: 1200px !important;
-    margin: 0 auto !important;
-    padding-left: 16px;
-    padding-right: 16px;
-}
-
+/* toolbar */
 .offers-toolbar-card {
-    padding: 26px;
-    border-radius: 26px;
-    background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(2,6,23,0.96));
+    padding: 28px;
+    border-radius: 28px;
+    background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96));
     border: 1px solid rgba(255,255,255,0.06);
     box-shadow: 0 18px 40px rgba(0,0,0,0.28);
 }
 
-.offers-filter-form {
+.offers-toolbar-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.offers-toolbar-top {
     width: 100%;
 }
 
+.offers-search-input {
+    width: 100%;
+    height: 58px;
+    padding: 0 20px !important;
+}
+
+.offers-toolbar-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) 320px;
+    gap: 24px;
+    align-items: stretch;
+}
+
+.offers-toolbar-filters {
+    display: grid;
+    grid-template-columns: 220px 260px 1fr;
+    gap: 16px;
+    align-items: end;
+}
+
+.offers-filter-group {
+    min-width: 0;
+}
+
+.offers-filter-label {
+    display: block;
+    margin-bottom: 10px;
+    color: rgba(255,255,255,0.72);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
 .offers-filter-input {
+    width: 100%;
+    height: 54px;
+    padding: 0 18px !important;
+    border-radius: 16px !important;
     background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96)) !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     color: #fff !important;
-    border-radius: 16px !important;
-    min-height: 54px;
     box-shadow: none !important;
 }
 
@@ -223,32 +264,34 @@
 
 select.offers-filter-input option {
     background: #0f172a;
-    color: #ffffff;
+    color: #fff;
 }
 
 .offers-filter-actions {
     display: flex;
-    gap: 12px;
+    gap: 14px;
+    align-items: end;
     flex-wrap: wrap;
 }
 
 .offers-filter-btn,
 .offers-reset-btn {
+    min-width: 170px;
+    height: 54px;
+    padding: 0 24px;
+    border-radius: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 170px;
-    padding: 13px 22px;
-    border-radius: 14px;
-    text-decoration: none;
     font-weight: 700;
-    border: none;
+    text-decoration: none;
     transition: all 0.25s ease;
 }
 
 .offers-filter-btn {
     background: linear-gradient(90deg, #0ea5a4, #22d3ee);
     color: #fff;
+    border: none;
     box-shadow: 0 10px 24px rgba(14, 165, 164, 0.22);
 }
 
@@ -258,9 +301,16 @@ select.offers-filter-input option {
     border: 1px solid rgba(255,255,255,0.10);
 }
 
+.offers-filter-btn:hover,
+.offers-reset-btn:hover {
+    transform: translateY(-2px);
+    color: #fff;
+}
+
 .offers-results-box {
     height: 100%;
-    padding: 22px;
+    min-height: 170px;
+    padding: 24px;
     border-radius: 22px;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
@@ -277,7 +327,7 @@ select.offers-filter-input option {
 
 .offers-results-box strong {
     color: #fff;
-    font-size: 2.2rem;
+    font-size: 2.4rem;
     font-weight: 800;
     line-height: 1.1;
     margin-bottom: 8px;
@@ -288,15 +338,16 @@ select.offers-filter-input option {
     line-height: 1.7;
 }
 
+/* tags */
 .offers-top-tags {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
 }
 
 .top-tag {
-    padding: 9px 14px;
+    padding: 10px 14px;
     border-radius: 999px;
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.08);
@@ -305,6 +356,7 @@ select.offers-filter-input option {
     font-weight: 600;
 }
 
+/* cards */
 .offers-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -493,6 +545,14 @@ select.offers-filter-input option {
 }
 
 @media (max-width: 992px) {
+    .offers-toolbar-bottom {
+        grid-template-columns: 1fr;
+    }
+
+    .offers-toolbar-filters {
+        grid-template-columns: 1fr 1fr;
+    }
+
     .offers-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -507,16 +567,30 @@ select.offers-filter-input option {
         font-size: 2.1rem;
     }
 
-    .offer-card-image {
-        height: 220px;
-    }
-
     .offers-toolbar-card {
         padding: 20px;
+    }
+
+    .offer-card-image {
+        height: 220px;
     }
 }
 
 @media (max-width: 576px) {
+    .offers-toolbar-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .offers-filter-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .offers-filter-btn,
+    .offers-reset-btn {
+        width: 100%;
+    }
+
     .offers-grid {
         grid-template-columns: 1fr;
     }
