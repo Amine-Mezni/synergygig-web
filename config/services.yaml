@@ -1,0 +1,26 @@
+parameters:
+    n8n_base_url: '%env(default:n8n_default:N8N_BASE_URL)%'
+    n8n_default: 'http://localhost:5678'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    App\Service\N8nWebhookService:
+        arguments:
+            $n8nBaseUrl: '%n8n_base_url%'
+
+    App\Service\AIService:
+        arguments:
+            $zaiApiKey: '%env(default::ZAI_API_KEY)%'
+            $groqApiKey: '%env(default::GROQ_API_KEY)%'
+            $openrouterApiKey: '%env(default::OPENROUTER_API_KEY)%'
+            $opencodeApiKey: '%env(default::OPENCODE_API_KEY)%'
