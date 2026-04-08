@@ -1,0 +1,103 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block title %}{{ is_edit ? 'Edit' : 'New' }} User | SynergyGig{% endblock %}
+
+{% block page_title %}{{ is_edit ? 'Edit User' : 'New User' }}{% endblock %}
+
+{% block breadcrumb %}
+    <nav class="breadcrumb">
+        <a href="{{ path('app_dashboard') }}">Home</a>
+        <span class="sep">/</span>
+        <a href="{{ path('app_user_index') }}">Users</a>
+        <span class="sep">/</span>
+        <span>{{ is_edit ? 'Edit' : 'New' }}</span>
+    </nav>
+{% endblock %}
+
+{% block content %}
+    <div style="max-width: 640px;">
+        <div class="card">
+            {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
+                <div class="form-group">
+                    {{ form_label(form.first_name) }}
+                    {{ form_widget(form.first_name) }}
+                    {% for error in form.first_name.vars.errors %}
+                        <div class="form-error">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="form-group">
+                    {{ form_label(form.last_name) }}
+                    {{ form_widget(form.last_name) }}
+                    {% for error in form.last_name.vars.errors %}
+                        <div class="form-error">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                {{ form_label(form.email) }}
+                {{ form_widget(form.email) }}
+                {% for error in form.email.vars.errors %}
+                    <div class="form-error">{{ error.message }}</div>
+                {% endfor %}
+            </div>
+
+            {% if not is_edit %}
+            <div class="form-group">
+                {{ form_label(form.password) }}
+                {{ form_widget(form.password) }}
+                {% for error in form.password.vars.errors %}
+                    <div class="form-error">{{ error.message }}</div>
+                {% endfor %}
+                <div class="form-hint">Minimum 6 characters.</div>
+            </div>
+            {% endif %}
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
+                <div class="form-group">
+                    {{ form_label(form.role) }}
+                    {{ form_widget(form.role) }}
+                </div>
+                <div class="form-group">
+                    {{ form_label(form.department) }}
+                    {{ form_widget(form.department) }}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
+                <div class="form-group">
+                    {{ form_label(form.monthly_salary) }}
+                    {{ form_widget(form.monthly_salary) }}
+                    {% for error in form.monthly_salary.vars.errors %}
+                        <div class="form-error">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+                <div class="form-group">
+                    {{ form_label(form.hourly_rate) }}
+                    {{ form_widget(form.hourly_rate) }}
+                    {% for error in form.hourly_rate.vars.errors %}
+                        <div class="form-error">{{ error.message }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                {{ form_label(form.bio) }}
+                {{ form_widget(form.bio) }}
+            </div>
+
+            <hr class="divider">
+
+            <div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                <a href="{{ path('app_user_index') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    {{ is_edit ? 'Save Changes' : 'Create User' }}
+                </button>
+            </div>
+
+            {{ form_end(form) }}
+        </div>
+    </div>
+{% endblock %}
