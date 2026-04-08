@@ -2,51 +2,285 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Espace HR{% endblock %}</title>
 
     <link href="{{ asset('front/css/variables.css') }}" rel="stylesheet">
     <link href="{{ asset('front/css/base.css') }}" rel="stylesheet">
     <link href="{{ asset('front/css/components.css') }}" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(20, 184, 166, 0.10), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(6, 182, 212, 0.08), transparent 30%),
+                linear-gradient(135deg, #020617 0%, #0b1220 50%, #020617 100%);
+            color: white;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+        }
+
+        .hr-navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            background: rgba(2, 6, 23, 0.82);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .hr-logo {
+            font-weight: 800;
+            font-size: 1.25rem;
+            color: #ffffff;
+            text-decoration: none;
+            letter-spacing: 0.4px;
+        }
+
+        .hr-menu {
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .hr-link {
+            color: rgba(255,255,255,0.86);
+            text-decoration: none;
+            padding: 10px 14px;
+            border-radius: 12px;
+            transition: all 0.25s ease;
+            font-weight: 600;
+        }
+
+        .hr-link:hover {
+            background: rgba(255,255,255,0.05);
+            color: #ffffff;
+        }
+
+        .hr-logout {
+            background: linear-gradient(90deg, #0ea5a4, #22d3ee);
+            padding: 10px 16px;
+            border-radius: 999px;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 10px 24px rgba(20, 184, 166, 0.22);
+            transition: transform 0.25s ease;
+        }
+
+        .hr-logout:hover {
+            transform: translateY(-2px);
+            color: white;
+        }
+
+        .hr-main {
+            padding: 36px 24px 50px;
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        /* Toasts */
+        .sg-toast-wrapper {
+            position: fixed;
+            top: 90px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            max-width: 390px;
+        }
+
+        .sg-toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 16px 18px;
+            border-radius: 18px;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,255,255,0.08);
+            animation: sgToastIn 0.35s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sg-toast::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0.18;
+            pointer-events: none;
+        }
+
+        .sg-toast-success {
+            background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96));
+            color: #ffffff;
+            border-left: 4px solid #14b8a6;
+        }
+
+        .sg-toast-success::before {
+            background: radial-gradient(circle at top right, rgba(20,184,166,0.28), transparent 40%);
+        }
+
+        .sg-toast-error {
+            background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96));
+            color: #ffffff;
+            border-left: 4px solid #ef4444;
+        }
+
+        .sg-toast-error::before {
+            background: radial-gradient(circle at top right, rgba(239,68,68,0.22), transparent 40%);
+        }
+
+        .sg-toast-icon {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1rem;
+            color: white;
+            margin-top: 2px;
+        }
+
+        .sg-toast-success .sg-toast-icon {
+            background: linear-gradient(90deg, #0ea5a4, #22d3ee);
+            box-shadow: 0 8px 20px rgba(20,184,166,0.28);
+        }
+
+        .sg-toast-error .sg-toast-icon {
+            background: linear-gradient(90deg, #ef4444, #f87171);
+            box-shadow: 0 8px 20px rgba(239,68,68,0.24);
+        }
+
+        .sg-toast-content strong {
+            display: block;
+            font-size: 0.98rem;
+            margin-bottom: 4px;
+            font-weight: 800;
+        }
+
+        .sg-toast-content p {
+            margin: 0;
+            color: rgba(255,255,255,0.78);
+            line-height: 1.55;
+            font-size: 0.92rem;
+        }
+
+        .sg-toast-close {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.65);
+            font-size: 1.2rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .sg-toast-close:hover {
+            color: #fff;
+        }
+
+        @keyframes sgToastIn {
+            from {
+                opacity: 0;
+                transform: translateY(-12px) translateX(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) translateX(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hr-navbar {
+                padding: 16px 18px;
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 14px;
+            }
+
+            .hr-main {
+                padding: 24px 14px 40px;
+            }
+
+            .sg-toast-wrapper {
+                right: 14px;
+                left: 14px;
+                max-width: none;
+            }
+        }
+    </style>
+
+    {% block extra_styles %}{% endblock %}
 </head>
 
-<body style="background:#0b0f19; color:white;">
+<body>
 
-<!-- NAVBAR -->
-<nav style="display:flex; justify-content:space-between; align-items:center; padding:20px 40px; border-bottom:1px solid rgba(255,255,255,0.1);">
+<nav class="hr-navbar">
+    <a href="{{ path('app_home') }}" class="hr-logo">SynergyGig</a>
 
-    <!-- LOGO -->
-    <div style="font-weight:700; font-size:20px;">
-        SynergyGig
-    </div>
-
-    <!-- MENU -->
-    <div style="display:flex; gap:20px; align-items:center;">
-
-        <a href="{{ path('app_home') }}" style="color:white; text-decoration:none;">
-            Dashboard
-        </a>
-
-        <a href="{{ path('app_project_owner_offer_new') }}" style="color:white; text-decoration:none;">
-            Ajouter une offre
-        </a>
-
-        <a href="{{ path('app_project_owner_offer_list') }}" style="color:white; text-decoration:none;">
-            Mes offres
-        </a>
-
-        <!-- BOUTON LOGOUT -->
-        <a href="{{ path('app_logout') }}" 
-           style="background:#ef4444; padding:8px 14px; border-radius:999px; text-decoration:none; color:white;">
-            Déconnexion
-        </a>
-
+    <div class="hr-menu">
+        <a href="{{ path('app_home') }}" class="hr-link">Dashboard</a>
+        <a href="{{ path('app_project_owner_offer_new') }}" class="hr-link">Ajouter une offre</a>
+        <a href="{{ path('app_project_owner_offer_list') }}" class="hr-link">Mes offres</a>
+        <a href="{{ path('app_logout') }}" class="hr-logout">Déconnexion</a>
     </div>
 </nav>
 
-<!-- CONTENU -->
-<main style="padding:40px;">
+<div class="sg-toast-wrapper">
+    {% for message in app.flashes('success') %}
+        <div class="sg-toast sg-toast-success">
+            <div class="sg-toast-icon">✓</div>
+            <div class="sg-toast-content">
+                <strong>Succès</strong>
+                <p>{{ message }}</p>
+            </div>
+            <button type="button" class="sg-toast-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+    {% endfor %}
+
+    {% for message in app.flashes('error') %}
+        <div class="sg-toast sg-toast-error">
+            <div class="sg-toast-icon">!</div>
+            <div class="sg-toast-content">
+                <strong>Erreur</strong>
+                <p>{{ message }}</p>
+            </div>
+            <button type="button" class="sg-toast-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+    {% endfor %}
+</div>
+
+<main class="hr-main">
     {% block body %}{% endblock %}
 </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toasts = document.querySelectorAll('.sg-toast');
+
+    toasts.forEach((toast) => {
+        setTimeout(() => {
+            toast.style.transition = 'all 0.3s ease';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    });
+});
+</script>
 
 </body>
 </html>
