@@ -95,34 +95,18 @@ public function new(
         'form' => $form->createView(),
     ]);
 }
-    #[Route('/project-owner/offers/{id}/edit', name: 'app_project_owner_offer_edit', requirements: ['id' => '\d+'])]
-    public function edit(
-        Offers $offer,
-        Request $request,
-        EntityManagerInterface $entityManager,
-        SluggerInterface $slugger
-    ): Response {
-        $user = $this->getUser();
+    #[Route('/project-owner/offers/{id}/edit', name: 'app_project_owner_offer_edit')]
+public function edit(
+    Request $request,
+    Offers $offer,
+    EntityManagerInterface $entityManager,
+    SluggerInterface $slugger
+): Response {
+    $form = $this->createForm(ProjectOwnerOfferType::class, $offer);
+    $form->handleRequest($request);
 
-        if (!$user) {
-            throw $this->createAccessDeniedException('Utilisateur non authentifié.');
-        }
-
-        if ($offer->getCreatedBy() !== $user) {
-            throw $this->createAccessDeniedException('Vous ne pouvez pas modifier cette offre.');
-        }
-
-        if ($offer->getStatus() !== 'DRAFT') {
-            $this->addFlash('error', 'Cette offre ne peut plus être modifiée car elle a déjà été publiée ou traitée.');
-            return $this->redirectToRoute('app_project_owner_offer_list');
-        }
-
-        $oldImage = $offer->getImageUrl();
-
-        $form = $this->createForm(ProjectOwnerOfferType::class, $offer);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
+    if ($form->isSubmitted()) {
+        if ($form->isValid()) {
             $imageFile = $form->get('imageFile')->getData();
 
             if ($imageFile) {
@@ -138,21 +122,31 @@ public function new(
                     $offer->setImageUrl($newFilename);
                 } catch (FileException $e) {
                     $this->addFlash('error', 'Erreur lors de l’upload de l’image.');
+                    return $this->render('project_owner/offer/edit.html.twig', [
+                        'form' => $form->createView(),
+                        'offer' => $offer,
+                    ]);
                 }
-            } else {
-                $offer->setImageUrl($oldImage);
             }
 
-            $entityManager->flush();
+            try {
+                $entityManager->flush();
+                $this->addFlash('success', 'Offre modifiée avec succès.');
 
-            $this->addFlash('success', 'Offre modifiée avec succès.');
-
-            return $this->redirectToRoute('app_project_owner_offer_list');
+                return $this->redirectToRoute('app_project_owner_offer_edit', [
+                    'id' => $offer->getId(),
+                ]);
+            } catch (\Exception $e) {
+                $this->addFlash('error', 'Les modifications n’ont pas pu être enregistrées.');
+            }
+        } else {
+            $this->addFlash('error', 'Veuillez corriger les erreurs du formulaire.');
         }
-
-       return $this->render('project_owner/offer/edit_project_owner.html.twig', [
-    'form' => $form->createView(),
-    'offer' => $offer,
-]);
     }
+
+    return $this->render('project_owner/offer/edit.html.twig', [
+        'form' => $form->createView(),
+        'offer' => $offer,
+    ]);
+}
 }

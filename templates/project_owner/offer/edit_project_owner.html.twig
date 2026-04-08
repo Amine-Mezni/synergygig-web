@@ -2,60 +2,288 @@
 
 {% block title %}Modifier une offre{% endblock %}
 
+{% block extra_styles %}
+<style>
+    .offer-edit-wrap {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .offer-edit-header {
+        margin-bottom: 26px;
+    }
+
+    .offer-edit-header h1 {
+        margin: 0 0 8px;
+        font-size: 2rem;
+        font-weight: 800;
+        color: #ffffff;
+    }
+
+    .offer-edit-header p {
+        margin: 0;
+        color: rgba(255,255,255,0.70);
+        line-height: 1.7;
+    }
+
+    .offer-edit-card {
+        background: linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96));
+        border: 1px solid rgba(20,184,166,0.14);
+        border-radius: 28px;
+        padding: 28px;
+        box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+    }
+
+    .form-alert-error {
+        background: rgba(239, 68, 68, 0.14);
+        border: 1px solid rgba(239, 68, 68, 0.30);
+        color: #fecaca;
+        padding: 14px 16px;
+        border-radius: 16px;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+
+    .offer-edit-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .offer-edit-full {
+        grid-column: 1 / -1;
+    }
+
+    .offer-form-group label {
+        display: block;
+        margin-bottom: 10px;
+        color: rgba(255,255,255,0.88);
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    .offer-form-group input,
+    .offer-form-group textarea,
+    .offer-form-group select {
+        width: 100%;
+        min-height: 54px;
+        padding: 0 16px;
+        border-radius: 16px !important;
+        border: 1px solid rgba(255,255,255,0.10) !important;
+        background: linear-gradient(145deg, rgba(15,23,42,0.95), rgba(2,6,23,0.95)) !important;
+        color: #ffffff !important;
+        box-shadow: none !important;
+        outline: none !important;
+        transition: all 0.25s ease;
+    }
+
+    .offer-form-group textarea {
+        min-height: 150px;
+        padding: 14px 16px;
+        resize: vertical;
+    }
+
+    .offer-form-group input::placeholder,
+    .offer-form-group textarea::placeholder {
+        color: rgba(255,255,255,0.45);
+    }
+
+    .offer-form-group input:focus,
+    .offer-form-group textarea:focus,
+    .offer-form-group select:focus {
+        border-color: rgba(20,184,166,0.60) !important;
+        box-shadow: 0 0 0 0.2rem rgba(20,184,166,0.12) !important;
+        background: rgba(255,255,255,0.08) !important;
+    }
+
+    .offer-form-group select option {
+        background: #0f172a;
+        color: #ffffff;
+    }
+
+    .is-invalid {
+        border-color: rgba(239,68,68,0.70) !important;
+        box-shadow: 0 0 0 0.2rem rgba(239,68,68,0.10) !important;
+    }
+
+    .invalid-feedback {
+        display: block;
+        margin-top: 8px;
+        color: #fca5a5;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+
+    .offer-current-image {
+        margin-top: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .offer-current-image span {
+        display: block;
+        margin-bottom: 10px;
+        color: rgba(255,255,255,0.72);
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .offer-current-image img {
+        width: 100%;
+        max-width: 260px;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 14px;
+        display: block;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .offer-actions {
+        display: flex;
+        gap: 14px;
+        margin-top: 26px;
+        flex-wrap: wrap;
+    }
+
+    .offer-submit-btn,
+    .offer-cancel-btn {
+        min-width: 180px;
+        height: 52px;
+        padding: 0 22px;
+        border-radius: 16px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        transition: all 0.25s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .offer-submit-btn {
+        background: linear-gradient(90deg, #0ea5a4, #22d3ee);
+        color: #fff;
+        box-shadow: 0 10px 24px rgba(20,184,166,0.22);
+    }
+
+    .offer-submit-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .offer-cancel-btn {
+        background: rgba(255,255,255,0.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .offer-cancel-btn:hover {
+        background: rgba(255,255,255,0.08);
+        color: #fff;
+    }
+
+    @media (max-width: 768px) {
+        .offer-edit-card {
+            padding: 20px;
+            border-radius: 22px;
+        }
+
+        .offer-edit-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .offer-submit-btn,
+        .offer-cancel-btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block body %}
-<div class="container py-4">
-
-{% if not form.vars.valid and form.vars.submitted %}
-    <div class="alert alert-danger">
-        Veuillez corriger les erreurs.
+<div class="offer-edit-wrap">
+    <div class="offer-edit-header">
+        <h1>Modifier une offre</h1>
+        <p>Modifiez les informations de votre offre avec une mise en page claire et professionnelle.</p>
     </div>
-{% endif %}
 
-{{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+    <div class="offer-edit-card">
 
-<div class="mb-3">
-    {{ form_label(form.title) }}
-    {{ form_widget(form.title, {
-        'attr': {'class': 'form-control ' ~ (form.title.vars.errors|length ? 'is-invalid' : '')}
-    }) }}
-    <div class="invalid-feedback">
-        {{ form_errors(form.title) }}
+        {% if not form.vars.valid and form.vars.submitted %}
+            <div class="form-alert-error">
+                Veuillez corriger les erreurs ci-dessous avant d’enregistrer les modifications.
+            </div>
+        {% endif %}
+
+        {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
+
+        <div class="offer-edit-grid">
+
+            <div class="offer-form-group">
+                {{ form_label(form.title) }}
+                {{ form_widget(form.title, {
+                    'attr': {'class': (form.title.vars.errors|length ? 'is-invalid' : '')}
+                }) }}
+                <div class="invalid-feedback">
+                    {{ form_errors(form.title) }}
+                </div>
+            </div>
+
+            <div class="offer-form-group">
+                {{ form_label(form.type) }}
+                {{ form_widget(form.type, {
+                    'attr': {'class': (form.type.vars.errors|length ? 'is-invalid' : '')}
+                }) }}
+                <div class="invalid-feedback">
+                    {{ form_errors(form.type) }}
+                </div>
+            </div>
+
+            <div class="offer-form-group offer-edit-full">
+                {{ form_label(form.description) }}
+                {{ form_widget(form.description, {
+                    'attr': {'class': (form.description.vars.errors|length ? 'is-invalid' : '')}
+                }) }}
+                <div class="invalid-feedback">
+                    {{ form_errors(form.description) }}
+                </div>
+            </div>
+
+            <div class="offer-form-group">
+                {{ form_label(form.amount) }}
+                {{ form_widget(form.amount, {
+                    'attr': {'class': (form.amount.vars.errors|length ? 'is-invalid' : '')}
+                }) }}
+                <div class="invalid-feedback">
+                    {{ form_errors(form.amount) }}
+                </div>
+            </div>
+
+            <div class="offer-form-group">
+                {{ form_label(form.imageFile) }}
+                {{ form_widget(form.imageFile) }}
+                <div class="invalid-feedback">
+                    {{ form_errors(form.imageFile) }}
+                </div>
+
+                {% if offer.imageUrl %}
+                    <div class="offer-current-image">
+                        <span>Image actuelle</span>
+                        <img src="{{ asset('uploads/offers/' ~ offer.imageUrl) }}" alt="{{ offer.title }}">
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <div class="offer-actions">
+            <button type="submit" class="offer-submit-btn">Enregistrer les modifications</button>
+            <a href="{{ path('app_project_owner_offer_list') }}" class="offer-cancel-btn">Retour à mes offres</a>
+        </div>
+
+        {{ form_end(form) }}
     </div>
-</div>
-
-<div class="mb-3">
-    {{ form_label(form.description) }}
-    {{ form_widget(form.description, {
-        'attr': {'class': 'form-control ' ~ (form.description.vars.errors|length ? 'is-invalid' : '')}
-    }) }}
-    <div class="invalid-feedback">
-        {{ form_errors(form.description) }}
-    </div>
-</div>
-
-<div class="mb-3">
-    {{ form_label(form.type) }}
-    {{ form_widget(form.type, {
-        'attr': {'class': 'form-select ' ~ (form.type.vars.errors|length ? 'is-invalid' : '')}
-    }) }}
-    <div class="invalid-feedback">
-        {{ form_errors(form.type) }}
-    </div>
-</div>
-
-<div class="mb-3">
-    {{ form_label(form.amount) }}
-    {{ form_widget(form.amount, {
-        'attr': {'class': 'form-control ' ~ (form.amount.vars.errors|length ? 'is-invalid' : '')}
-    }) }}
-    <div class="invalid-feedback">
-        {{ form_errors(form.amount) }}
-    </div>
-</div>
-
-<button class="btn btn-warning">Modifier</button>
-
-{{ form_end(form) }}
-
 </div>
 {% endblock %}
