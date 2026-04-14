@@ -1,0 +1,417 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block page_title %}Training Center{% endblock %}
+
+{% block header_actions %}
+    {% if is_granted('ROLE_HR') %}
+        <a href="{{ path('app_training_new') }}" class="btn btn-primary btn-sm">+ New Course</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+{# ====== Tab Navigation ====== #}
+<div class="card" style="padding:0;margin-bottom:var(--space-lg);overflow:visible">
+    <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;padding:0 var(--space-sm)">
+        {% set tabs = [
+            {key:'dashboard', icon:'📊', label:'Dashboard'},
+            {key:'catalog', icon:'📚', label:'Catalog'},
+            {key:'learning', icon:'🎓', label:'My Learning'},
+            {key:'certificates', icon:'🏆', label:'Certificates'},
+        ] %}
+        {% for t in tabs %}
+            <a href="{{ path('app_training_index', {tab: t.key}) }}"
+               style="padding:.875rem 1.25rem;text-decoration:none;font-size:.85rem;font-weight:500;white-space:nowrap;border-bottom:2px solid {{ tab == t.key ? 'var(--accent)' : 'transparent' }};color:{{ tab == t.key ? 'var(--accent)' : 'var(--text-muted)' }};transition:all .2s"
+            >{{ t.icon }} {{ t.label }}</a>
+        {% endfor %}
+        {% if is_granted('ROLE_HR') %}
+            <a href="{{ path('app_training_index', {tab: 'manage'}) }}"
+               style="padding:.875rem 1.25rem;text-decoration:none;font-size:.85rem;font-weight:500;white-space:nowrap;border-bottom:2px solid {{ tab == 'manage' ? 'var(--accent)' : 'transparent' }};color:{{ tab == 'manage' ? 'var(--accent)' : 'var(--text-muted)' }};transition:all .2s"
+            >⚙️ Manage</a>
+        {% endif %}
+    </div>
+</div>
+
+{# ====== DASHBOARD TAB ====== #}
+{% if tab == 'dashboard' %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-md);margin-bottom:var(--space-lg)">
+    <div class="card" style="padding:var(--space-md);text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--accent-blue)">{{ totalCourses }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Active Courses</div>
+    </div>
+    <div class="card" style="padding:var(--space-md);text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--accent)">{{ myEnrollmentCount }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">My Enrollments</div>
+    </div>
+    <div class="card" style="padding:var(--space-md);text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:#10b981">{{ completedCount }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Completed</div>
+    </div>
+    <div class="card" style="padding:var(--space-md);text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:#f59e0b">{{ certCount }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Certificates</div>
+    </div>
+    <div class="card" style="padding:var(--space-md);text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:#8b5cf6">{{ avgProgress }}%</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Avg Progress</div>
+    </div>
+</div>
+
+{# Recent Enrollments #}
+<div class="card" style="padding:var(--space-lg)">
+    <h3 style="margin-bottom:var(--space-md);font-size:1rem;color:var(--text-primary)">📋 Recent Enrollments</h3>
+    {% if recentEnrollments|length > 0 %}
+        <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
+        {% for e in recentEnrollments %}
+            <div style="display:flex;align-items:center;gap:var(--space-md);padding:.75rem;border-radius:var(--radius-md);background:var(--bg-tertiary)">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:.85rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                        <a href="{{ path('app_training_show', {id: e.course.id}) }}" style="color:var(--accent-blue);text-decoration:none">{{ e.course.title }}</a>
+                    </div>
+                    <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Enrolled {{ e.enrolledAt ? e.enrolledAt|date('M j, Y') : '—' }}</div>
+                </div>
+                <div style="width:120px">
+                    <div style="height:6px;background:var(--glass-border);border-radius:3px;overflow:hidden">
+                        <div style="height:100%;width:{{ e.progress ?? 0 }}%;background:{{ e.status == 'COMPLETED' ? '#10b981' : 'var(--accent)' }};border-radius:3px"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px;text-align:center">{{ e.progress ?? 0 }}%</div>
+                </div>
+                {% set esc = {'ENROLLED':'blue','IN_PROGRESS':'orange','COMPLETED':'green','DROPPED':'red'} %}
+                <span class="badge badge--{{ esc[e.status] ?? 'blue' }}" style="font-size:.7rem">{{ e.status }}</span>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align:center;padding:2rem;color:var(--text-muted)">
+            <div style="font-size:2rem;margin-bottom:.5rem">📚</div>
+            <p>No enrollments yet. <a href="{{ path('app_training_index', {tab:'catalog'}) }}" style="color:var(--accent)">Browse the catalog</a> to get started!</p>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ====== CATALOG TAB ====== #}
+{% if tab == 'catalog' %}
+{# Search + Filters #}
+<div class="card" style="padding:var(--space-md) var(--space-lg);margin-bottom:var(--space-lg)">
+    <form method="get" action="{{ path('app_training_index') }}" style="display:flex;align-items:center;gap:var(--space-md);flex-wrap:wrap">
+        <input type="hidden" name="tab" value="catalog">
+        <div style="position:relative;flex:1;min-width:200px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" name="q" value="{{ app.request.query.get('q') }}" placeholder="Search courses..." class="form-control" style="padding-left:2.25rem">
+        </div>
+        <select name="category" class="form-control" style="width:auto;min-width:140px">
+            <option value="">All Categories</option>
+            {% for cat in ['TECHNICAL','SOFT_SKILLS','COMPLIANCE','ONBOARDING','LEADERSHIP'] %}
+                <option value="{{ cat }}" {{ app.request.query.get('category') == cat ? 'selected' : '' }}>{{ cat|replace({'_': ' '})|title }}</option>
+            {% endfor %}
+        </select>
+        <select name="difficulty" class="form-control" style="width:auto;min-width:130px">
+            <option value="">All Levels</option>
+            {% for d in ['BEGINNER','INTERMEDIATE','ADVANCED'] %}
+                <option value="{{ d }}" {{ app.request.query.get('difficulty') == d ? 'selected' : '' }}>{{ d|title }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+    </form>
+</div>
+
+{# Course Cards Grid #}
+{% if courses|length > 0 %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-md);margin-bottom:var(--space-lg)">
+    {% for c in courses %}
+    {% set categoryColors = {'TECHNICAL':'#6366f1','SOFT_SKILLS':'#ec4899','COMPLIANCE':'#f59e0b','ONBOARDING':'#8b5cf6','LEADERSHIP':'#ef4444'} %}
+    {% set enrollment = enrollmentMap[c.id] is defined ? enrollmentMap[c.id] : null %}
+    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+        {# Category color banner #}
+        <div style="height:4px;background:{{ categoryColors[c.category] ?? '#6366f1' }}"></div>
+        <div style="padding:var(--space-md);flex:1;display:flex;flex-direction:column">
+            {# Badges #}
+            <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:var(--space-sm)">
+                {% set cc = {'TECHNICAL':'blue','SOFT_SKILLS':'green','COMPLIANCE':'orange','ONBOARDING':'purple','LEADERSHIP':'red'} %}
+                <span class="badge badge--{{ cc[c.category] ?? 'blue' }}" style="font-size:.7rem">{{ c.category|replace({'_': ' '}) }}</span>
+                {% set dc = {'BEGINNER':'green','INTERMEDIATE':'orange','ADVANCED':'red'} %}
+                <span class="badge badge--{{ dc[c.difficulty] ?? 'blue' }}" style="font-size:.7rem">{{ c.difficulty }}</span>
+                {% if enrollment %}
+                    <span class="badge badge--green" style="font-size:.7rem">✅ ENROLLED</span>
+                {% endif %}
+            </div>
+            {# Title + Description #}
+            <h4 style="margin:0 0 .375rem;font-size:.95rem;color:var(--text-primary)">
+                <a href="{{ path('app_training_show', {id: c.id}) }}" style="color:inherit;text-decoration:none">{{ c.title }}</a>
+            </h4>
+            <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 var(--space-sm);flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ c.description|default('No description available.')|slice(0,100) }}</p>
+            {# Meta #}
+            <div style="display:flex;gap:var(--space-md);font-size:.75rem;color:var(--text-muted);margin-bottom:var(--space-sm)">
+                {% if c.durationHours %}<span>⏱ {{ c.durationHours }}h</span>{% endif %}
+                {% if c.instructorName %}<span>👤 {{ c.instructorName }}</span>{% endif %}
+                {% if c.quizTimerSeconds %}<span>⏰ {{ c.quizTimerSeconds }}s/Q</span>{% endif %}
+            </div>
+            {% if c.startDate or c.endDate %}
+            <div style="font-size:.7rem;color:var(--text-muted);margin-bottom:var(--space-sm)">
+                📅 {{ c.startDate ? c.startDate|date('M j') : '?' }} → {{ c.endDate ? c.endDate|date('M j, Y') : 'Ongoing' }}
+            </div>
+            {% endif %}
+            {# Action row #}
+            <div style="display:flex;gap:.5rem;margin-top:auto;padding-top:var(--space-sm);border-top:1px solid var(--glass-border)">
+                {% if enrollment %}
+                    {% if enrollment.status != 'COMPLETED' %}
+                        <a href="{{ path('app_training_show', {id: c.id}) }}" class="btn btn-primary btn-sm" style="flex:1;text-align:center;font-size:.8rem">Continue Learning</a>
+                    {% else %}
+                        <a href="{{ path('app_training_show', {id: c.id}) }}" class="btn btn-outline btn-sm" style="flex:1;text-align:center;font-size:.8rem">✅ Completed</a>
+                    {% endif %}
+                {% else %}
+                    <form method="post" action="{{ path('app_training_enroll', {id: c.id}) }}" style="flex:1">
+                        <input type="hidden" name="_token" value="{{ csrf_token('enroll' ~ c.id) }}">
+                        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;font-size:.8rem">Enroll Now</button>
+                    </form>
+                {% endif %}
+                <a href="{{ path('app_training_show', {id: c.id}) }}" class="btn btn-ghost btn-sm" title="View details">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:3rem">
+    <div style="font-size:2rem;margin-bottom:.5rem">📚</div>
+    <p class="text-muted">No courses found.</p>
+</div>
+{% endif %}
+
+{% if pagination is defined %}{% include 'components/_pagination.html.twig' %}{% endif %}
+{% endif %}
+
+{# ====== MY LEARNING TAB ====== #}
+{% if tab == 'learning' %}
+{% if learningList|length > 0 %}
+<div style="display:flex;flex-direction:column;gap:var(--space-md)">
+    {% for e in learningList %}
+    {% set accentColor = e.status == 'COMPLETED' ? '#10b981' : (e.status == 'IN_PROGRESS' ? '#f59e0b' : '#6366f1') %}
+    <div class="card" style="padding:0;overflow:hidden;display:flex">
+        {# Left accent bar #}
+        <div style="width:4px;background:{{ accentColor }};flex-shrink:0"></div>
+        <div style="flex:1;padding:var(--space-md) var(--space-lg);display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+                <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:.375rem">
+                    <h4 style="margin:0;font-size:.95rem;color:var(--text-primary)">
+                        <a href="{{ path('app_training_show', {id: e.course.id}) }}" style="color:inherit;text-decoration:none">{{ e.course.title }}</a>
+                    </h4>
+                    {% if e.status == 'COMPLETED' %}<span style="font-size:.85rem">✅</span>{% endif %}
+                </div>
+                <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.375rem">
+                    {% set cc = {'TECHNICAL':'blue','SOFT_SKILLS':'green','COMPLIANCE':'orange','ONBOARDING':'purple','LEADERSHIP':'red'} %}
+                    <span class="badge badge--{{ cc[e.course.category] ?? 'blue' }}" style="font-size:.65rem">{{ e.course.category|replace({'_': ' '}) }}</span>
+                    {% set dc = {'BEGINNER':'green','INTERMEDIATE':'orange','ADVANCED':'red'} %}
+                    <span class="badge badge--{{ dc[e.course.difficulty] ?? 'blue' }}" style="font-size:.65rem">{{ e.course.difficulty }}</span>
+                    {% if e.course.durationHours %}<span style="font-size:.7rem;color:var(--text-muted)">⏱ {{ e.course.durationHours }}h</span>{% endif %}
+                </div>
+                {% set esc = {'ENROLLED':'blue','IN_PROGRESS':'orange','COMPLETED':'green'} %}
+                <span class="badge badge--{{ esc[e.status] ?? 'blue' }}" style="font-size:.7rem">{{ e.status }}</span>
+            </div>
+            {# Progress + Score #}
+            <div style="width:160px;text-align:center">
+                <div style="height:8px;background:var(--glass-border);border-radius:4px;overflow:hidden;margin-bottom:4px">
+                    <div style="height:100%;width:{{ e.progress ?? 0 }}%;background:{{ accentColor }};border-radius:4px"></div>
+                </div>
+                <span style="font-size:.75rem;color:var(--text-muted)">{{ e.progress ?? 0 }}% progress</span>
+                {% if e.score is not null %}
+                    <div style="font-size:.8rem;color:{{ e.score >= 70 ? '#10b981' : '#ef4444' }};font-weight:600;margin-top:2px">🏆 {{ e.score|number_format(0) }}%</div>
+                {% endif %}
+            </div>
+            {# Actions #}
+            <div style="display:flex;gap:.5rem;flex-shrink:0">
+                {% if e.status != 'COMPLETED' %}
+                    <a href="{{ path('app_training_quiz', {id: e.course.id}) }}" class="btn btn-primary btn-sm" style="font-size:.8rem">Take Quiz</a>
+                    <form method="post" action="{{ path('app_training_drop', {id: e.course.id}) }}" onsubmit="return confirm('Drop this course?')">
+                        <input type="hidden" name="_token" value="{{ csrf_token('drop' ~ e.course.id) }}">
+                        <button type="submit" class="btn btn-ghost btn-sm" style="font-size:.8rem;color:#ef4444" title="Drop course">✕</button>
+                    </form>
+                {% else %}
+                    <a href="{{ path('app_training_show', {id: e.course.id}) }}" class="btn btn-outline btn-sm" style="font-size:.8rem">View Course</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:3rem">
+    <div style="font-size:2rem;margin-bottom:.5rem">🎓</div>
+    <p class="text-muted">You're not enrolled in any courses yet.</p>
+    <a href="{{ path('app_training_index', {tab:'catalog'}) }}" class="btn btn-primary" style="margin-top:1rem">Browse Catalog</a>
+</div>
+{% endif %}
+{% endif %}
+
+{# ====== CERTIFICATES TAB ====== #}
+{% if tab == 'certificates' %}
+{% if certificates|length > 0 %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--space-md)">
+    {% for cert in certificates %}
+    <div class="card" style="padding:var(--space-lg);position:relative;overflow:hidden">
+        {# Gold accent #}
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#fbbf24,#f59e0b)"></div>
+        <div style="display:flex;align-items:flex-start;gap:var(--space-md)">
+            <span style="font-size:2rem">🏆</span>
+            <div style="flex:1;min-width:0">
+                <h4 style="margin:0 0 .375rem;font-size:.95rem;color:var(--text-primary)">{{ cert.course.title }}</h4>
+                <div style="font-size:.8rem;color:var(--text-muted)">Awarded to <strong>{{ cert.user.firstName }} {{ cert.user.lastName }}</strong></div>
+                <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">
+                    <span>📋 {{ cert.certificateNumber }}</span>
+                </div>
+                <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">
+                    📅 Issued {{ cert.issuedAt ? cert.issuedAt|date('M j, Y') : '—' }}
+                </div>
+                {# Signature status #}
+                <div style="margin-top:.5rem">
+                    {% if cert.signatureData %}
+                        <span class="badge badge--green" style="font-size:.7rem">✅ Signed{{ cert.signedAt ? ' on ' ~ cert.signedAt|date('M j, Y') : '' }}</span>
+                    {% else %}
+                        <span class="badge badge--orange" style="font-size:.7rem">⏳ Pending Signature</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {# Actions #}
+        <div style="display:flex;gap:.5rem;margin-top:var(--space-md);padding-top:var(--space-sm);border-top:1px solid var(--glass-border)">
+            <a href="{{ path('app_training_show', {id: cert.course.id}) }}" class="btn btn-outline btn-sm" style="font-size:.8rem;flex:1;text-align:center">View</a>
+            {% if is_granted('ROLE_HR') and not cert.signatureData %}
+                <button type="button" class="btn btn-primary btn-sm sign-cert-btn" style="font-size:.8rem;flex:1" data-cert-id="{{ cert.id }}" data-course-id="{{ cert.course.id }}">✍️ Sign</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:3rem">
+    <div style="font-size:2rem;margin-bottom:.5rem">🏆</div>
+    <p class="text-muted">No certificates earned yet. Complete courses with a score of 70% or higher!</p>
+    <a href="{{ path('app_training_index', {tab:'catalog'}) }}" class="btn btn-primary" style="margin-top:1rem">Browse Courses</a>
+</div>
+{% endif %}
+
+{# Signature Modal for HR/Admin #}
+{% if is_granted('ROLE_HR') %}
+<div id="signModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+    <div class="card" style="width:520px;max-width:95vw;padding:var(--space-lg)">
+        <h3 style="margin:0 0 var(--space-md);color:var(--text-primary)">✍️ Sign Certificate</h3>
+        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:var(--space-md)">Draw your signature below</p>
+        <canvas id="signCanvas" width="460" height="140" style="border:2px dashed var(--glass-border);border-radius:var(--radius-md);cursor:crosshair;background:rgba(255,255,255,.05);display:block;width:100%"></canvas>
+        <div style="display:flex;gap:.5rem;margin-top:var(--space-md);justify-content:flex-end">
+            <button type="button" class="btn btn-ghost btn-sm" id="signClear">Clear</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="signCancel">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" id="signConfirm">Confirm & Sign</button>
+        </div>
+        <form id="signForm" method="post" style="display:none">
+            <input type="hidden" name="_token" id="signToken">
+            <input type="hidden" name="signature_data" id="signData">
+        </form>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    var modal = document.getElementById('signModal');
+    var canvas = document.getElementById('signCanvas');
+    var ctx = canvas.getContext('2d');
+    var drawing = false;
+    var currentCertId = null;
+
+    document.querySelectorAll('.sign-cert-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            currentCertId = this.dataset.certId;
+            document.getElementById('signForm').action = '/training/certificate/' + currentCertId + '/sign';
+            // Generate proper CSRF token via a hidden field
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            modal.style.display = 'flex';
+        });
+    });
+
+    canvas.addEventListener('mousedown', function(e){ drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
+    canvas.addEventListener('mousemove', function(e){ if(!drawing) return; ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.lineCap = 'round'; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); });
+    canvas.addEventListener('mouseup', function(){ drawing = false; });
+    canvas.addEventListener('mouseleave', function(){ drawing = false; });
+
+    document.getElementById('signClear').addEventListener('click', function(){ ctx.clearRect(0, 0, canvas.width, canvas.height); });
+    document.getElementById('signCancel').addEventListener('click', function(){ modal.style.display = 'none'; });
+    document.getElementById('signConfirm').addEventListener('click', function(){
+        document.getElementById('signData').value = canvas.toDataURL('image/png');
+        document.getElementById('signToken').value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        document.getElementById('signForm').submit();
+    });
+});
+</script>
+{% endif %}
+{% endif %}
+
+{# ====== MANAGE TAB (HR/Admin only) ====== #}
+{% if tab == 'manage' %}
+{% if is_granted('ROLE_HR') %}
+<div class="card">
+    {% if manageCourses|length > 0 %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Difficulty</th>
+                    <th>Duration</th>
+                    <th>Instructor</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in manageCourses %}
+                <tr>
+                    <td class="text-muted">{{ c.id }}</td>
+                    <td><a href="{{ path('app_training_show', {id: c.id}) }}" style="color:var(--accent-blue);font-weight:600">{{ c.title }}</a></td>
+                    <td>
+                        {% set cc = {'TECHNICAL':'blue','SOFT_SKILLS':'green','COMPLIANCE':'orange','ONBOARDING':'purple','LEADERSHIP':'red'} %}
+                        <span class="badge badge--{{ cc[c.category] ?? 'blue' }}">{{ c.category|replace({'_': ' '}) }}</span>
+                    </td>
+                    <td>
+                        {% set sc = {'DRAFT':'blue','ACTIVE':'green','COMPLETED':'orange','CANCELLED':'red'} %}
+                        <span class="badge badge--{{ sc[c.status] ?? 'blue' }}">{{ c.status ?? 'N/A' }}</span>
+                    </td>
+                    <td>
+                        {% set dc = {'BEGINNER':'green','INTERMEDIATE':'orange','ADVANCED':'red'} %}
+                        <span class="badge badge--{{ dc[c.difficulty] ?? 'blue' }}">{{ c.difficulty }}</span>
+                    </td>
+                    <td>{{ c.durationHours ? c.durationHours ~ 'h' : '—' }}</td>
+                    <td>{{ c.instructorName ?? '—' }}</td>
+                    <td>
+                        <div style="display:flex;gap:.375rem">
+                            <a href="{{ path('app_training_edit', {id: c.id}) }}" class="btn btn-ghost btn-sm" title="Edit">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </a>
+                            <form method="post" action="{{ path('app_training_delete', {id: c.id}) }}" onsubmit="return confirm('Delete this course?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ c.id) }}">
+                                <button type="submit" class="btn btn-ghost btn-sm" style="color:#ef4444" title="Delete">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:3rem">
+        <p class="text-muted">No courses created yet.</p>
+        <a href="{{ path('app_training_new') }}" class="btn btn-primary" style="margin-top:1rem">+ Create Course</a>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:3rem">
+    <p class="text-muted">This section is restricted to HR and Admin users.</p>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
