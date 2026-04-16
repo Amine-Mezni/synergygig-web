@@ -1,0 +1,1 @@
+ALTER TABLE user_follows MODIFY COLUMN status ENUM('ACTIVE','BLOCKED','following','friend_pending','friend_accepted') DEFAULT 'ACTIVE';
