@@ -30,10 +30,13 @@
         {% endif %}
     </div>
 
-    {% if certificateGenerated %}
+    {% if passed and issuedCertificate %}
     <div style="margin-top:1.5rem;padding:1rem;background:rgba(16,185,129,0.1);border-radius:var(--radius-md);border:1px solid rgba(16,185,129,0.3)">
-        <div style="font-size:1.1rem;font-weight:600;color:var(--color-success)">🎓 Certificate Generated!</div>
-        <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem">Your certificate is available on the course page. You can sign it there.</div>
+        <div style="font-size:1.1rem;font-weight:600;color:var(--color-success)">🎓 Certificate Ready!</div>
+        <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem">{% if certificateGenerated %}A new certificate was generated and auto-signed.{% else %}Your certificate is ready and auto-signed.{% endif %}</div>
+        <div style="margin-top:0.9rem">
+            <a href="{{ path('app_training_certificate_pdf', {id: issuedCertificate.id}) }}" class="btn btn-primary btn-sm" target="_blank">📄 Download Certificate</a>
+        </div>
     </div>
     {% endif %}
 </div>
@@ -58,21 +61,46 @@
 
 {# ── Answer review ── #}
 <div class="card" style="margin-bottom:2rem">
-    <div class="card__header"><h4>📋 Answer Review</h4></div>
-    <div class="card__body">
+    <div class="card__header"><h4>📋 Question-by-Question Review</h4></div>
+    <div class="card__body" style="padding:0">
         {% for r in results %}
-        <div style="padding:1rem;margin-bottom:0.75rem;border-radius:var(--radius-md);
-            {% if r.isCorrect %}background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25)
-            {% else %}background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.25){% endif %}">
-            <div style="font-weight:600;color:var(--text-primary);margin-bottom:0.5rem">
-                {{ r.isCorrect ? '✅' : '❌' }} Q{{ r.index + 1 }}
+        <div style="padding:1.1rem 1.25rem;border-bottom:1px solid var(--glass-border);
+            {% if r.isCorrect %}background:rgba(16,185,129,0.05){% else %}background:rgba(220,38,38,0.04){% endif %}">
+
+            {# Question header #}
+            <div style="display:flex;align-items:flex-start;gap:0.6rem;margin-bottom:0.65rem">
+                <span style="flex-shrink:0;font-size:1rem">{{ r.isCorrect ? '✅' : '❌' }}</span>
+                <strong style="color:var(--text-primary);font-size:0.92rem">Q{{ r.index + 1 }}. {{ r.question }}</strong>
             </div>
-            <div style="font-size:0.85rem;color:var(--text-secondary)">
+
+            {# Options list #}
+            {% if r.options|length > 0 %}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem 1rem;padding-left:1.6rem">
+                {% for i, opt in r.options %}
+                <div style="font-size:0.82rem;padding:0.3rem 0.6rem;border-radius:4px;
+                    {% if i == r.correct and i == r.submitted %}
+                        background:rgba(16,185,129,0.18);color:#065f46;font-weight:700;border:1px solid rgba(16,185,129,0.5)
+                    {% elseif i == r.correct %}
+                        background:rgba(16,185,129,0.12);color:#065f46;font-weight:600;border:1px solid rgba(16,185,129,0.35)
+                    {% elseif i == r.submitted %}
+                        background:rgba(220,38,38,0.12);color:#991b1b;font-weight:600;border:1px solid rgba(220,38,38,0.35)
+                    {% else %}
+                        color:var(--text-muted)
+                    {% endif %}
+                ">
+                    {% if i == r.correct and i == r.submitted %}✅ {% elseif i == r.correct %}✔ {% elseif i == r.submitted %}✗ {% endif %}
+                    {{ opt }}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="font-size:0.82rem;color:var(--text-muted);padding-left:1.6rem">
                 Your answer: option {{ r.submitted >= 0 ? (r.submitted + 1) : '⏰ Not answered' }}
                 {% if not r.isCorrect %}
-                    <span style="color:var(--color-success);margin-left:1rem">Correct: option {{ r.correct + 1 }}</span>
+                    &nbsp;·&nbsp;<span style="color:var(--color-success)">Correct: option {{ r.correct + 1 }}</span>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

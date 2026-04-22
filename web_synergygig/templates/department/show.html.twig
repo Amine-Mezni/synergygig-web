@@ -79,4 +79,140 @@
             </table>
         </div>
     </div>
+
+    {# ── Members List ── #}
+    <div class="card" style="margin-top:1.5rem">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+            <h3 style="margin:0;font-size:1rem">
+                Members
+                <span class="badge badge--blue" style="margin-left:.5rem">{{ members|length }}</span>
+            </h3>
+            {% if is_granted('ROLE_HR') and available_employees|length > 0 %}
+            <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('addMemberModal').style.display='flex'">+ Add Employee</button>
+            {% endif %}
+        </div>
+        {% if members|length > 0 %}
+        <div class="table-wrapper">
+            <table class="table">
+                <thead><tr><th>Employee</th><th>Email</th><th>Role</th>{% if is_granted('ROLE_HR') %}<th style="width:180px">Actions</th>{% endif %}</tr></thead>
+                <tbody>
+                {% for member in members %}
+                <tr>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:.5rem">
+                            <div class="avatar avatar--sm">{{ member.first_name|first|upper }}{{ member.last_name|first|upper }}</div>
+                            {{ member.first_name }} {{ member.last_name }}
+                        </div>
+                    </td>
+                    <td class="text-muted">{{ member.email }}</td>
+                    <td><span class="badge badge--blue">{{ member.role ?? 'EMPLOYEE' }}</span></td>
+                    {% if is_granted('ROLE_HR') %}
+                    <td>
+                        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+                            {# Move to another dept #}
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                onclick="openMoveModal({{ member.id }}, '{{ (member.first_name ~ ' ' ~ member.last_name)|e('html_attr') }}')"
+                                title="Move to another department">⇄ Move</button>
+                            {# Remove from dept #}
+                            <form method="post" action="{{ path('app_department_remove_employee', {id: department.id, userId: member.id}) }}" onsubmit="return confirm('Remove {{ (member.first_name ~ ' ' ~ member.last_name)|e('html_attr') }} from this department?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('remove-' ~ department.id ~ '-' ~ member.id) }}">
+                                <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff">✕ Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:2rem;text-align:center">
+            <p class="text-muted">No employees assigned to this department yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Add Employee Modal ── #}
+    {% if is_granted('ROLE_HR') %}
+    <div id="addMemberModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+        <div style="background:var(--bg-card,#1a1a1d);border-radius:1rem;padding:2rem;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+            <h3 style="margin:0 0 1.25rem;color:var(--text-primary)">Add Employee to {{ department.name }}</h3>
+            <form method="post" action="{{ path('app_department_assign_employee', {id: department.id, userId: 0})|replace({'/0': ''}) }}" id="addMemberForm">
+                <input type="hidden" name="_token" value="{{ csrf_token('assign-' ~ department.id) }}">
+                <div class="form-group" style="margin-bottom:1.25rem">
+                    <label class="form-label">Select Employee</label>
+                    <select name="user_id" id="addMemberSelect" class="form-control form-select" required>
+                        <option value="">-- Choose employee --</option>
+                        {% for emp in available_employees %}
+                        <option value="{{ emp.id }}">{{ emp.first_name }} {{ emp.last_name }} ({{ emp.email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display:flex;gap:.75rem;justify-content:flex-end">
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('addMemberModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="addMemberSubmitBtn" disabled>Add to Department</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Move Employee Modal ── #}
+    <div id="moveMemberModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+        <div style="background:var(--bg-card,#1a1a1d);border-radius:1rem;padding:2rem;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+            <h3 style="margin:0 0 .5rem;color:var(--text-primary)">Move Employee</h3>
+            <p id="moveMemberName" class="text-muted" style="margin:0 0 1.25rem;font-size:.875rem"></p>
+            <form id="moveMemberForm" method="post" action="">
+                <input type="hidden" name="_token" id="moveMemberToken" value="">
+                <div class="form-group" style="margin-bottom:1.25rem">
+                    <label class="form-label">Destination Department</label>
+                    <select name="target_department_id" class="form-control form-select" required>
+                        <option value="">-- Select department --</option>
+                        {% for dept in all_departments %}
+                        {% if dept.id != department.id %}
+                        <option value="{{ dept.id }}">{{ dept.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display:flex;gap:.75rem;justify-content:flex-end">
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('moveMemberModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Move</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('addMemberSelect').addEventListener('change', function() {
+        document.getElementById('addMemberSubmitBtn').disabled = !this.value;
+        if (this.value) {
+            document.getElementById('addMemberForm').action = '/departments/{{ department.id }}/assign/' + this.value;
+        }
+    });
+
+    function openMoveModal(userId, userName) {
+        document.getElementById('moveMemberName').textContent = 'Moving: ' + userName;
+        document.getElementById('moveMemberForm').action = '/departments/{{ department.id }}/move/' + userId;
+        document.getElementById('moveMemberToken').value = ''; {# CSRF injected per user below #}
+        document.getElementById('moveMemberModal').style.display = 'flex';
+    }
+    // CSRF tokens for move
+    const moveTokens = {
+        {% for member in members %}
+        {{ member.id }}: '{{ csrf_token('move-' ~ member.id) }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    };
+    function openMoveModal(userId, userName) {
+        document.getElementById('moveMemberName').textContent = 'Moving: ' + userName;
+        document.getElementById('moveMemberForm').action = '/departments/{{ department.id }}/move/' + userId;
+        document.getElementById('moveMemberToken').value = moveTokens[userId] || '';
+        document.getElementById('moveMemberModal').style.display = 'flex';
+    }
+    // Close modals on overlay click
+    document.querySelectorAll('#addMemberModal,#moveMemberModal').forEach(function(el) {
+        el.addEventListener('click', function(e) { if (e.target === el) el.style.display = 'none'; });
+    });
+    </script>
+    {% endif %}
 {% endblock %}

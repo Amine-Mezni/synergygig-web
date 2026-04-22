@@ -3,21 +3,11 @@
 {% block page_title %}Offer: {{ offer.title }}{% endblock %}
 
 {% block header_actions %}
-    {% if is_granted('ROLE_ADMIN') or (offer.owner and offer.owner.id == app.user.id) %}
-    <a href="{{ path('app_offer_edit', {id: offer.id}) }}" class="btn btn-primary btn-sm">Edit</a>
-    {% if offer.status == 'DRAFT' %}
-    <a href="{{ path('app_offer_publish', {id: offer.id}) }}" class="btn btn-sm" style="background:var(--color-success);color:#fff">Publish</a>
-    {% elseif offer.status == 'OPEN' %}
-    <a href="{{ path('app_offer_close', {id: offer.id}) }}" class="btn btn-sm" style="background:var(--color-danger);color:#fff">Close</a>
-    {% endif %}
-    {% endif %}
-    <a href="{{ path('app_offer_index') }}" class="btn btn-ghost btn-sm">Back</a>
+    <a href="{{ path('app_offer_index') }}" class="btn btn-ghost btn-sm">Back to Marketplace</a>
 {% endblock %}
 
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start">
-{# ─── Left Column: Main Content ─── #}
-<div>
+<div style="max-width:900px">
     {# Stat cards #}
     <div class="bento-grid" style="grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
         <div class="card" style="padding:1.25rem;text-align:center">
@@ -27,15 +17,15 @@
         </div>
         <div class="card" style="padding:1.25rem;text-align:center">
             <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Type</div>
-            <span class="badge badge--blue">{{ offer.offerType ?? '—' }}</span>
+            <span class="badge badge--blue">{{ offer.offerType ? offer.offerType|replace({'_': ' '}) : '—' }}</span>
         </div>
         <div class="card" style="padding:1.25rem;text-align:center">
             <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Department</div>
             <div style="font-weight:600;color:var(--text-primary)">{{ offer.department ? offer.department.name : '—' }}</div>
         </div>
         <div class="card" style="padding:1.25rem;text-align:center">
-            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Salary</div>
-            <div style="font-weight:600;color:var(--accent-blue)">{% if offer.amount %}{{ offer.amount|number_format(2) }} {{ offer.currency }}{% else %}—{% endif %}</div>
+            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Budget</div>
+            <div style="font-weight:600;color:var(--accent-blue)">{% if offer.amount %}{{ offer.amount|number_format(2) }} {{ offer.currency ?? 'TND' }}{% else %}—{% endif %}</div>
         </div>
     </div>
 
@@ -62,8 +52,8 @@
         </div>
     </div>
 
-    {# Apply / Already Applied #}
-    {% if offer.status == 'OPEN' and (not offer.owner or offer.owner.id != app.user.id) %}
+    {# Apply / Already Applied (for Gig Workers) #}
+    {% if offer.status == 'OPEN' and app.user and (not offer.owner or offer.owner.id != app.user.id) %}
     <div class="card" style="margin-bottom:1.5rem;padding:1.5rem">
         {% if alreadyApplied is defined and alreadyApplied %}
             <div style="display:flex;align-items:center;gap:.75rem">
@@ -79,154 +69,18 @@
                 </div>
             </div>
         {% else %}
-            <a href="{{ path('app_offer_apply', {id: offer.id}) }}" class="btn btn-primary" style="width:100%;text-align:center;font-size:1rem;padding:.75rem">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:.5rem"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                Apply to this Offer
-            </a>
+            <form method="post" action="{{ path('app_offer_apply', {id: offer.id}) }}">
+                <div style="margin-bottom:1rem">
+                    <label style="font-weight:600;color:var(--text-primary);display:block;margin-bottom:.5rem">Cover Letter (optional)</label>
+                    <textarea name="cover_letter" class="form-control" rows="4" placeholder="Why are you a great fit for this role?"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;text-align:center;font-size:1rem;padding:.75rem">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:.5rem"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Apply to this Offer
+                </button>
+            </form>
         {% endif %}
     </div>
     {% endif %}
-
-    {# Delete #}
-    {% if is_granted('ROLE_ADMIN') or (offer.owner and offer.owner.id == app.user.id) %}
-    <div style="margin-top:1rem">
-        <form method="post" action="{{ path('app_offer_delete', {id: offer.id}) }}" onsubmit="return confirm('Delete this offer?')">
-            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ offer.id) }}">
-            <button class="btn btn-danger btn-sm">Delete Offer</button>
-        </form>
-    </div>
-    {% endif %}
-</div>
-
-{# ─── Right Column: AI Panels ─── #}
-<div>
-    {# AI Insight Panel #}
-    {% if aiInsight is defined and aiInsight %}
-    <div class="card" style="margin-bottom:1.5rem;overflow:hidden">
-        <div class="card__header" style="background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(168,85,247,.15));border-bottom:1px solid var(--border-subtle)">
-            <h4 style="display:flex;align-items:center;gap:.5rem">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                AI Insight
-            </h4>
-        </div>
-        <div class="card__body" style="padding:1.25rem">
-            {# Score Circle #}
-            <div style="text-align:center;margin-bottom:1.25rem">
-                <div style="position:relative;width:80px;height:80px;margin:0 auto">
-                    <svg width="80" height="80" viewBox="0 0 80 80">
-                        <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border-subtle)" stroke-width="6"/>
-                        <circle cx="40" cy="40" r="34" fill="none"
-                            stroke="{% if aiInsight.score >= 70 %}var(--color-success){% elseif aiInsight.score >= 50 %}var(--color-warning){% else %}var(--color-danger){% endif %}"
-                            stroke-width="6" stroke-dasharray="{{ (aiInsight.score / 100 * 213.6)|round }} 213.6"
-                            stroke-linecap="round" transform="rotate(-90 40 40)"/>
-                    </svg>
-                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.25rem;color:var(--text-primary)">{{ aiInsight.score }}%</div>
-                </div>
-            </div>
-
-            {# Meta grid #}
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem">
-                <div style="background:var(--bg-elevated);padding:.5rem .75rem;border-radius:8px">
-                    <div class="text-muted" style="font-size:.7rem;text-transform:uppercase">Category</div>
-                    <div style="font-size:.85rem;font-weight:600;color:var(--text-primary)">{{ aiInsight.category }}</div>
-                </div>
-                <div style="background:var(--bg-elevated);padding:.5rem .75rem;border-radius:8px">
-                    <div class="text-muted" style="font-size:.7rem;text-transform:uppercase">Level</div>
-                    <div style="font-size:.85rem;font-weight:600;color:var(--text-primary)">{{ aiInsight.experience_level }}</div>
-                </div>
-                <div style="background:var(--bg-elevated);padding:.5rem .75rem;border-radius:8px">
-                    <div class="text-muted" style="font-size:.7rem;text-transform:uppercase">Urgency</div>
-                    <div style="font-size:.85rem;font-weight:600;color:{% if aiInsight.urgency == 'High' %}var(--color-danger){% elseif aiInsight.urgency == 'Medium' %}var(--color-warning){% else %}var(--color-success){% endif %}">{{ aiInsight.urgency }}</div>
-                </div>
-                <div style="background:var(--bg-elevated);padding:.5rem .75rem;border-radius:8px">
-                    <div class="text-muted" style="font-size:.7rem;text-transform:uppercase">Risk</div>
-                    <div style="font-size:.85rem;font-weight:600;color:{% if aiInsight.risk == 'High' %}var(--color-danger){% elseif aiInsight.risk == 'Moderate' %}var(--color-warning){% else %}var(--color-success){% endif %}">{{ aiInsight.risk }}</div>
-                </div>
-            </div>
-
-            {# Summary #}
-            <p class="text-muted" style="font-size:.85rem;margin-bottom:1rem">{{ aiInsight.summary }}</p>
-
-            {# Strengths #}
-            {% if aiInsight.strengths|length > 0 %}
-            <div style="margin-bottom:.75rem">
-                <div style="font-size:.75rem;font-weight:600;color:var(--color-success);text-transform:uppercase;margin-bottom:.25rem">Strengths</div>
-                {% for s in aiInsight.strengths %}
-                <div style="font-size:.85rem;color:var(--text-secondary);padding:.15rem 0">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--color-success)" style="vertical-align:middle;margin-right:.25rem"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01" fill="none" stroke="var(--color-success)" stroke-width="2"/></svg>
-                    {{ s }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {# Warnings #}
-            {% if aiInsight.warnings|length > 0 %}
-            <div>
-                <div style="font-size:.75rem;font-weight:600;color:var(--color-warning);text-transform:uppercase;margin-bottom:.25rem">Points to clarify</div>
-                {% for w in aiInsight.warnings %}
-                <div style="font-size:.85rem;color:var(--text-secondary);padding:.15rem 0">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--color-warning)" style="vertical-align:middle;margin-right:.25rem"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13" stroke="#fff" stroke-width="2"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="#fff" stroke-width="2"/></svg>
-                    {{ w }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    {# AI Match Panel #}
-    {% if matchData is defined and matchData %}
-    <div class="card" style="overflow:hidden">
-        <div class="card__header" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(59,130,246,.15));border-bottom:1px solid var(--border-subtle)">
-            <h4 style="display:flex;align-items:center;gap:.5rem">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                Skill Match
-            </h4>
-        </div>
-        <div class="card__body" style="padding:1.25rem">
-            {# Score + Label #}
-            <div style="text-align:center;margin-bottom:1rem">
-                <div style="font-size:2rem;font-weight:700;color:{% if matchData.score >= 70 %}var(--color-success){% elseif matchData.score >= 50 %}var(--color-warning){% else %}var(--color-danger){% endif %}">{{ matchData.score }}%</div>
-                <div class="badge badge--{% if matchData.score >= 70 %}green{% elseif matchData.score >= 50 %}orange{% else %}red{% endif %}" style="margin-top:.25rem">{{ matchData.label }}</div>
-            </div>
-
-            {# Progress bar #}
-            <div style="background:var(--border-subtle);border-radius:4px;height:6px;margin-bottom:1.25rem;overflow:hidden">
-                <div style="height:100%;width:{{ matchData.score }}%;border-radius:4px;background:{% if matchData.score >= 70 %}var(--color-success){% elseif matchData.score >= 50 %}var(--color-warning){% else %}var(--color-danger){% endif %};transition:width .6s ease"></div>
-            </div>
-
-            <p class="text-muted" style="font-size:.85rem;margin-bottom:1rem">{{ matchData.summary }}</p>
-
-            {# Matched Skills #}
-            {% if matchData.matched_skills|length > 0 %}
-            <div style="margin-bottom:.75rem">
-                <div style="font-size:.75rem;font-weight:600;color:var(--color-success);text-transform:uppercase;margin-bottom:.25rem">Matched Skills</div>
-                {% for ms in matchData.matched_skills %}
-                <div style="font-size:.85rem;color:var(--text-secondary);padding:.15rem 0">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" style="vertical-align:middle;margin-right:.25rem"><polyline points="20 6 9 17 4 12"/></svg>
-                    {{ ms.name }} <span class="text-muted" style="font-size:.75rem">({{ ms.level }})</span>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {# Missing Skills #}
-            {% if matchData.missing_skills|length > 0 %}
-            <div>
-                <div style="font-size:.75rem;font-weight:600;color:var(--color-danger);text-transform:uppercase;margin-bottom:.25rem">Missing Skills</div>
-                {% for ms in matchData.missing_skills %}
-                <div style="font-size:.85rem;color:var(--text-secondary);padding:.15rem 0">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2" style="vertical-align:middle;margin-right:.25rem"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    {{ ms }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-</div>
 </div>
 {% endblock %}

@@ -21,10 +21,16 @@
         <span id="scoreDisplay" style="color:var(--color-success);font-weight:700">⭐ 0</span>
     </div>
 
-    {# ── Timer ring ── #}
+    {# ── Timer ring (SVG circular arc) ── #}
     <div style="text-align:center;margin-bottom:1.5rem">
-        <div id="timerRing" style="display:inline-flex;align-items:center;justify-content:center;width:70px;height:70px;border-radius:50%;border:4px solid var(--accent-blue);position:relative">
-            <span id="timerText" style="font-size:1.5rem;font-weight:700;color:var(--text-primary)">{{ timer }}</span>
+        <div id="timerRing" style="display:inline-block;position:relative;width:72px;height:72px">
+            <svg width="72" height="72" style="transform:rotate(-90deg)">
+                <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5"/>
+                <circle id="timerArc" cx="36" cy="36" r="30" fill="none" stroke="#4ADE80" stroke-width="5"
+                        stroke-dasharray="188.5" stroke-dashoffset="0" stroke-linecap="round"
+                        style="transition:stroke-dashoffset 0.9s linear,stroke 0.4s"/>
+            </svg>
+            <span id="timerText" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.3rem;font-weight:700;color:#4ADE80;transition:color 0.4s">{{ timer }}</span>
         </div>
     </div>
 
@@ -76,6 +82,18 @@
     var optColors = ['#E14B4B', '#2D70AE', '#D89E00', '#298F47'];
     var optIcons = ['◆', '●', '▲', '■'];
 
+    var ARC_TOTAL = 2 * Math.PI * 30; // circumference for r=30
+
+    function updateArc(fraction) {
+        var arc  = document.getElementById('timerArc');
+        var text = document.getElementById('timerText');
+        var offset = ARC_TOTAL * (1 - Math.max(0, fraction));
+        arc.style.strokeDashoffset = offset;
+        var color = fraction > 0.5 ? '#4ADE80' : (fraction > 0.25 ? '#FBBF24' : '#F87171');
+        arc.style.stroke = color;
+        text.style.color = color;
+    }
+
     function showQuestion(idx) {
         answered = false;
         var q = questions[idx];
@@ -103,14 +121,12 @@
         // Start timer
         timeLeft = timerSec;
         document.getElementById('timerText').textContent = timeLeft;
-        document.getElementById('timerRing').style.borderColor = 'var(--accent-blue)';
+        updateArc(1);
         clearInterval(timerInterval);
         timerInterval = setInterval(function() {
             timeLeft--;
             document.getElementById('timerText').textContent = timeLeft;
-            if (timeLeft <= 3) {
-                document.getElementById('timerRing').style.borderColor = 'var(--color-danger)';
-            }
+            updateArc(timeLeft / timerSec);
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 if (!answered) {
@@ -158,6 +174,7 @@
         answered = true;
         streak = 0;
         document.getElementById('streakDisplay').textContent = '🔥 0';
+        updateArc(0);
 
         // Mark as unanswered (-1)
         document.getElementById('answer_' + questions[qIdx].index).value = -1;

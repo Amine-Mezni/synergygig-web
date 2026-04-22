@@ -6,6 +6,9 @@
     {% if is_granted('ROLE_HR') %}
     <a href="{{ path('app_export_payroll_pdf', {id: payroll.id}) }}" class="btn btn-ghost btn-sm" target="_blank">🖨️ PDF</a>
     <a href="{{ path('app_payroll_edit', {id: payroll.id}) }}" class="btn btn-primary btn-sm">Edit</a>
+    {% elseif payroll.user and payroll.user.id == app.user.id %}
+    <a href="{{ path('app_export_payroll_pdf', {id: payroll.id}) }}" class="btn btn-primary btn-sm" target="_blank">📄 Download Payslip</a>
+    <a href="{{ path('app_payroll_mine') }}" class="btn btn-ghost btn-sm">My Payrolls</a>
     {% endif %}
     <a href="{{ path('app_payroll_index') }}" class="btn btn-ghost btn-sm">Back</a>
 {% endblock %}

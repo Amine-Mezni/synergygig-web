@@ -2,10 +2,6 @@
 
 {% block page_title %}Applications{% endblock %}
 
-{% block header_actions %}
-    <a href="{{ path('app_application_new') }}" class="btn btn-primary btn-sm">+ New Application</a>
-{% endblock %}
-
 {% block content %}
 {# Filter bar #}
 <div class="card" style="padding:var(--space-md) var(--space-lg);margin-bottom:var(--space-lg);display:flex;align-items:center;gap:var(--space-md)">
@@ -64,21 +60,25 @@
                     </td>
                     <td>{{ a.appliedAt ? a.appliedAt|date('M d, Y H:i') : '—' }}</td>
                     <td>
-                        <details class="crud-actions-menu">
-                            <summary class="btn btn-ghost btn-sm" title="Actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></summary>
-                            <div class="crud-actions-dropdown">
-                                <a href="{{ path('app_application_show', {id: a.id}) }}" class="crud-action-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View</a>
-                                {% if is_granted('ROLE_HR') and a.status == 'PENDING' %}
-                                <a href="{{ path('app_application_accept', {id: a.id}) }}" class="crud-action-item" style="color:var(--color-success)" onclick="return confirm('Accept this application?')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Accept</a>
-                                <a href="{{ path('app_application_reject', {id: a.id}) }}" class="crud-action-item" style="color:var(--color-danger)" onclick="return confirm('Reject this application?')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</a>
-                                {% endif %}
-                                <a href="{{ path('app_application_edit', {id: a.id}) }}" class="crud-action-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</a>
-                                <form method="post" action="{{ path('app_application_delete', {id: a.id}) }}" onsubmit="return confirm('Delete this application?')">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ a.id) }}">
-                                    <button type="submit" class="crud-action-item crud-action-danger"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>
-                                </form>
-                            </div>
-                        </details>
+                        <div style="display:flex;align-items:center;gap:.5rem">
+                            <a href="{{ path('app_application_show', {id: a.id}) }}" class="btn btn-ghost btn-sm" title="View">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </a>
+                            {% if a.status == 'PENDING' or a.status == 'REVIEWED' %}
+                            <form method="post" action="{{ path('app_application_accept', {id: a.id}) }}" style="display:inline" onsubmit="event.preventDefault();showConfirm(this,{type:'success',title:'Accept Application',message:'Accept this application? You will be redirected to schedule an interview.',okText:'Accept'});return false">
+                                <input type="hidden" name="_token" value="{{ csrf_token('accept' ~ a.id) }}">
+                                <button type="submit" class="btn btn-sm" style="background:var(--color-success);color:#fff;padding:.25rem .5rem" title="Accept">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </form>
+                            <form method="post" action="{{ path('app_application_reject', {id: a.id}) }}" style="display:inline" onsubmit="event.preventDefault();showConfirm(this,{type:'danger',title:'Reject Application',message:'Are you sure you want to reject this application?',okText:'Reject'});return false">
+                                <input type="hidden" name="_token" value="{{ csrf_token('reject' ~ a.id) }}">
+                                <button type="submit" class="btn btn-sm" style="background:var(--color-danger);color:#fff;padding:.25rem .5rem" title="Reject">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -88,10 +88,7 @@
     {% else %}
     <div style="text-align:center;padding:3rem">
         <p class="text-muted">No applications yet.</p>
-        <a href="{{ path('app_application_new') }}" class="btn btn-primary" style="margin-top:1rem">+ Submit Application</a>
     </div>
     {% endif %}
 </div>
-
-{% if pagination is defined %}{% include 'components/_pagination.html.twig' %}{% endif %}
 {% endblock %}

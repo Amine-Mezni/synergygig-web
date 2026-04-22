@@ -19,6 +19,9 @@
                 <input type="text" name="q" value="{{ app.request.query.get('q') }}" placeholder="Search departments..." class="form-control" style="padding-left:2.25rem">
             </div>
             <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+            {% if app.request.query.get('q') %}
+            <a href="{{ path('app_department_index') }}" class="btn btn-ghost btn-sm" style="color:var(--color-danger)">✕ Clear</a>
+            {% endif %}
         </form>
     </div>
 

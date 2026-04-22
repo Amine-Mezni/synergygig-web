@@ -5,12 +5,62 @@
 {% block header_actions %}
     {% if is_granted('ROLE_HR') %}
     <a href="{{ path('app_export_payroll_csv') }}" class="btn btn-ghost btn-sm" title="Export CSV">📥 CSV</a>
+    <a href="{{ path('app_payroll_department_overview') }}" class="btn btn-ghost btn-sm">🏢 Dept Overview</a>
     <a href="{{ path('app_payroll_generate') }}" class="btn btn-primary btn-sm">⚡ Auto-Generate</a>
     <a href="{{ path('app_payroll_new') }}" class="btn btn-ghost btn-sm">+ Manual Entry</a>
     {% endif %}
 {% endblock %}
 
 {% block content %}
+{# ── All Employees — Current Month Status ── #}
+{% if allEmployees is defined and allEmployees|length > 0 %}
+<div class="card" style="margin-bottom:var(--space-lg)">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+        <h3 style="margin:0;font-size:1rem">All Employees — Payroll Status for {{ currentMonth }}/{{ currentYear }}</h3>
+        <span class="badge badge--blue">{{ allEmployees|length }} employees</span>
+    </div>
+    <div class="table-wrapper">
+        <table class="table">
+            <thead><tr><th>Employee</th><th>Department</th><th>Monthly Salary</th><th>This Month's Payroll</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% set months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'} %}
+            {% for emp in allEmployees %}
+            {% set p = payrollMap[emp.id] ?? null %}
+            <tr>
+                <td>
+                    <div style="display:flex;align-items:center;gap:.5rem">
+                        <div class="avatar avatar--sm">{{ emp.first_name|first|upper }}{{ emp.last_name|first|upper }}</div>
+                        {{ emp.first_name }} {{ emp.last_name }}
+                    </div>
+                </td>
+                <td class="text-muted">{{ emp.department ? emp.department.name : '—' }}</td>
+                <td>{{ emp.monthly_salary ? emp.monthly_salary|number_format(2) : '—' }}</td>
+                <td>
+                    {% if p %}
+                        {% set sc = {'PENDING': 'blue', 'PAID': 'green', 'CANCELLED': 'red'} %}
+                        <a href="{{ path('app_payroll_show', {id: p.id}) }}" class="badge badge--{{ sc[p.status] ?? 'blue' }}" style="text-decoration:none">
+                            {{ p.status }} — {{ p.netSalary|number_format(2) }}
+                        </a>
+                    {% else %}
+                        <span class="text-muted" style="font-size:.8rem">No payroll</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p %}
+                        <a href="{{ path('app_payroll_show', {id: p.id}) }}" class="btn btn-ghost btn-sm">View</a>
+                        <a href="{{ path('app_export_payroll_pdf', {id: p.id}) }}" class="btn btn-ghost btn-sm" target="_blank">📄 PDF</a>
+                    {% else %}
+                        <a href="{{ path('app_payroll_generate') }}?user={{ emp.id }}" class="btn btn-primary btn-sm" style="font-size:.75rem">⚡ Generate</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {# Filter bar #}
 <div class="card" style="padding:var(--space-md) var(--space-lg);margin-bottom:var(--space-lg);display:flex;align-items:center;gap:var(--space-md)">
     <form method="get" action="{{ path('app_payroll_index') }}" style="flex:1;display:flex;align-items:center;gap:var(--space-md)">
@@ -20,6 +70,9 @@
             <option value="PAID" {{ app.request.query.get('status') == 'PAID' ? 'selected' }}>Paid</option>
         </select>
         <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+        {% if app.request.query.get('status') %}
+        <a href="{{ path('app_payroll_index') }}" class="btn btn-ghost btn-sm" style="color:var(--color-danger)">✕ Clear</a>
+        {% endif %}
     </form>
 </div>
 

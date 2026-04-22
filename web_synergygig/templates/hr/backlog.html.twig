@@ -10,26 +10,26 @@
 {% block content %}
 {# ── Stat Cards ── #}
 <div class="bento-grid bento-grid--stats" style="grid-template-columns:repeat(5,1fr);margin-bottom:1.5rem">
-    <div class="card card--glow-blue" style="text-align:center;padding:1.25rem">
+    <a href="{{ path('app_user_index') }}" class="card card--glow-blue" style="text-align:center;padding:1.25rem;text-decoration:none;color:inherit">
         <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Total Employees</div>
         <div style="font-size:1.75rem;font-weight:700;color:var(--accent-blue)">{{ stats.employees }}</div>
-    </div>
-    <div class="card card--glow-orange" style="text-align:center;padding:1.25rem">
+    </a>
+    <a href="{{ path('app_leave_index') }}" class="card card--glow-orange" style="text-align:center;padding:1.25rem;text-decoration:none;color:inherit">
         <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Pending Leaves</div>
         <div style="font-size:1.75rem;font-weight:700;color:var(--warning)">{{ stats.pending_leaves }}</div>
-    </div>
-    <div class="card card--glow-green" style="text-align:center;padding:1.25rem">
+    </a>
+    <a href="{{ path('app_attendance_index') }}" class="card card--glow-green" style="text-align:center;padding:1.25rem;text-decoration:none;color:inherit">
         <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Present Today</div>
         <div style="font-size:1.75rem;font-weight:700;color:var(--success)">{{ stats.present_today }}</div>
-    </div>
-    <div class="card card--glow-purple" style="text-align:center;padding:1.25rem">
+    </a>
+    <a href="{{ path('app_payroll_index') }}" class="card card--glow-purple" style="text-align:center;padding:1.25rem;text-decoration:none;color:inherit">
         <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Pending Payroll</div>
         <div style="font-size:1.75rem;font-weight:700;color:var(--accent-purple, #a855f7)">{{ stats.pending_payroll }}</div>
-    </div>
-    <div class="card" style="text-align:center;padding:1.25rem;border-left:3px solid var(--accent-primary)">
+    </a>
+    <a href="{{ path('app_task_index') }}" class="card" style="text-align:center;padding:1.25rem;border-left:3px solid var(--accent-primary);text-decoration:none;color:inherit">
         <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Open Tasks</div>
         <div style="font-size:1.75rem;font-weight:700;color:var(--text-primary)">{{ stats.open_tasks }}</div>
-    </div>
+    </a>
 </div>
 
 {# ── Charts Row ── #}

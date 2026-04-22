@@ -3,8 +3,24 @@
 {% block page_title %}Contract #{{ contract.id }}{% endblock %}
 
 {% block header_actions %}
+    {% if is_granted('ROLE_HR') and contract.status == 'DRAFT' %}
+    <form method="post" action="{{ path('app_contract_generate_ai_draft', {id: contract.id}) }}" style="display:inline" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Generating…'">
+        <input type="hidden" name="_token" value="{{ csrf_token('ai_draft' ~ contract.id) }}">
+        <button class="btn btn-secondary btn-sm" title="Generate contract text with AI based on offer details">AI Generate Draft</button>
+    </form>
+    {% endif %}
     {% if is_granted('ROLE_PROJECT_OWNER') %}
     <a href="{{ path('app_contract_edit', {id: contract.id}) }}" class="btn btn-primary btn-sm">Edit</a>
+    {% endif %}
+    <a href="{{ path('app_contract_print', {id: contract.id}) }}" target="_blank" class="btn btn-secondary btn-sm" title="Open print-ready PDF view">⬇ PDF</a>
+    {% if contract.blockchainHash %}
+    <a href="{{ path('app_contract_verify', {hash: contract.blockchainHash}) }}" target="_blank" class="btn btn-ghost btn-sm" title="Verify contract on the blockchain registry">🔒 Verify</a>
+    {% endif %}
+    {% if is_granted('ROLE_HR') and contract.applicant and contract.applicant.email %}
+    <form method="post" action="{{ path('app_contract_send_email', {id: contract.id}) }}" style="display:inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('send_email' ~ contract.id) }}">
+        <button type="submit" class="btn btn-ghost btn-sm" title="Send contract PDF email to {{ contract.applicant.email }}">📧 Send Email</button>
+    </form>
     {% endif %}
     <a href="{{ path('app_contract_index') }}" class="btn btn-ghost btn-sm">Back</a>
 {% endblock %}
@@ -49,7 +65,7 @@
             <tr><td class="text-muted">Start Date</td><td>{{ contract.startDate ? contract.startDate|date('M d, Y') : '—' }}</td></tr>
             <tr><td class="text-muted">End Date</td><td>{{ contract.endDate ? contract.endDate|date('M d, Y') : '—' }}</td></tr>
             <tr><td class="text-muted">Signed At</td><td>{{ contract.signedAt ? contract.signedAt|date('M d, Y H:i') : '—' }}</td></tr>
-            <tr><td class="text-muted">Blockchain Hash</td><td style="font-family:monospace;font-size:0.8rem;word-break:break-all">{{ contract.blockchainHash ?? '—' }}</td></tr>
+            <tr><td class="text-muted">Blockchain Hash</td><td style="font-family:monospace;font-size:0.8rem;word-break:break-all">{% if contract.blockchainHash %}<a href="{{ path('app_contract_verify', {hash: contract.blockchainHash}) }}" target="_blank" style="color:var(--accent-blue)">{{ contract.blockchainHash }}</a>{% else %}—{% endif %}</td></tr>
             <tr><td class="text-muted">Created</td><td>{{ contract.createdAt ? contract.createdAt|date('M d, Y H:i') : '—' }}</td></tr>
         </table>
     </div>

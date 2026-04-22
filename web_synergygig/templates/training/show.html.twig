@@ -68,6 +68,11 @@
         <a href="{{ path('app_training_quiz', {id: course.id}) }}" class="btn btn-primary" style="font-size:1rem;padding:0.75rem 2rem">
             📝 Start Quiz
         </a>
+        {% if enrollment %}
+        <a href="{{ path('app_training_quiz_ai', {id: course.id}) }}" class="btn btn-outline" style="font-size:1rem;padding:0.75rem 2rem;margin-left:.75rem" title="AI generates custom questions for this course">
+            🤖 AI Quiz
+        </a>
+        {% endif %}
     </div>
 </div>
 
@@ -131,6 +136,7 @@
     <div class="card__header"><h4>🏆 Certificates</h4></div>
     <div class="card__body">
         {% for cert in certificates %}
+        {% set isSigned = cert.signatureData or cert.signedAt %}
         <div style="padding:1.25rem;background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:1rem;border:1px solid var(--glass-border)">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:1rem">
                 <div>
@@ -150,14 +156,20 @@
             {% endif %}
 
             {# Signature display or sign form #}
-            {% if cert.signatureData %}
+            {% if isSigned %}
                 <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--glass-border)">
                     <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem">Signature</div>
-                    <div style="background:#fff;display:inline-block;padding:0.5rem;border-radius:var(--radius-sm)">
-                        <img src="{{ cert.signatureData }}" alt="Signature" style="max-width:300px;max-height:100px">
-                    </div>
+                    {% if cert.signatureData %}
+                        <div style="background:#fff;display:inline-block;padding:0.5rem;border-radius:var(--radius-sm)">
+                            <img src="{{ cert.signatureData }}" alt="Signature" style="max-width:300px;max-height:100px">
+                        </div>
+                    {% else %}
+                        <div style="display:inline-block;padding:0.65rem 0.9rem;background:#fff;border-radius:var(--radius-sm);border:1px solid var(--glass-border)">
+                            <span style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:1.35rem;color:var(--text-primary)">{{ cert.user ? cert.user.firstName ~ ' ' ~ cert.user.lastName : 'Authorized Signatory' }}</span>
+                        </div>
+                    {% endif %}
                     <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem">
-                        Signed {{ cert.signedAt ? cert.signedAt|date('M d, Y \\a\\t H:i') : '' }}
+                        {{ cert.signatureData ? 'Signed' : 'Auto-signed' }} {{ cert.signedAt ? cert.signedAt|date('M d, Y \\a\\t H:i') : '' }}
                     </div>
                 </div>
             {% else %}
@@ -178,6 +190,10 @@
                     </form>
                 </div>
             {% endif %}
+
+            <div style="display:flex;gap:0.5rem;margin-top:1rem">
+                <a href="{{ path('app_training_certificate_pdf', {id: cert.id}) }}" class="btn btn-ghost btn-sm" target="_blank">📄 Download PDF</a>
+            </div>
         </div>
         {% endfor %}
     </div>

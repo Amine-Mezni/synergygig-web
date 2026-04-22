@@ -10,7 +10,7 @@
     {# ── Top 4 Stat Cards (ADMIN/HR only) ── #}
     {% if is_granted('ROLE_HR') %}
     <div class="bento-grid bento-grid--stats" style="margin-bottom:var(--space-xl)">
-        <div class="card card--glow-blue">
+        <a href="{{ path('app_user_index') }}" class="card card--glow-blue" style="text-decoration:none;color:inherit">
             <div class="card-header">
                 <span class="card-title">Total Users</span>
                 <div class="card-icon card-icon--blue">
@@ -19,9 +19,9 @@
             </div>
             <div class="card-value">{{ stats.users }}</div>
             <div class="card-footer"><span class="text-muted" style="font-size:.8125rem">All registered accounts</span></div>
-        </div>
+        </a>
 
-        <div class="card card--glow-purple">
+        <a href="{{ path('app_user_index') }}" class="card card--glow-purple" style="text-decoration:none;color:inherit">
             <div class="card-header">
                 <span class="card-title">Employees</span>
                 <div class="card-icon card-icon--purple">
@@ -30,9 +30,9 @@
             </div>
             <div class="card-value">{{ stats.employees }}</div>
             <div class="card-footer"><span class="text-muted" style="font-size:.8125rem">Employees &amp; project managers</span></div>
-        </div>
+        </a>
 
-        <div class="card card--glow-green">
+        <a href="{{ path('app_user_index') }}" class="card card--glow-green" style="text-decoration:none;color:inherit">
             <div class="card-header">
                 <span class="card-title">Gig Workers</span>
                 <div class="card-icon card-icon--green">
@@ -41,9 +41,9 @@
             </div>
             <div class="card-value">{{ stats.gig_workers }}</div>
             <div class="card-footer"><span class="text-muted" style="font-size:.8125rem">Freelance contributors</span></div>
-        </div>
+        </a>
 
-        <div class="card card--glow-orange">
+        <a href="{{ path('app_interview_index') }}" class="card card--glow-orange" style="text-decoration:none;color:inherit">
             <div class="card-header">
                 <span class="card-title">Interviews</span>
                 <div class="card-icon card-icon--orange">
@@ -53,9 +53,9 @@
             <div class="card-value">{{ stats.interviews }}</div>
             <div class="card-footer">
                 <span class="text-muted" style="font-size:.8125rem">{{ stats.interviews }} pending</span>
-                <br><a href="{{ path('app_interview_index') }}" style="font-size:.75rem;color:var(--accent-primary)">Click to view calendar →</a>
+                <br><span style="font-size:.75rem;color:var(--accent-primary)">Click to view calendar →</span>
             </div>
-        </div>
+        </a>
     </div>
     {% endif %}
 
@@ -176,7 +176,7 @@
     </div>
 
     {# ── Charts Row 2: Offers & Applications ── #}
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-lg);margin-bottom:var(--space-xl)">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-lg);margin-bottom:var(--space-lg)">
         <div class="card" style="padding:var(--space-lg)">
             <div style="font-weight:600;color:var(--text-primary);margin-bottom:var(--space-md)">Offers by Status</div>
             <div style="height:220px"><canvas id="offerChart"></canvas></div>
@@ -186,6 +186,31 @@
             <div style="height:220px"><canvas id="appChart"></canvas></div>
         </div>
     </div>
+
+    {# ── Charts Row 3: Department Distribution ── #}
+    {% if deptChart|length > 0 %}
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:var(--space-lg);margin-bottom:var(--space-xl)">
+        <div class="card" style="padding:var(--space-lg)">
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:var(--space-md)">Department Headcount</div>
+            <div style="height:220px"><canvas id="deptChart"></canvas></div>
+        </div>
+        <div class="card" style="padding:var(--space-lg)">
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:var(--space-md)">Employees per Department</div>
+            <div style="display:flex;flex-direction:column;gap:.75rem;justify-content:center;height:220px;overflow:auto">
+            {% for deptName, count in deptChart %}
+                <div style="display:flex;align-items:center;gap:1rem">
+                    <span style="flex:1;font-size:.875rem;color:var(--text-primary)">{{ deptName }}</span>
+                    <div style="flex:3;background:var(--bg-secondary);border-radius:6px;height:10px;overflow:hidden">
+                        {% set total = deptChart|reduce((carry, v) => carry + v, 0) %}
+                        <div style="width:{{ total > 0 ? (count / total * 100)|round : 0 }}%;height:100%;background:var(--accent-primary);border-radius:6px"></div>
+                    </div>
+                    <span class="badge badge--blue" style="min-width:2rem;text-align:center">{{ count }}</span>
+                </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     {# ── Two-Column Recent Tables ── #}
     <div class="bento-grid bento-grid--2col">
@@ -335,6 +360,22 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         options: doughnutOpts
     });
+
+    // Department headcount doughnut
+    {% if deptChart|length > 0 %}
+    new Chart(document.getElementById('deptChart'), {
+        type: 'doughnut',
+        data: {
+            labels: [{% for deptName, count in deptChart %}'{{ deptName|e('js') }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for deptName, count in deptChart %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: ['#2C666E', '#90DDF0', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#3b82f6', '#ec4899'],
+                borderWidth: 0
+            }]
+        },
+        options: doughnutOpts
+    });
+    {% endif %}
 });
 </script>
 {% endif %}

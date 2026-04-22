@@ -45,6 +45,10 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                     </summary>
                     <div class="dropdown-menu">
+                        <button type="button" class="dropdown-item" onclick="var f=this.parentElement.querySelector('.edit-form-inline');f.classList.toggle('show')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Edit Post
+                        </button>
                         <div class="edit-form-inline">
                             <form action="{{ path('app_community_edit', {id: post.id}) }}" method="post" enctype="multipart/form-data">
                                 <input type="hidden" name="_token" value="{{ csrf_token('edit-post-' ~ post.id) }}">
@@ -182,13 +186,28 @@
                         <strong>{{ comment.author ? comment.author.firstName ~ ' ' ~ comment.author.lastName : 'Unknown' }}</strong>
                         <span class="comment-time">{{ comment.createdAt ? comment.createdAt|date('M d \\a\\t H:i') : '' }}</span>
                         {% if app.user and comment.author and app.user.id == comment.author.id %}
-                        <form action="{{ path('app_community_comment_delete', {id: comment.id}) }}" method="post" onsubmit="return confirm('Delete this comment?')" style="margin-left:auto">
-                            <input type="hidden" name="_token" value="{{ csrf_token('delete-comment-' ~ comment.id) }}">
-                            <button type="submit" class="comment-delete-btn">&times;</button>
-                        </form>
+                        <div style="margin-left:auto;display:flex;gap:.25rem;align-items:center">
+                            <button type="button" class="comment-edit-btn" onclick="var f=this.closest('.comment-body').querySelector('.comment-edit-form');f.style.display=f.style.display==='none'?'flex':'none'" title="Edit">✎</button>
+                            <form action="{{ path('app_community_comment_delete', {id: comment.id}) }}" method="post" onsubmit="return confirm('Delete this comment?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete-comment-' ~ comment.id) }}">
+                                <button type="submit" class="comment-delete-btn">&times;</button>
+                            </form>
+                        </div>
                         {% endif %}
                     </div>
-                    <p class="comment-text">{{ comment.content }}</p>
+                    <p class="comment-text" id="comment-text-{{ comment.id }}">{{ comment.content }}</p>
+                    {% if app.user and comment.author and app.user.id == comment.author.id %}
+                    <form action="{{ path('app_community_comment_edit', {id: comment.id}) }}" method="post" class="comment-edit-form comment-form-inline" style="display:none;margin-top:.25rem" novalidate>
+                        <input type="hidden" name="_token" value="{{ csrf_token('edit-comment-' ~ comment.id) }}">
+                        <input type="text" name="content" class="comment-input" value="{{ comment.content }}" autocomplete="off">
+                        <button type="submit" class="comment-send-btn" title="Save">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        </button>
+                        <button type="button" class="comment-send-btn" title="Cancel" onclick="this.closest('.comment-edit-form').style.display='none'" style="color:#8E8E99">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </form>
+                    {% endif %}
 
                     {# Reply toggle - <details> #}
                     {% if app.user %}
@@ -215,13 +234,28 @@
                                     <strong>{{ reply.author ? reply.author.firstName ~ ' ' ~ reply.author.lastName : 'Unknown' }}</strong>
                                     <span class="comment-time">{{ reply.createdAt ? reply.createdAt|date('M d \\a\\t H:i') : '' }}</span>
                                     {% if app.user and reply.author and app.user.id == reply.author.id %}
-                                    <form action="{{ path('app_community_comment_delete', {id: reply.id}) }}" method="post" onsubmit="return confirm('Delete this reply?')" style="margin-left:auto">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('delete-comment-' ~ reply.id) }}">
-                                        <button type="submit" class="comment-delete-btn">&times;</button>
-                                    </form>
+                                    <div style="margin-left:auto;display:flex;gap:.25rem;align-items:center">
+                                        <button type="button" class="comment-edit-btn" onclick="var f=this.closest('.comment-body').querySelector('.comment-edit-form');f.style.display=f.style.display==='none'?'flex':'none'" title="Edit">✎</button>
+                                        <form action="{{ path('app_community_comment_delete', {id: reply.id}) }}" method="post" onsubmit="return confirm('Delete this reply?')">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete-comment-' ~ reply.id) }}">
+                                            <button type="submit" class="comment-delete-btn">&times;</button>
+                                        </form>
+                                    </div>
                                     {% endif %}
                                 </div>
                                 <p class="comment-text">{{ reply.content }}</p>
+                                {% if app.user and reply.author and app.user.id == reply.author.id %}
+                                <form action="{{ path('app_community_comment_edit', {id: reply.id}) }}" method="post" class="comment-edit-form comment-form-inline" style="display:none;margin-top:.25rem" novalidate>
+                                    <input type="hidden" name="_token" value="{{ csrf_token('edit-comment-' ~ reply.id) }}">
+                                    <input type="text" name="content" class="comment-input" value="{{ reply.content }}" autocomplete="off">
+                                    <button type="submit" class="comment-send-btn" title="Save">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                    </button>
+                                    <button type="button" class="comment-send-btn" title="Cancel" onclick="this.closest('.comment-edit-form').style.display='none'" style="color:#8E8E99">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                </form>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
