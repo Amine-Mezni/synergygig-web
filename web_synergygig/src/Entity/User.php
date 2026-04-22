@@ -416,6 +416,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getOnlineStatus(): ?string { return $this->online_status; }
     public function setOnlineStatus(?string $v): self { $this->online_status = $v; return $this; }
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $google_id = null;
+
+    public function getGoogleId(): ?string { return $this->google_id; }
+    public function setGoogleId(?string $v): self { $this->google_id = $v; return $this; }
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $github_id = null;
+
+    public function getGithubId(): ?string { return $this->github_id; }
+    public function setGithubId(?string $v): self { $this->github_id = $v; return $this; }
+
     // ── UserInterface methods ──
 
     public function getUserIdentifier(): string

@@ -47,9 +47,11 @@ class ContractController extends AbstractController
     }
 
     #[Route('/new', name: 'app_contract_new')]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
+        if (!$this->isGranted('ROLE_HR') && !$this->isGranted('ROLE_PROJECT_OWNER')) {
+            throw $this->createAccessDeniedException('Only HR managers or Project Owners can create contracts.');
+        }
         $contract = new Contract();
         $form = $this->createForm(ContractType::class, $contract);
         $form->handleRequest($request);
@@ -77,10 +79,12 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_contract_edit', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function edit(Contract $contract, Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isGranted('ROLE_ADMIN') && $contract->getOwner()?->getId() !== $this->getUser()?->getId()) {
+        if (!$this->isGranted('ROLE_HR') && !$this->isGranted('ROLE_PROJECT_OWNER')) {
+            throw $this->createAccessDeniedException('Only HR managers or Project Owners can edit contracts.');
+        }
+        if (!$this->isGranted('ROLE_ADMIN') && !$this->isGranted('ROLE_HR') && $contract->getOwner()?->getId() !== $this->getUser()?->getId()) {
             throw $this->createAccessDeniedException('You can only edit your own contracts.');
         }
         $form = $this->createForm(ContractType::class, $contract);
@@ -99,10 +103,12 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_contract_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
     public function delete(Contract $contract, Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isGranted('ROLE_ADMIN') && $contract->getOwner()?->getId() !== $this->getUser()?->getId()) {
+        if (!$this->isGranted('ROLE_HR') && !$this->isGranted('ROLE_PROJECT_OWNER')) {
+            throw $this->createAccessDeniedException('Only HR managers or Project Owners can delete contracts.');
+        }
+        if (!$this->isGranted('ROLE_ADMIN') && !$this->isGranted('ROLE_HR') && $contract->getOwner()?->getId() !== $this->getUser()?->getId()) {
             throw $this->createAccessDeniedException('You can only delete your own contracts.');
         }
         if ($this->isCsrfTokenValid('delete' . $contract->getId(), $request->request->get('_token'))) {

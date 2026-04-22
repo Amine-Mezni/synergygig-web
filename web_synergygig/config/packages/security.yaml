@@ -31,6 +31,10 @@ security:
             lazy: true
             provider: app_user_provider
             user_checker: App\Security\UserChecker
+            entry_point: form_login
+            custom_authenticators:
+                - App\Security\GoogleAuthenticator
+                - App\Security\GithubAuthenticator
             form_login:
                 login_path: app_login
                 check_path: app_login
@@ -44,6 +48,7 @@ security:
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/signup, roles: PUBLIC_ACCESS }
+        - { path: ^/connect, roles: PUBLIC_ACCESS }
         - { path: ^/check-email, roles: PUBLIC_ACCESS }
         - { path: ^/verify-email, roles: PUBLIC_ACCESS }
         - { path: ^/resend-verification, roles: PUBLIC_ACCESS }

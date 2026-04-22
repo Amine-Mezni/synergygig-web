@@ -3,7 +3,7 @@
 {% block page_title %}Contracts{% endblock %}
 
 {% block header_actions %}
-    {% if is_granted('ROLE_PROJECT_OWNER') %}
+    {% if is_granted('ROLE_HR') or is_granted('ROLE_PROJECT_OWNER') %}
     <a href="{{ path('app_contract_new') }}" class="btn btn-primary btn-sm">+ New Contract</a>
     {% endif %}
 {% endblock %}

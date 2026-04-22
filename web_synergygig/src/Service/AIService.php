@@ -366,6 +366,121 @@ class AIService
             ?? $this->fallbackContractDraft($candidateName, $offerTitle, $contractType, $amount, $startDate, $endDate);
     }
 
+    // ──────────────────────────────────────────────────────────
+    //  PROJECT AI FEATURES (ported from Java ZAIService)
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * Generate 6-10 smart tasks from project name + description.
+     * Returns JSON array: [{"title","description","priority"}]
+     */
+    public function generateProjectTasks(string $projectName, string $description, int $teamSize = 1): array
+    {
+        $system = "You are an expert project manager. Based on the project info, generate 6-10 smart, actionable tasks.\n"
+            . "Consider the team size and project scope. Prioritize correctly.\n"
+            . "Return ONLY a valid JSON array (no markdown/code fences):\n"
+            . '[{"title": "<task title>", "description": "<1-2 sentence description>", "priority": "HIGH|MEDIUM|LOW"}]';
+
+        $user = "Project: {$projectName}\nDescription: " . ($description ?: 'No description') . "\nTeam size: {$teamSize}";
+
+        $result = $this->chat($system, $user, 0.7, 2048);
+        if ($result) {
+            $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+            $parsed = json_decode($result, true);
+            if (is_array($parsed) && !empty($parsed)) {
+                return $parsed;
+            }
+        }
+
+        // Keyword-based fallback
+        return $this->fallbackGenerateTasks($projectName, $description);
+    }
+
+    private function fallbackGenerateTasks(string $projectName, string $description): array
+    {
+        $combined = strtolower($projectName . ' ' . $description);
+        if (str_contains($combined, 'web') || str_contains($combined, 'app') || str_contains($combined, 'site')) {
+            return [
+                ['title' => 'Define project requirements and scope', 'description' => 'Document functional and non-functional requirements with stakeholders.', 'priority' => 'HIGH'],
+                ['title' => 'Set up development environment', 'description' => 'Configure repositories, CI/CD pipeline, and local dev tools.', 'priority' => 'HIGH'],
+                ['title' => 'Design system architecture', 'description' => 'Create architecture diagrams covering database, backend, and frontend layers.', 'priority' => 'HIGH'],
+                ['title' => 'Implement core backend API', 'description' => 'Build primary REST endpoints for main entities.', 'priority' => 'HIGH'],
+                ['title' => 'Design and build UI components', 'description' => 'Create reusable frontend components following design guidelines.', 'priority' => 'MEDIUM'],
+                ['title' => 'Write unit and integration tests', 'description' => 'Cover critical paths with automated tests targeting 80% coverage.', 'priority' => 'MEDIUM'],
+                ['title' => 'Conduct security audit', 'description' => 'Review authentication, authorization, and input validation.', 'priority' => 'HIGH'],
+                ['title' => 'Deploy to staging environment', 'description' => 'Configure staging server and deploy application for QA testing.', 'priority' => 'MEDIUM'],
+            ];
+        }
+        return [
+            ['title' => 'Project planning and kickoff', 'description' => 'Define goals, timeline, and team responsibilities.', 'priority' => 'HIGH'],
+            ['title' => 'Requirements gathering', 'description' => 'Collect and document all stakeholder requirements.', 'priority' => 'HIGH'],
+            ['title' => 'Research and analysis', 'description' => 'Investigate technical options and competitive landscape.', 'priority' => 'MEDIUM'],
+            ['title' => 'Initial implementation', 'description' => 'Build the core functionality based on requirements.', 'priority' => 'HIGH'],
+            ['title' => 'Testing and quality assurance', 'description' => 'Verify all features work as expected and fix defects.', 'priority' => 'MEDIUM'],
+            ['title' => 'Documentation', 'description' => 'Write user and technical documentation.', 'priority' => 'LOW'],
+            ['title' => 'Deployment and launch', 'description' => 'Deploy to production and monitor for issues.', 'priority' => 'HIGH'],
+        ];
+    }
+
+    /**
+     * Plan a sprint: assigns story points and selects tasks that fit capacity.
+     * $tasksJson: JSON array [{id, title, status, priority}]
+     * Returns JSON: {tasks:[{id,title,points,reason}], total_points, capacity_points, recommended_ids, warnings}
+     */
+    public function planSprint(string $tasksJson, int $teamSize, int $sprintDays): ?string
+    {
+        $system = "You are an agile coach. Plan a sprint using Fibonacci estimation (1/2/3/5/8/13).\n"
+            . "Calculate capacity: team_size × sprint_days × 6 productive hours. Target 70-80% capacity.\n"
+            . "Return ONLY valid JSON:\n"
+            . '{"tasks": [{"id": <id>, "title": "<title>", "points": <1-13>, "reason": "<why>"}],'
+            . ' "total_points": <sum>, "capacity_points": <capacity>, "recommended_ids": [<ids that fit>],'
+            . ' "warnings": ["<dependency or risk warnings>"]}';
+
+        $user = "Team size: {$teamSize}\nSprint days: {$sprintDays}\nTasks:\n{$tasksJson}";
+
+        $result = $this->chat($system, $user, 0.5, 2048);
+        if ($result) {
+            return preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+        }
+        return null;
+    }
+
+    /**
+     * Prepare a meeting agenda from project state.
+     * Returns formatted text (not JSON).
+     */
+    public function prepMeeting(string $projectName, string $tasksText, string $teamText): ?string
+    {
+        $system = "You are a meeting preparation assistant. Generate a structured meeting agenda including:\n"
+            . "1. Numbered agenda items (max 8)\n"
+            . "2. Risk alerts (overdue tasks, blocked items) marked with ⚠\n"
+            . "3. Talking points per team member\n"
+            . "4. Suggested time allocation per item\n"
+            . "Return formatted text (not JSON), using clear headings and bullet points.";
+
+        $user = "Project: {$projectName}\nTasks:\n{$tasksText}\nTeam:\n{$teamText}\n\nGenerate the meeting agenda.";
+
+        return $this->chat($system, $user, 0.7, 1536)
+            ?? "Unable to prepare meeting agenda. Please try again.";
+    }
+
+    /**
+     * Decision helper: weighted criteria scoring.
+     * Returns formatted analysis text with comparison table and recommendation.
+     */
+    public function helpDecide(string $question, string $options, string $criteria): ?string
+    {
+        $system = "You are a decision coach. Apply weighted criteria scoring to compare options.\n"
+            . "Process: 1) Evaluate each option against each criterion (1-10). 2) Apply weights. 3) Sum scores.\n"
+            . "4) Check for biases. 5) Recommend with confidence (High/Medium/Low).\n"
+            . "Return formatted text with: comparison table, scores, bias check, recommendation.";
+
+        $user = "Decision: {$question}\nOptions: {$options}\nCriteria: {$criteria}";
+
+        return $this->chat($system, $user, 0.6, 1536)
+            ?? "Unable to analyze decision. Please try again.";
+    }
+
     private function fallbackContractDraft(
         string $candidateName,
         string $offerTitle,

@@ -4,14 +4,20 @@ namespace App\Controller;
 
 use App\Entity\Project;
 use App\Entity\Task;
+use App\Entity\User;
 use App\Form\ProjectType;
 use App\Repository\ProjectRepository;
 use App\Repository\TaskRepository;
+use App\Service\AIService;
+use App\Service\CalendarSyncService;
+use App\Service\ProjectRiskService;
 use Doctrine\ORM\EntityManagerInterface;
+use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -20,31 +26,38 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 class ProjectController extends AbstractController
 {
     #[Route('/', name: 'app_project_index')]
-    public function index(ProjectRepository $repo, TaskRepository $taskRepo): Response
+    public function index(Request $request, ProjectRepository $repo, TaskRepository $taskRepo, PaginatorInterface $paginator): Response
     {
         $user = $this->getUser();
 
         if ($this->isGranted('ROLE_HR')) {
-            // ADMIN and HR see all projects
-            $projects = $repo->findBy([], ['id' => 'DESC']);
+            $qb = $repo->createQueryBuilder('p')->orderBy('p.id', 'DESC');
         } elseif ($this->isGranted('ROLE_PROJECT_OWNER')) {
-            // PROJECT_OWNER sees only their own projects
-            $projects = $repo->findBy(['owner' => $user], ['id' => 'DESC']);
+            $qb = $repo->createQueryBuilder('p')
+                ->where('p.owner = :user')->setParameter('user', $user)
+                ->orderBy('p.id', 'DESC');
         } else {
-            // EMPLOYEE / GIG_WORKER see projects where they have assigned tasks
             $myTasks = $taskRepo->findBy(['assignedTo' => $user]);
             $projectIds = array_unique(array_filter(array_map(
                 fn($t) => $t->getProject()?->getId(), $myTasks
             )));
-            $projects = $projectIds
-                ? $repo->createQueryBuilder('p')
+            if ($projectIds) {
+                $qb = $repo->createQueryBuilder('p')
                     ->where('p.id IN (:ids)')->setParameter('ids', $projectIds)
-                    ->orderBy('p.id', 'DESC')->getQuery()->getResult()
-                : [];
+                    ->orderBy('p.id', 'DESC');
+            } else {
+                $qb = $repo->createQueryBuilder('p')->where('1=0');
+            }
         }
 
+        $pagination = $paginator->paginate(
+            $qb,
+            $request->query->getInt('page', 1),
+            12
+        );
+
         return $this->render('project/index.html.twig', [
-            'projects' => $projects,
+            'pagination' => $pagination,
         ]);
     }
 
@@ -98,11 +111,95 @@ class ProjectController extends AbstractController
     #[Route('/{id}', name: 'app_project_show', requirements: ['id' => '\d+'])]
     public function show(Project $project, TaskRepository $taskRepo): Response
     {
+        $user = $this->getUser();
+        if (!$user instanceof User || !$this->canViewProject($project, $user)) {
+            throw new AccessDeniedException('Access denied.');
+        }
+
         $tasks = $taskRepo->findBy(['project' => $project], ['id' => 'DESC']);
         return $this->render('project/show.html.twig', [
             'project' => $project,
             'tasks' => $tasks,
         ]);
+    }
+
+    #[Route('/{id}/intelligence/risk', name: 'app_project_risk_forecast', methods: ['GET'], requirements: ['id' => '\\d+'])]
+    public function riskForecast(
+        Project $project,
+        Request $request,
+        ProjectRiskService $projectRiskService,
+        RateLimiterFactory $integrationApiLimiter
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['message' => 'Not authenticated.'], 401);
+        }
+        if (!$this->canViewProject($project, $user)) {
+            return $this->json(['message' => 'Access denied.'], 403);
+        }
+
+        $limiter = $integrationApiLimiter->create(($request->getClientIp() ?? 'unknown') . ':project-web-risk');
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json(['message' => 'Too many requests.'], 429);
+        }
+
+        $lat = (float) $request->query->get('lat', '36.8');
+        $lon = (float) $request->query->get('lon', '10.18');
+        $country = strtoupper((string) $request->query->get('country', 'TN'));
+        $days = (int) $request->query->get('days', 30);
+
+        if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
+            return $this->json(['message' => 'Invalid coordinates.'], 400);
+        }
+        if (!preg_match('/^[A-Z]{2}$/', $country)) {
+            return $this->json(['message' => 'Invalid country code.'], 400);
+        }
+        if ($days < 1 || $days > 90) {
+            return $this->json(['message' => 'Invalid days window. Must be between 1 and 90.'], 400);
+        }
+
+        $riskData = $projectRiskService->buildForecast($project, $lat, $lon, $country, $days);
+        if (!$riskData) {
+            return $this->json(['message' => 'Risk forecast providers unavailable.'], 502);
+        }
+
+        return $this->json($riskData);
+    }
+
+    #[Route('/{id}/intelligence/calendar-sync/{milestoneId}', name: 'app_project_calendar_preview', methods: ['POST'], requirements: ['id' => '\\d+', 'milestoneId' => '\\d+'])]
+    public function calendarPreview(
+        Project $project,
+        int $milestoneId,
+        Request $request,
+        EntityManagerInterface $em,
+        CalendarSyncService $calendarSyncService,
+        RateLimiterFactory $integrationApiLimiter
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['message' => 'Not authenticated.'], 401);
+        }
+        if (!$this->canManageProject($project, $user)) {
+            return $this->json(['message' => 'Access denied.'], 403);
+        }
+
+        $limiter = $integrationApiLimiter->create(($request->getClientIp() ?? 'unknown') . ':project-web-calendar');
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json(['message' => 'Too many requests.'], 429);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $task = $em->getRepository(Task::class)->find($milestoneId);
+        if ($task && $task->getProject()?->getId() !== $project->getId()) {
+            return $this->json(['message' => 'Milestone task does not belong to this project.'], 400);
+        }
+
+        $result = $calendarSyncService->createMilestoneSyncPayload($project, $milestoneId, $payload, $task);
+        return $this->json($result, 202);
     }
 
     #[Route('/{id}/edit', name: 'app_project_edit', requirements: ['id' => '\d+'])]
@@ -171,5 +268,264 @@ class ProjectController extends AbstractController
         $em->flush();
 
         return new JsonResponse(['success' => true, 'status' => $newStatus]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  PROJECT AI ENDPOINTS
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * POST /projects/{id}/ai/generate-tasks
+     * Generates tasks from the project description and persists them.
+     */
+    #[Route('/{id}/ai/generate-tasks', name: 'app_project_ai_generate_tasks', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function aiGenerateTasks(
+        Project $project,
+        Request $request,
+        EntityManagerInterface $em,
+        TaskRepository $taskRepo,
+        AIService $aiService,
+        RateLimiterFactory $integrationApiLimiter
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+
+        $limiter = $integrationApiLimiter->create(($request->getClientIp() ?? 'unknown') . ':project-ai-tasks');
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json(['error' => 'Too many requests. Please wait before generating again.'], 429);
+        }
+
+        // Count team size (distinct assignees on this project + 1)
+        $teamSize = max(1, count(array_unique(array_filter(
+            array_map(fn($t) => $t->getAssignedTo()?->getId(), $taskRepo->findBy(['project' => $project]))
+        ))));
+
+        $generated = $aiService->generateProjectTasks(
+            $project->getName(),
+            $project->getDescription() ?? '',
+            $teamSize
+        );
+
+        if (empty($generated)) {
+            return $this->json(['error' => 'AI returned no tasks. Please try again.'], 502);
+        }
+
+        $created = [];
+        foreach ($generated as $taskData) {
+            $title = is_string($taskData['title'] ?? null) ? substr(trim($taskData['title']), 0, 255) : null;
+            if (!$title) {
+                continue;
+            }
+            $priority = strtoupper((string) ($taskData['priority'] ?? 'MEDIUM'));
+            if (!in_array($priority, ['HIGH', 'MEDIUM', 'LOW'], true)) {
+                $priority = 'MEDIUM';
+            }
+
+            $task = new Task();
+            $task->setProject($project);
+            $task->setTitle($title);
+            $task->setDescription(is_string($taskData['description'] ?? null) ? $taskData['description'] : '');
+            $task->setStatus('TODO');
+            $task->setPriority($priority);
+            $task->setCreatedAt(new \DateTime());
+            $em->persist($task);
+
+            $created[] = [
+                'title'       => $title,
+                'description' => $task->getDescription(),
+                'priority'    => $priority,
+                'status'      => 'TODO',
+            ];
+        }
+
+        $em->flush();
+
+        return $this->json([
+            'success' => true,
+            'count'   => count($created),
+            'tasks'   => $created,
+        ]);
+    }
+
+    /**
+     * POST /projects/{id}/ai/sprint-plan
+     * Returns sprint plan JSON from current task list.
+     */
+    #[Route('/{id}/ai/sprint-plan', name: 'app_project_ai_sprint_plan', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function aiSprintPlan(
+        Project $project,
+        Request $request,
+        TaskRepository $taskRepo,
+        AIService $aiService,
+        RateLimiterFactory $integrationApiLimiter
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+
+        $limiter = $integrationApiLimiter->create(($request->getClientIp() ?? 'unknown') . ':project-ai-sprint');
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json(['error' => 'Too many requests.'], 429);
+        }
+
+        $payload    = json_decode($request->getContent(), true) ?? [];
+        $sprintDays = max(1, min(90, (int) ($payload['sprint_days'] ?? 10)));
+
+        $tasks = $taskRepo->findBy(['project' => $project]);
+        if (empty($tasks)) {
+            return $this->json(['error' => 'No tasks found. Add tasks before planning a sprint.'], 400);
+        }
+
+        // Build task JSON for AI
+        $taskArr = array_map(fn($t) => [
+            'id'       => $t->getId(),
+            'title'    => $t->getTitle(),
+            'status'   => $t->getStatus() ?? 'TODO',
+            'priority' => $t->getPriority() ?? 'MEDIUM',
+        ], $tasks);
+
+        $teamSize = max(1, count(array_unique(array_filter(
+            array_map(fn($t) => $t->getAssignedTo()?->getId(), $tasks)
+        ))));
+
+        $result = $aiService->planSprint(json_encode($taskArr), $teamSize, $sprintDays);
+        if (!$result) {
+            return $this->json(['error' => 'Sprint planning failed. Please try again.'], 502);
+        }
+
+        $parsed = json_decode($result, true);
+        if (!is_array($parsed)) {
+            return $this->json(['raw' => $result]);
+        }
+
+        return $this->json($parsed);
+    }
+
+    /**
+     * POST /projects/{id}/ai/meeting
+     * Two modes: "prepare" (agenda from project state) or "summarize" (free-text notes).
+     */
+    #[Route('/{id}/ai/meeting', name: 'app_project_ai_meeting', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function aiMeeting(
+        Project $project,
+        Request $request,
+        TaskRepository $taskRepo,
+        AIService $aiService,
+        RateLimiterFactory $integrationApiLimiter
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+
+        $limiter = $integrationApiLimiter->create(($request->getClientIp() ?? 'unknown') . ':project-ai-meeting');
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json(['error' => 'Too many requests.'], 429);
+        }
+
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $mode    = $payload['mode'] ?? 'prepare';
+
+        if ($mode === 'summarize') {
+            $notes = trim((string) ($payload['notes'] ?? ''));
+            if (strlen($notes) < 10) {
+                return $this->json(['error' => 'Please provide meeting notes to summarize.'], 400);
+            }
+            $summary = $aiService->summarizeMeeting($notes);
+            return $this->json(['result' => $summary]);
+        }
+
+        // "prepare" mode: build context from project tasks
+        $tasks = $taskRepo->findBy(['project' => $project]);
+        $tasksText = implode("\n", array_map(
+            fn($t) => sprintf('- [%s] %s (%s)', $t->getStatus() ?? 'TODO', $t->getTitle(), $t->getPriority() ?? 'MEDIUM'),
+            $tasks
+        ));
+        if (!$tasksText) {
+            $tasksText = '- No tasks yet.';
+        }
+
+        $agenda = $aiService->prepMeeting($project->getName(), $tasksText, 'Team (see project members)');
+        return $this->json(['result' => $agenda]);
+    }
+
+    /**
+     * POST /projects/{id}/ai/decision
+     * AI-powered decision analysis using weighted criteria scoring.
+     */
+    #[Route('/{id}/ai/decision', name: 'app_project_ai_decision', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function aiDecision(
+        Project $project,
+        Request $request,
+        AIService $aiService,
+        RateLimiterFactory $integrationApiLimiter
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+
+        $limiter = $integrationApiLimiter->create(($request->getClientIp() ?? 'unknown') . ':project-ai-decision');
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json(['error' => 'Too many requests.'], 429);
+        }
+
+        $payload  = json_decode($request->getContent(), true) ?? [];
+        $question = trim((string) ($payload['question'] ?? ''));
+        $options  = trim((string) ($payload['options'] ?? ''));
+        $criteria = trim((string) ($payload['criteria'] ?? ''));
+
+        if (strlen($question) < 5) {
+            return $this->json(['error' => 'Please provide a decision question.'], 400);
+        }
+
+        $result = $aiService->helpDecide(
+            $question,
+            $options ?: 'Not specified',
+            $criteria ?: 'Not specified'
+        );
+
+        return $this->json(['result' => $result]);
+    }
+
+    private function canViewProject(Project $project, User $user): bool
+    {
+        if ($this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_HR')) {
+            return true;
+        }
+
+        if ($this->isGranted('ROLE_PROJECT_OWNER') && $project->getOwner()?->getId() === $user->getId()) {
+            return true;
+        }
+
+        foreach ($project->getTasks() as $task) {
+            if ($task->getAssignedTo()?->getId() === $user->getId()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function canManageProject(Project $project, User $user): bool
+    {
+        return $this->isGranted('ROLE_ADMIN')
+            || $this->isGranted('ROLE_HR')
+            || $project->getOwner()?->getId() === $user->getId();
     }
 }
