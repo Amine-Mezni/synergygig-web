@@ -12,6 +12,9 @@ use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -71,9 +74,19 @@ class ProjectType extends AbstractType
                     'Cancelled' => 'CANCELLED',
                 ],
                 'placeholder' => 'Select status',
+                'constraints' => [new Assert\NotBlank(['message' => 'Please select a status.'])],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ]);
+
+        $builder->addEventListener(FormEvents::POST_SUBMIT, function (FormEvent $event) {
+            $form = $event->getForm();
+            $startDate = $form->get('start_date')->getData();
+            $deadline = $form->get('deadline')->getData();
+            if ($startDate && $deadline && $deadline < $startDate) {
+                $form->get('deadline')->addError(new FormError('Deadline must be after or equal to start date.'));
+            }
+        });
     }
 
     public function configureOptions(OptionsResolver $resolver): void

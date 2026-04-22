@@ -25,12 +25,14 @@ class AttendanceType extends AbstractType
                     return $u->getFirstName() . ' ' . $u->getLastName();
                 },
                 'placeholder' => 'Select employee',
+                'constraints' => [new Assert\NotBlank(message: 'Please select an employee.')],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ])
             ->add('date', DateType::class, [
                 'widget' => 'single_text',
-                'constraints' => [new Assert\NotBlank()],
+                'required' => true,
+                'constraints' => [new Assert\NotBlank(message: 'Date is required.')],
                 'attr' => ['class' => 'form-control'],
                 'label_attr' => ['class' => 'form-label'],
             ])
@@ -56,6 +58,7 @@ class AttendanceType extends AbstractType
                     'Half Day' => 'HALF_DAY',
                 ],
                 'placeholder' => 'Select status',
+                'constraints' => [new Assert\NotBlank(message: 'Please select a status.')],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ]);

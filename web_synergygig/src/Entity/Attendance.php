@@ -119,6 +119,20 @@ class Attendance
         return $this;
     }
 
+    #[ORM\Column(type: 'string', length: 20, nullable: false, options: ['default' => 'PENDING'])]
+    private string $approval_status = 'PENDING';
+
+    public function getApproval_status(): string { return $this->approval_status; }
+    public function getApprovalStatus(): string { return $this->approval_status; }
+    public function setApproval_status(string $s): self { $this->approval_status = $s; return $this; }
+    public function setApprovalStatus(string $s): self { return $this->setApproval_status($s); }
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $rejection_reason = null;
+
+    public function getRejectionReason(): ?string { return $this->rejection_reason; }
+    public function setRejectionReason(?string $r): self { $this->rejection_reason = $r; return $this; }
+
     #[ORM\Column(type: 'datetime', nullable: false)]
     private ?\DateTimeInterface $created_at = null;
 

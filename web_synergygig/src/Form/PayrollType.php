@@ -9,7 +9,6 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -25,6 +24,7 @@ class PayrollType extends AbstractType
                     return $u->getFirstName() . ' ' . $u->getLastName();
                 },
                 'placeholder' => 'Select employee',
+                'constraints' => [new Assert\NotBlank(['message' => 'Please select an employee.'])],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ])
@@ -38,26 +38,42 @@ class PayrollType extends AbstractType
                 'attr' => ['class' => 'form-control', 'placeholder' => date('Y')],
                 'label_attr' => ['class' => 'form-label'],
             ])
-            ->add('base_salary', TextType::class, [
+            ->add('base_salary', NumberType::class, [
                 'required' => false,
                 'label' => 'Base Salary',
-                'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
+                'scale' => 2,
+                'constraints' => [
+                    new Assert\PositiveOrZero(['message' => 'Base salary must be zero or a positive number.']),
+                ],
+                'attr' => ['class' => 'form-control', 'placeholder' => '0.00', 'step' => '0.01'],
                 'label_attr' => ['class' => 'form-label'],
             ])
-            ->add('bonus', TextType::class, [
+            ->add('bonus', NumberType::class, [
                 'required' => false,
-                'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
+                'scale' => 2,
+                'constraints' => [
+                    new Assert\PositiveOrZero(['message' => 'Bonus must be zero or a positive number.']),
+                ],
+                'attr' => ['class' => 'form-control', 'placeholder' => '0.00', 'step' => '0.01'],
                 'label_attr' => ['class' => 'form-label'],
             ])
-            ->add('deductions', TextType::class, [
+            ->add('deductions', NumberType::class, [
                 'required' => false,
-                'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
+                'scale' => 2,
+                'constraints' => [
+                    new Assert\PositiveOrZero(['message' => 'Deductions must be zero or a positive number.']),
+                ],
+                'attr' => ['class' => 'form-control', 'placeholder' => '0.00', 'step' => '0.01'],
                 'label_attr' => ['class' => 'form-label'],
             ])
-            ->add('net_salary', TextType::class, [
+            ->add('net_salary', NumberType::class, [
                 'required' => false,
                 'label' => 'Net Salary',
-                'attr' => ['class' => 'form-control', 'placeholder' => '0.00'],
+                'scale' => 2,
+                'constraints' => [
+                    new Assert\PositiveOrZero(['message' => 'Net salary must be zero or a positive number.']),
+                ],
+                'attr' => ['class' => 'form-control', 'placeholder' => '0.00', 'step' => '0.01'],
                 'label_attr' => ['class' => 'form-label'],
             ])
             ->add('total_hours_worked', NumberType::class, [
@@ -73,6 +89,7 @@ class PayrollType extends AbstractType
                     'Cancelled' => 'CANCELLED',
                 ],
                 'placeholder' => 'Select status',
+                'constraints' => [new Assert\NotBlank(['message' => 'Please select a status.'])],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ]);

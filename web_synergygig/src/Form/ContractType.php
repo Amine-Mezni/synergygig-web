@@ -13,6 +13,9 @@ use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -107,6 +110,15 @@ class ContractType extends AbstractType
                 ],
             ])
         ;
+
+        $builder->addEventListener(FormEvents::POST_SUBMIT, function (FormEvent $event) {
+            $form = $event->getForm();
+            $startDate = $form->get('start_date')->getData();
+            $endDate = $form->get('end_date')->getData();
+            if ($startDate && $endDate && $endDate < $startDate) {
+                $form->get('end_date')->addError(new FormError('End date must be after or equal to start date.'));
+            }
+        });
     }
 
     public function configureOptions(OptionsResolver $resolver): void

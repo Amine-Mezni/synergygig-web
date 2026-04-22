@@ -157,6 +157,20 @@ class Leave
         return $this->setRejection_reason($rejection_reason);
     }
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $attachment = null;
+
+    public function getAttachment(): ?string
+    {
+        return $this->attachment;
+    }
+
+    public function setAttachment(?string $attachment): self
+    {
+        $this->attachment = $attachment;
+        return $this;
+    }
+
     #[ORM\Column(type: 'datetime', nullable: false)]
     private ?\DateTimeInterface $created_at = null;
 

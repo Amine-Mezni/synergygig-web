@@ -57,6 +57,7 @@ class TaskType extends AbstractType
                     'Done' => 'DONE',
                 ],
                 'placeholder' => 'Select status',
+                'constraints' => [new Assert\NotBlank(['message' => 'Please select a status.'])],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ])
@@ -67,6 +68,7 @@ class TaskType extends AbstractType
                     'High' => 'HIGH',
                 ],
                 'placeholder' => 'Select priority',
+                'constraints' => [new Assert\NotBlank(['message' => 'Please select a priority.'])],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ])

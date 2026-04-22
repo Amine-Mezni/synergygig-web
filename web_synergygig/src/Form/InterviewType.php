@@ -43,7 +43,10 @@ class InterviewType extends AbstractType
                 'widget' => 'single_text',
                 'label' => 'Date & Time',
                 'required' => true,
-                'constraints' => [new Assert\NotBlank(['message' => 'Please select a date and time.'])],
+                'constraints' => [
+                    new Assert\NotBlank(['message' => 'Please select a date and time.']),
+                    new Assert\GreaterThanOrEqual(['value' => 'today', 'message' => 'Interview date cannot be in the past.']),
+                ],
                 'attr' => ['class' => 'form-control'],
                 'label_attr' => ['class' => 'form-label'],
             ])
@@ -57,7 +60,10 @@ class InterviewType extends AbstractType
             ])
             ->add('meet_link', TextType::class, [
                 'label' => 'Meeting Link',
-                'constraints' => [new Assert\NotBlank(['message' => 'Please provide a meeting link.'])],
+                'constraints' => [
+                    new Assert\NotBlank(['message' => 'Please provide a meeting link.']),
+                    new Assert\Url(['message' => 'Please provide a valid URL (e.g. https://meet.google.com/...).']),
+                ],
                 'attr' => ['class' => 'form-control', 'placeholder' => 'https://meet.google.com/...'],
                 'label_attr' => ['class' => 'form-label'],
             ])

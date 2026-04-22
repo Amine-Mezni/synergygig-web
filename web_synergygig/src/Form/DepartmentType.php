@@ -39,8 +39,9 @@ class DepartmentType extends AbstractType
                 'choice_label' => function (User $user) {
                     return $user->getFirst_name() . ' ' . $user->getLast_name();
                 },
-                'required' => false,
+                'required' => true,
                 'placeholder' => 'Select a manager',
+                'constraints' => [new Assert\NotBlank(message: 'Each department must have a manager.')],
                 'attr' => ['class' => 'form-control form-select'],
                 'label_attr' => ['class' => 'form-label'],
             ])
