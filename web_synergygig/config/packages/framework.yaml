@@ -15,6 +15,11 @@ framework:
         storage_factory_id: session.storage.factory.native
     php_errors:
         log: true
+    rate_limiter:
+        login_attempt:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
 
 twig:
     default_path: '%kernel.project_dir%/templates'

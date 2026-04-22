@@ -404,6 +404,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $last_seen_at = null;
+
+    public function getLastSeenAt(): ?\DateTimeInterface { return $this->last_seen_at; }
+    public function setLastSeenAt(?\DateTimeInterface $v): self { $this->last_seen_at = $v; return $this; }
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $online_status = null; // online | away | offline
+
+    public function getOnlineStatus(): ?string { return $this->online_status; }
+    public function setOnlineStatus(?string $v): self { $this->online_status = $v; return $this; }
+
     // ── UserInterface methods ──
 
     public function getUserIdentifier(): string

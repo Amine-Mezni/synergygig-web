@@ -6,7 +6,7 @@ doctrine:
         dbname: '%env(DB_NAME)%'
         user: '%env(DB_USER)%'
         password: '%env(DB_PASSWORD)%'
-        server_version: '8.0'
+        server_version: 'mariadb-10.4.32'
         use_savepoints: true
         charset: utf8mb4
         default_table_options:

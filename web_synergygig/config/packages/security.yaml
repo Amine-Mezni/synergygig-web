@@ -22,6 +22,11 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
 
+        api:
+            pattern: ^/api
+            stateless: true
+            jwt: ~
+
         main:
             lazy: true
             provider: app_user_provider
@@ -47,6 +52,8 @@ security:
         - { path: ^/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/$, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth, roles: PUBLIC_ACCESS }
+        - { path: ^/api/password, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/health, roles: PUBLIC_ACCESS }
         - { path: ^/contracts/verify, roles: PUBLIC_ACCESS }
         - { path: ^/face, roles: IS_AUTHENTICATED_FULLY }
