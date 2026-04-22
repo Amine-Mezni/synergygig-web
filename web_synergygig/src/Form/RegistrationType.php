@@ -84,6 +84,9 @@ class RegistrationType extends AbstractType
                     'label' => 'Confirm Password',
                     'attr' => ['class' => 'form-control', 'placeholder' => '••••••••', 'autocomplete' => 'new-password'],
                     'label_attr' => ['class' => 'form-label'],
+                    'constraints' => [
+                        new Assert\NotBlank(['message' => 'Please confirm your password.']),
+                    ],
                 ],
                 'constraints' => [
                     new Assert\NotBlank(['message' => 'Password is required.']),

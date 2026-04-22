@@ -171,6 +171,13 @@ class AuthController extends AbstractController
                 }
             }
 
+            if (!$bestUser->isVerified()) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Your email address is not verified. Please check your inbox and click the verification link.',
+                ], 403);
+            }
+
             $response = $security->login($bestUser, null, 'main');
             if ($response instanceof Response) {
                 return $this->json([
@@ -226,16 +233,167 @@ class AuthController extends AbstractController
             $user->setIsOnline(false);
             $user->setPassword($hasher->hashPassword($user, $data['password']));
 
+            // Generate email verification token
+            $token = bin2hex(random_bytes(32));
+            $user->setResetToken($token);
+            $user->setResetTokenExpiresAt(new \DateTime('+24 hours'));
+
             $em->persist($user);
             $em->flush();
 
-            $this->addFlash('success', 'Account created! You can now sign in.');
-            return $this->redirectToRoute('app_login');
+            // Send verification email via Mailjet HTTP API
+            $this->sendVerificationEmail($user, $token, $request);
+
+            $request->getSession()->set('verify_email_address', $user->getEmail());
+            $this->addFlash('success', 'Account created! Please check your email to verify your account.');
+            return $this->redirectToRoute('app_check_email');
         }
 
         return $this->render('auth/signup.html.twig', [
             'form' => $form->createView(),
         ]);
+    }
+
+    #[Route('/check-email', name: 'app_check_email')]
+    public function checkEmail(Request $request): Response
+    {
+        $email = $request->getSession()->get('verify_email_address', '');
+        if ($email === '') {
+            return $this->redirectToRoute('app_signup');
+        }
+
+        return $this->render('auth/check_email.html.twig', [
+            'email' => $email,
+        ]);
+    }
+
+    #[Route('/verify-email/{token}', name: 'app_verify_email', methods: ['GET'])]
+    public function verifyEmail(
+        string $token,
+        EntityManagerInterface $em,
+    ): Response {
+        $user = $em->getRepository(User::class)->findOneBy(['reset_token' => $token]);
+
+        if (!$user) {
+            $this->addFlash('error', 'Invalid verification link.');
+            return $this->redirectToRoute('app_signup');
+        }
+
+        if ($user->getResetTokenExpiresAt() < new \DateTime()) {
+            $this->addFlash('error', 'Verification link has expired. Please sign up again.');
+            return $this->redirectToRoute('app_signup');
+        }
+
+        $user->setIsVerified(true);
+        $user->setResetToken(null);
+        $user->setResetTokenExpiresAt(null);
+        $em->flush();
+
+        $this->addFlash('success', 'Email verified! You can now sign in.');
+        return $this->redirectToRoute('app_login');
+    }
+
+    #[Route('/resend-verification', name: 'app_resend_verification', methods: ['POST'])]
+    public function resendVerification(
+        Request $request,
+        EntityManagerInterface $em,
+    ): Response {
+        $email = trim((string) $request->request->get('email', ''));
+        if ($email === '') {
+            $email = $request->getSession()->get('verify_email_address', '');
+        }
+
+        $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+        if (!$user || $user->isVerified()) {
+            $this->addFlash('error', 'Invalid request.');
+            return $this->redirectToRoute('app_login');
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $user->setResetToken($token);
+        $user->setResetTokenExpiresAt(new \DateTime('+24 hours'));
+        $em->flush();
+
+        $this->sendVerificationEmail($user, $token, $request);
+
+        $request->getSession()->set('verify_email_address', $email);
+        $this->addFlash('success', 'Verification email resent!');
+        return $this->redirectToRoute('app_check_email');
+    }
+
+    private function sendVerificationEmail(User $user, string $token, Request $request): void
+    {
+        $verifyUrl = $request->getSchemeAndHttpHost() . $this->generateUrl('app_verify_email', ['token' => $token]);
+
+        $htmlBody =
+            '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px">' .
+            '<h2 style="text-align:center;color:#8b5cf6;margin:0 0 8px">SynergyGig</h2>' .
+            '<p style="text-align:center;color:#94a3b8;font-size:14px;margin:0 0 24px">Email Verification</p>' .
+            '<p style="color:#e2e8f0;font-size:15px">Hi <strong style="color:#3b82f6">' . htmlspecialchars($user->getFirstName()) . '</strong>,</p>' .
+            '<p style="color:#94a3b8;font-size:14px">Welcome to SynergyGig! Please verify your email to activate your account.</p>' .
+            '<div style="text-align:center;margin:24px 0">' .
+            '<a href="' . htmlspecialchars($verifyUrl) . '" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;font-weight:700;font-size:15px;text-decoration:none;border-radius:8px">Verify My Email →</a>' .
+            '</div>' .
+            '<div style="padding:12px 16px;background:rgba(139,92,246,0.08);border-radius:8px;margin:0 0 16px">' .
+            '<p style="color:#94a3b8;font-size:13px;margin:0">If you didn\'t create an account, you can safely ignore this email.</p>' .
+            '</div>' .
+            '<p style="text-align:center;color:#64748b;font-size:12px;margin:16px 0 0">© 2026 SynergyGig · Secure HR Platform</p>' .
+            '</div>';
+
+        $textBody = "Hi {$user->getFirstName()},\n\nWelcome to SynergyGig! Please verify your email to activate your account.\n\nVerify here: {$verifyUrl}\n\nIf you didn't create an account, you can safely ignore this email.\n\n© 2026 SynergyGig";
+
+        $this->sendEmailViaMailjet($user->getEmail(), 'SynergyGig — Verify Your Email', $htmlBody, $textBody);
+    }
+
+    /**
+     * Send email via Mailjet HTTP API v3.1 — uses HTTPS (port 443), no SMTP needed.
+     */
+    private function sendEmailViaMailjet(string $toEmail, string $subject, string $htmlBody, string $textBody = ''): bool
+    {
+        $apiKey = $_ENV['MAILJET_API_KEY'] ?? '';
+        $secretKey = $_ENV['MAILJET_SECRET_KEY'] ?? '';
+        $fromEmail = $_ENV['MAILER_FROM'] ?? 'noreply@synergygig.work.gd';
+        $replyTo = $_ENV['MAILER_REPLY_TO'] ?? 'synergygig@gmail.com';
+
+        if ($apiKey === '' || $secretKey === '') {
+            return false;
+        }
+
+        if ($textBody === '') {
+            $textBody = strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>', '</div>'], "\n", $htmlBody));
+            $textBody = html_entity_decode($textBody, ENT_QUOTES, 'UTF-8');
+            $textBody = preg_replace('/\n{3,}/', "\n\n", trim($textBody));
+        }
+
+        $message = [
+            'From' => ['Email' => $fromEmail, 'Name' => 'SynergyGig HR Platform'],
+            'To' => [['Email' => $toEmail]],
+            'ReplyTo' => ['Email' => $replyTo, 'Name' => 'SynergyGig Support'],
+            'Subject' => $subject,
+            'HTMLPart' => $htmlBody,
+            'TextPart' => $textBody,
+            'CustomID' => 'synergygig-' . bin2hex(random_bytes(8)),
+        ];
+
+        $payload = json_encode(['Messages' => [$message]]);
+
+        $ch = curl_init('https://api.mailjet.com/v3.1/send');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+            ],
+            CURLOPT_USERPWD => $apiKey . ':' . $secretKey,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return $httpCode >= 200 && $httpCode < 300;
     }
 
     #[Route('/forgot-password', name: 'app_forgot_password', methods: ['GET', 'POST'])]
@@ -244,13 +402,13 @@ class AuthController extends AbstractController
         EntityManagerInterface $em,
     ): Response {
         if ($request->isMethod('POST')) {
-            $email = trim((string) $request->request->get('email', ''));
-            if ($email === '') {
+            $emailAddr = trim((string) $request->request->get('email', ''));
+            if ($emailAddr === '') {
                 $this->addFlash('error', 'Please enter your email address.');
                 return $this->redirectToRoute('app_forgot_password');
             }
 
-            $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+            $user = $em->getRepository(User::class)->findOneBy(['email' => $emailAddr]);
             if (!$user) {
                 $this->addFlash('error', 'No account found with this email address.');
                 return $this->redirectToRoute('app_forgot_password');
@@ -263,52 +421,22 @@ class AuthController extends AbstractController
             $em->flush();
 
             // Store email in session for the verify step
-            $request->getSession()->set('reset_email', $email);
+            $request->getSession()->set('reset_email', $emailAddr);
 
-            // Send OTP via Brevo HTTP API (direct curl)
-            $emailSent = false;
-            $apiKey = $_ENV['BREVO_API_KEY'] ?? '';
+            // Send OTP via Mailjet HTTP API (HTTPS, no SMTP)
+            $htmlBody =
+                '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px">' .
+                '<h2 style="text-align:center;color:#8b5cf6;margin:0 0 8px">SynergyGig</h2>' .
+                '<p style="text-align:center;color:#94a3b8;font-size:14px;margin:0 0 24px">Password Reset Code</p>' .
+                '<div style="text-align:center;padding:20px;background:rgba(139,92,246,0.1);border-radius:8px;margin:0 0 24px">' .
+                '<span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#3b82f6">' . $otp . '</span>' .
+                '</div>' .
+                '<p style="text-align:center;color:#94a3b8;font-size:13px;margin:0">This code expires in 10 minutes.<br>If you did not request this, ignore this email.</p>' .
+                '</div>';
 
-            if ($apiKey !== '') {
-                $htmlBody =
-                    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px">' .
-                    '<h2 style="text-align:center;color:#8b5cf6;margin:0 0 8px">SynergyGig</h2>' .
-                    '<p style="text-align:center;color:#94a3b8;font-size:14px;margin:0 0 24px">Password Reset Code</p>' .
-                    '<div style="text-align:center;padding:20px;background:rgba(139,92,246,0.1);border-radius:8px;margin:0 0 24px">' .
-                    '<span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#3b82f6">' . $otp . '</span>' .
-                    '</div>' .
-                    '<p style="text-align:center;color:#94a3b8;font-size:13px;margin:0">This code expires in 10 minutes.<br>If you did not request this, ignore this email.</p>' .
-                    '</div>';
+            $textBody = "SynergyGig - Password Reset\n\nYour password reset code is: {$otp}\n\nThis code expires in 10 minutes.\nIf you did not request this, ignore this email.\n\n© 2026 SynergyGig";
 
-                $payload = json_encode([
-                    'sender' => ['name' => 'SynergyGig', 'email' => 'mohamedsejibouallegue@gmail.com'],
-                    'to' => [['email' => $email, 'name' => $user->getFirstName() . ' ' . $user->getLastName()]],
-                    'subject' => 'SynergyGig - Password Reset Code',
-                    'htmlContent' => $htmlBody,
-                ]);
-
-                $ch = curl_init('https://api.brevo.com/v3/smtp/email');
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $payload,
-                    CURLOPT_HTTPHEADER => [
-                        'api-key: ' . $apiKey,
-                        'Content-Type: application/json',
-                        'Accept: application/json',
-                    ],
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 10,
-                    CURLOPT_CONNECTTIMEOUT => 5,
-                ]);
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                $emailSent = ($httpCode >= 200 && $httpCode < 300);
-            }
-
-            // Show OTP on screen as fallback if email fails
-            $request->getSession()->set('reset_otp_display', $emailSent ? null : $otp);
+            $this->sendEmailViaMailjet($emailAddr, 'SynergyGig - Password Reset Code', $htmlBody, $textBody);
 
             return $this->redirectToRoute('app_verify_otp');
         }
@@ -357,12 +485,8 @@ class AuthController extends AbstractController
             return $this->redirectToRoute('app_reset_password');
         }
 
-        $otpDisplay = $request->getSession()->get('reset_otp_display');
-        $request->getSession()->remove('reset_otp_display');
-
         return $this->render('auth/verify_otp.html.twig', [
             'email' => $email,
-            'otp_display' => $otpDisplay,
         ]);
     }
 
@@ -422,7 +546,7 @@ class AuthController extends AbstractController
     private function extractFaceEncodingFromImage(string $imagePath): ?array
     {
         $pythonScript = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'python' . DIRECTORY_SEPARATOR . 'face_encode_image.py';
-        $cmd = sprintf('python "%s" "%s"', str_replace('/', DIRECTORY_SEPARATOR, $pythonScript), $imagePath);
+        $cmd = sprintf('/usr/bin/python3 "%s" "%s"', $pythonScript, $imagePath);
         $output = $this->runProcessWithTimeout($cmd, self::FACE_PYTHON_TIMEOUT_SECONDS);
 
         if ($output === null || trim($output) === '') {

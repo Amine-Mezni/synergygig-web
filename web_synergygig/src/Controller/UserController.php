@@ -15,7 +15,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Knp\Component\Pager\PaginatorInterface;
 
 #[Route('/users')]
-#[IsGranted('ROLE_ADMIN')]
+#[IsGranted('ROLE_HR')]
 class UserController extends AbstractController
 {
     #[Route('/', name: 'app_user_index')]
@@ -127,5 +127,47 @@ class UserController extends AbstractController
         }
 
         return $this->redirectToRoute('app_user_index');
+    }
+
+    #[Route('/{id}/upload-avatar', name: 'app_user_upload_avatar', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function uploadAvatar(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('avatar-' . $user->getId(), $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_user_edit', ['id' => $user->getId()]);
+        }
+
+        $file = $request->files->get('avatar');
+        if ($file && $file->isValid()) {
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!in_array($file->getMimeType(), $allowedMimes)) {
+                $this->addFlash('error', 'Only JPG, PNG, GIF or WEBP images are allowed.');
+                return $this->redirectToRoute('app_user_edit', ['id' => $user->getId()]);
+            }
+            if ($file->getSize() > 5 * 1024 * 1024) {
+                $this->addFlash('error', 'Image must be smaller than 5 MB.');
+                return $this->redirectToRoute('app_user_edit', ['id' => $user->getId()]);
+            }
+
+            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/avatars';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            if ($user->getAvatar_path()) {
+                $old = $uploadDir . '/' . $user->getAvatar_path();
+                if (file_exists($old)) {
+                    unlink($old);
+                }
+            }
+
+            $filename = 'user_' . $user->getId() . '_' . uniqid() . '.' . $file->guessExtension();
+            $file->move($uploadDir, $filename);
+            $user->setAvatarPath($filename);
+            $em->flush();
+            $this->addFlash('success', 'Profile photo updated.');
+        }
+
+        return $this->redirectToRoute('app_user_edit', ['id' => $user->getId()]);
     }
 }

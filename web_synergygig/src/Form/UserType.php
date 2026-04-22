@@ -99,7 +99,7 @@ class UserType extends AbstractType
             $builder->add('password', PasswordType::class, [
                 'constraints' => [
                     new Assert\NotBlank(),
-                    new Assert\Length(min: 6),
+                    new Assert\Length(min: 8, minMessage: 'Password must be at least {{ limit }} characters.'),
                 ],
                 'attr' => ['class' => 'form-control', 'placeholder' => '••••••••'],
                 'label_attr' => ['class' => 'form-label'],
