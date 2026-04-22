@@ -88,10 +88,7 @@ class Applications
         return $this;
     }
 
-    public function getContractss(): Collection
-    {
-        return $this->contractss;
-    }
+   
 
     public function addContracts(Contracts $contracts): self
     {
