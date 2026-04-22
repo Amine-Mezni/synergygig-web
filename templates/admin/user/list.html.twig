@@ -32,17 +32,7 @@
                                 <td>{{ user.full_name }}</td>
                                 <td>{{ user.email }}</td>
                                 <td>
-                                    {% if user.role == 'ADMIN' %}
-                                        <span class="badge bg-danger">Admin</span>
-                                    {% elseif user.role == 'HR' %}
-                                        <span class="badge bg-primary">HR</span>
-                                    {% elseif user.role == 'EMPLOYEE' %}
-                                        <span class="badge bg-secondary">Employee</span>
-                                    {% elseif user.role == 'GIG_WORKER' %}
-                                        <span class="badge bg-success">Gig Worker</span>
-                                    {% else %}
-                                        <span class="badge bg-dark">{{ user.role }}</span>
-                                    {% endif %}
+                                   
                                 </td>
                                 <td>{{ user.created_at|date('d/m/Y H:i') }}</td>
                                 <td class="text-end">
