@@ -21,19 +21,24 @@ class AIService
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         string $zaiApiKey = '',
+        string $zaiApiKeyBackup = '',
         string $groqApiKey = '',
         string $openrouterApiKey = '',
         string $opencodeApiKey = '',
     ) {
         $this->providers = [
-            ['name' => 'Z.AI glm-5',           'url' => 'https://api.z.ai/api/paas/v4/chat/completions',        'key' => $zaiApiKey,        'model' => 'glm-5'],
-            ['name' => 'Z.AI glm-4.7-flash',   'url' => 'https://api.z.ai/api/paas/v4/chat/completions',        'key' => $zaiApiKey,        'model' => 'glm-4.7-flash'],
-            ['name' => 'Groq llama-3.3-70b',    'url' => 'https://api.groq.com/openai/v1/chat/completions',      'key' => $groqApiKey,       'model' => 'llama-3.3-70b-versatile'],
-            ['name' => 'Groq llama-3.1-8b',     'url' => 'https://api.groq.com/openai/v1/chat/completions',      'key' => $groqApiKey,       'model' => 'llama-3.1-8b-instant'],
-            ['name' => 'OpenCode glm-5',        'url' => 'https://opencode.ai/zen/v1/chat/completions',          'key' => $opencodeApiKey,   'model' => 'glm-5'],
-            ['name' => 'OpenCode qwen3-coder',  'url' => 'https://opencode.ai/zen/v1/chat/completions',          'key' => $opencodeApiKey,   'model' => 'qwen3-coder'],
-            ['name' => 'OpenRouter llama-free',  'url' => 'https://openrouter.ai/api/v1/chat/completions',        'key' => $openrouterApiKey, 'model' => 'meta-llama/llama-3.3-70b-instruct:free'],
-            ['name' => 'OpenRouter gemma-free',  'url' => 'https://openrouter.ai/api/v1/chat/completions',        'key' => $openrouterApiKey, 'model' => 'google/gemma-2-9b-it:free'],
+            // Primary Z.AI key (working)
+            ['name' => 'Z.AI glm-5',              'url' => 'https://api.z.ai/api/paas/v4/chat/completions',   'key' => $zaiApiKey,        'model' => 'glm-5'],
+            ['name' => 'Z.AI glm-4.7-flash',      'url' => 'https://api.z.ai/api/paas/v4/chat/completions',   'key' => $zaiApiKey,        'model' => 'glm-4.7-flash'],
+            // Backup Z.AI key
+            ['name' => 'Z.AI backup glm-5',       'url' => 'https://api.z.ai/api/paas/v4/chat/completions',   'key' => $zaiApiKeyBackup,  'model' => 'glm-5'],
+            ['name' => 'Z.AI backup glm-4.7-flash','url' => 'https://api.z.ai/api/paas/v4/chat/completions',  'key' => $zaiApiKeyBackup,  'model' => 'glm-4.7-flash'],
+            // Groq (working)
+            ['name' => 'Groq llama-3.3-70b',      'url' => 'https://api.groq.com/openai/v1/chat/completions', 'key' => $groqApiKey,       'model' => 'llama-3.3-70b-versatile'],
+            ['name' => 'Groq llama-3.1-8b',       'url' => 'https://api.groq.com/openai/v1/chat/completions', 'key' => $groqApiKey,       'model' => 'llama-3.1-8b-instant'],
+            // OpenRouter (429 — may recover)
+            ['name' => 'OpenRouter llama-free',   'url' => 'https://openrouter.ai/api/v1/chat/completions',   'key' => $openrouterApiKey, 'model' => 'meta-llama/llama-3.3-70b-instruct:free'],
+            ['name' => 'OpenRouter gemma-free',   'url' => 'https://openrouter.ai/api/v1/chat/completions',   'key' => $openrouterApiKey, 'model' => 'google/gemma-2-9b-it:free'],
         ];
     }
 
@@ -43,15 +48,59 @@ class AIService
      */
     public function chat(string $systemPrompt, string $userMessage, float $temperature = 0.7, int $maxTokens = 2048): ?string
     {
+        return $this->runChatRequest($systemPrompt, $userMessage, $temperature, $maxTokens);
+    }
+
+    /**
+     * Use a short AI deadline for request/response paths where we prefer a fast local fallback over waiting.
+     */
+    public function chatFast(string $systemPrompt, string $userMessage, float $temperature = 0.7, int $maxTokens = 2048): ?string
+    {
+        return $this->runChatRequest($systemPrompt, $userMessage, $temperature, $maxTokens, [
+            'preferredProviders' => [
+                'Groq llama-3.3-70b',
+                'Groq llama-3.1-8b',
+                'Z.AI glm-4.7-flash',
+            ],
+            'timeout' => 4,
+            'totalTimeout' => 10,
+            'maxProviders' => 3,
+        ]);
+    }
+
+    private function runChatRequest(string $systemPrompt, string $userMessage, float $temperature, int $maxTokens, array $options = []): ?string
+    {
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user',   'content' => $userMessage],
         ];
 
-        foreach ($this->providers as $provider) {
+        $providers = $this->orderedProviders($options['preferredProviders'] ?? []);
+        $requestTimeout = (float) ($options['timeout'] ?? 30);
+        $totalTimeout = isset($options['totalTimeout']) ? (float) $options['totalTimeout'] : null;
+        $maxProviders = isset($options['maxProviders']) ? (int) $options['maxProviders'] : null;
+        $deadline = $totalTimeout !== null ? microtime(true) + $totalTimeout : null;
+        $attempts = 0;
+
+        foreach ($providers as $provider) {
             if (empty($provider['key'])) {
                 continue;
             }
+
+            if ($maxProviders !== null && $attempts >= $maxProviders) {
+                break;
+            }
+
+            $timeout = $requestTimeout;
+            if ($deadline !== null) {
+                $remaining = $deadline - microtime(true);
+                if ($remaining <= 0) {
+                    break;
+                }
+                $timeout = min($timeout, max(1.0, $remaining));
+            }
+
+            $attempts++;
 
             try {
                 $response = $this->httpClient->request('POST', $provider['url'], [
@@ -65,7 +114,7 @@ class AIService
                         'temperature' => $temperature,
                         'max_tokens'  => $maxTokens,
                     ],
-                    'timeout' => 30,
+                    'timeout' => $timeout,
                 ]);
 
                 $data = $response->toArray();
@@ -85,6 +134,37 @@ class AIService
 
         $this->logger->error('All AI providers failed.');
         return null;
+    }
+
+    private function orderedProviders(array $preferredProviders = []): array
+    {
+        if (empty($preferredProviders)) {
+            return $this->providers;
+        }
+
+        $ordered = [];
+        $seen = [];
+
+        foreach ($preferredProviders as $providerName) {
+            foreach ($this->providers as $provider) {
+                if ($provider['name'] !== $providerName) {
+                    continue;
+                }
+
+                $ordered[] = $provider;
+                $seen[$provider['name']] = true;
+                break;
+            }
+        }
+
+        foreach ($this->providers as $provider) {
+            if (isset($seen[$provider['name']])) {
+                continue;
+            }
+            $ordered[] = $provider;
+        }
+
+        return $ordered;
     }
 
     /* ─── Convenience methods matching Java ZAIService ─── */
@@ -250,6 +330,104 @@ class AIService
 
         return $this->chat($system, $user, 0.8, 2048)
             ?? "Unable to scan jobs at this time. Please try again later.";
+    }
+
+    public function generateContractDraft(
+        string $candidateName,
+        string $offerTitle,
+        string $contractType = 'GIG',
+        ?float $amount = null,
+        ?\DateTimeInterface $startDate = null,
+        ?\DateTimeInterface $endDate = null
+    ): string {
+        $system = "You are a legal contract drafting assistant for SynergyGig, a platform connecting gig workers with employers. "
+            . "Draft a professional, legally-sound {$contractType} contract. "
+            . "Structure it with clear numbered sections: "
+            . "1. Parties & Recitals  2. Scope of Work  3. Duration & Schedule  4. Compensation & Payment Terms  "
+            . "5. Intellectual Property  6. Confidentiality & Non-Disclosure  7. Termination  "
+            . "8. Dispute Resolution & Governing Law  9. General Provisions. "
+            . "Use plain English. Add [PLACEHOLDER] markers where specific values need HR review. "
+            . "Do NOT use markdown code fences — return plain text only.";
+
+        $amountStr = $amount ? '$' . number_format($amount, 2) . ' USD' : '[RATE TO BE AGREED]';
+        $startStr  = $startDate ? $startDate->format('F d, Y') : '[START DATE]';
+        $endStr    = $endDate   ? $endDate->format('F d, Y')   : '[END DATE / AT-WILL]';
+
+        $user = "Contract Type: {$contractType}\n"
+            . "Candidate (Worker): {$candidateName}\n"
+            . "Employer: SynergyGig Platform / [CLIENT COMPANY NAME]\n"
+            . "Position / Offer: {$offerTitle}\n"
+            . "Compensation: {$amountStr}\n"
+            . "Start Date: {$startStr}\n"
+            . "End Date: {$endStr}\n\n"
+            . "Draft the complete contract now.";
+
+        return $this->chat($system, $user, 0.35, 3500)
+            ?? $this->fallbackContractDraft($candidateName, $offerTitle, $contractType, $amount, $startDate, $endDate);
+    }
+
+    private function fallbackContractDraft(
+        string $candidateName,
+        string $offerTitle,
+        string $contractType,
+        ?float $amount,
+        ?\DateTimeInterface $startDate,
+        ?\DateTimeInterface $endDate
+    ): string {
+        $amountStr = $amount ? '$' . number_format($amount, 2) . ' USD' : '[RATE TO BE AGREED]';
+        $startStr  = $startDate ? $startDate->format('F d, Y') : '[START DATE]';
+        $endStr    = $endDate   ? $endDate->format('F d, Y')   : '[END DATE]';
+        $date      = date('F d, Y');
+
+        return <<<TXT
+{$contractType} SERVICES AGREEMENT
+
+Effective Date: {$date}
+
+1. PARTIES & RECITALS
+   This {$contractType} Services Agreement ("Agreement") is entered into between:
+   Worker: {$candidateName} ("Contractor")
+   Client: [CLIENT COMPANY NAME] ("Client"), facilitated through SynergyGig Platform.
+
+2. SCOPE OF WORK
+   Contractor agrees to perform services related to: {$offerTitle}
+   Specific deliverables, milestones, and acceptance criteria shall be documented in a Statement of Work ("SOW") attached hereto.
+
+3. DURATION & SCHEDULE
+   Start Date: {$startStr}
+   End Date:   {$endStr}
+   This Agreement may be extended by mutual written consent.
+
+4. COMPENSATION & PAYMENT TERMS
+   Rate: {$amountStr}
+   Payment Schedule: [NET-30 / MILESTONE-BASED — specify]
+   Invoices submitted by Contractor within 5 business days of milestone completion.
+
+5. INTELLECTUAL PROPERTY
+   All work product created under this Agreement shall be considered work-for-hire and shall vest exclusively in Client upon full payment, unless otherwise agreed in writing.
+
+6. CONFIDENTIALITY & NON-DISCLOSURE
+   Contractor agrees not to disclose any proprietary or confidential information of Client to third parties during or after the term of this Agreement.
+
+7. TERMINATION
+   Either party may terminate this Agreement with 14 days written notice. Client may terminate immediately for material breach.
+
+8. DISPUTE RESOLUTION & GOVERNING LAW
+   This Agreement shall be governed by the laws of [JURISDICTION]. Disputes shall be resolved by binding arbitration before litigation.
+
+9. GENERAL PROVISIONS
+   This Agreement constitutes the entire understanding between the parties. Amendments must be in writing signed by both parties.
+
+SIGNATURES
+
+Worker: ___________________________  Date: ___________
+{$candidateName}
+
+Client: ___________________________  Date: ___________
+[Authorized Representative]
+
+*(AI providers unavailable — standard template used. Review all [PLACEHOLDER] values before sending.)*
+TXT;
     }
 
     /* ─── Fallback generators (used when all AI providers fail) ─── */

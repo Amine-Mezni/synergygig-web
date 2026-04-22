@@ -601,6 +601,32 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
         return $this->redirectToRoute('app_community_index');
     }
 
+    #[Route('/comment/{id}/edit', name: 'app_community_comment_edit', methods: ['POST'])]
+    public function editComment(Request $request, int $id, CommentRepository $commentRepo, EntityManagerInterface $em): Response
+    {
+        $comment = $commentRepo->find($id);
+        if (!$comment) {
+            throw $this->createNotFoundException('Comment not found.');
+        }
+        if ($comment->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
+            throw $this->createAccessDeniedException('You can only edit your own comments.');
+        }
+        if ($this->isCsrfTokenValid('edit-comment-' . $id, $request->request->get('_token'))) {
+            $content = trim($request->request->get('content', ''));
+            if ($content !== '') {
+                $check = BadWordsService::check($content);
+                if ($check['hasBadWords']) {
+                    $this->addFlash('error', 'Your comment contains inappropriate language. Please review.');
+                    return $this->redirectToRoute('app_community_show', ['id' => $comment->getPost()->getId()]);
+                }
+                $comment->setContent($content);
+                $em->flush();
+                $this->addFlash('success', 'Comment updated.');
+            }
+        }
+        return $this->redirectToRoute('app_community_show', ['id' => $comment->getPost()->getId()]);
+    }
+
     // ═══════════════════════════
     //  PEOPLE + FRIEND + FOLLOW
     // ═══════════════════════════

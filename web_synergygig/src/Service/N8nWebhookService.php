@@ -8,17 +8,72 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class N8nWebhookService
 {
     private string $baseUrl;
+    private string $webhookSecret;
     private HttpClientInterface $client;
     private LoggerInterface $logger;
 
     public function __construct(
         HttpClientInterface $client,
         LoggerInterface $logger,
-        string $n8nBaseUrl = 'http://localhost:5678'
+        string $n8nBaseUrl = 'http://localhost:5678',
+        string $webhookSecret = 'synergygig-webhook-secret'
     ) {
         $this->client = $client;
         $this->logger = $logger;
         $this->baseUrl = rtrim($n8nBaseUrl, '/');
+        $this->webhookSecret = $webhookSecret;
+    }
+
+    /**
+     * Fire a webhook with HMAC-SHA256 signature and automatic retry (up to 3 attempts).
+     * Used for critical business events that must be auditable.
+     */
+    private function fireWithRetry(string $path, array $data, int $maxRetries = 3): ?array
+    {
+        $correlationId = $data['correlation_id'] ?? uniqid('sg_', true);
+        $body = json_encode($data);
+        $signature = 'sha256=' . hash_hmac('sha256', $body, $this->webhookSecret);
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $response = $this->client->request('POST', $this->baseUrl . $path, [
+                    'body' => $body,
+                    'headers' => [
+                        'Content-Type'           => 'application/json',
+                        'X-SynergyGig-Signature' => $signature,
+                        'X-Correlation-ID'       => $correlationId,
+                        'X-Attempt'              => (string) $attempt,
+                    ],
+                    'timeout' => 10,
+                ]);
+
+                $statusCode = $response->getStatusCode();
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    $this->logger->info('n8n webhook delivered', [
+                        'path' => $path, 'attempt' => $attempt, 'correlation_id' => $correlationId,
+                    ]);
+                    return $response->toArray(false);
+                }
+
+                $this->logger->warning('n8n webhook non-2xx', [
+                    'path' => $path, 'status' => $statusCode, 'attempt' => $attempt,
+                ]);
+            } catch (\Exception $e) {
+                $this->logger->warning('n8n webhook attempt failed', [
+                    'path' => $path, 'attempt' => $attempt, 'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Exponential backoff: 1s, 2s before retries 2 and 3
+            if ($attempt < $maxRetries) {
+                usleep($attempt * 1_000_000);
+            }
+        }
+
+        $this->logger->error('n8n webhook failed after all retries', [
+            'path' => $path, 'correlation_id' => $correlationId,
+        ]);
+        return null;
     }
 
     /**
@@ -128,6 +183,41 @@ class N8nWebhookService
             'position' => $position,
             'date' => $date,
             'created_at' => (new \DateTime())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Fired when HR accepts an interview — triggers contract creation flow in n8n.
+     * Uses HMAC-signed retry pipeline for auditability.
+     */
+    public function interviewAccepted(
+        int    $interviewId,
+        int    $candidateId,
+        string $candidateName,
+        string $candidateEmail,
+        int    $offerId,
+        string $offerTitle,
+        int    $contractId,
+        string $acceptedBy,
+        string $contractType = 'GIG'
+    ): ?array {
+        $correlationId = 'sgig-' . $interviewId . '-' . uniqid();
+
+        return $this->fireWithRetry('/webhook/interview-accepted', [
+            'correlation_id'  => $correlationId,
+            'trigger'         => 'interview_accepted',
+            'platform'        => 'SynergyGig',
+            'accepted_at'     => (new \DateTime())->format('c'),
+            'interview_id'    => $interviewId,
+            'candidate_id'    => $candidateId,
+            'candidate_name'  => $candidateName,
+            'candidate_email' => $candidateEmail,
+            'offer_id'        => $offerId,
+            'offer_title'     => $offerTitle,
+            'contract_id'     => $contractId,
+            'contract_type'   => $contractType,
+            'accepted_by'     => $acceptedBy,
+            'next_step'       => 'ai_contract_generation',
         ]);
     }
 }

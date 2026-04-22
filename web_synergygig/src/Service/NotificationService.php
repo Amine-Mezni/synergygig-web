@@ -68,4 +68,13 @@ class NotificationService
     {
         $this->notify($user, 'INTERVIEW', 'Interview Scheduled', "An interview has been scheduled for: {$position}", $interviewId, 'Interview');
     }
+
+    public function interviewAccepted(User $user, int $interviewId, string $position, ?int $contractId = null): void
+    {
+        $body = "Congratulations! Your interview for \"{$position}\" has been accepted.";
+        if ($contractId) {
+            $body .= " A draft contract (#$contractId) is ready for your review.";
+        }
+        $this->notify($user, 'INTERVIEW', 'Interview Accepted', $body, $interviewId, 'Interview');
+    }
 }

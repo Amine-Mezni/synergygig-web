@@ -9,8 +9,10 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/face')]
+#[IsGranted('ROLE_ADMIN')]
 class FaceController extends AbstractController
 {
     #[Route('/enroll', name: 'app_face_enroll', methods: ['GET'])]
@@ -71,7 +73,7 @@ class FaceController extends AbstractController
         try {
             // Run Python encoding script
             $pythonScript = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'python' . DIRECTORY_SEPARATOR . 'face_encode_image.py';
-            $cmd = sprintf('python "%s" "%s" 2>&1', str_replace('/', DIRECTORY_SEPARATOR, $pythonScript), $tmpFile);
+            $cmd = sprintf('python3 "%s" "%s" 2>&1', str_replace('/', DIRECTORY_SEPARATOR, $pythonScript), $tmpFile);
             $output = shell_exec($cmd);
 
             if ($output === null || trim($output) === '') {

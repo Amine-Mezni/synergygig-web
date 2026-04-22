@@ -13,12 +13,12 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/export')]
-#[IsGranted('ROLE_HR')]
 class ExportController extends AbstractController
 {
     /* ─── Payroll CSV ─── */
 
     #[Route('/payroll/csv', name: 'app_export_payroll_csv')]
+    #[IsGranted('ROLE_HR')]
     public function payrollCsv(PayrollRepository $repo): StreamedResponse
     {
         $records = $repo->findBy([], ['year' => 'DESC', 'month' => 'DESC']);
@@ -53,6 +53,7 @@ class ExportController extends AbstractController
     /* ─── Attendance CSV ─── */
 
     #[Route('/attendance/csv', name: 'app_export_attendance_csv')]
+    #[IsGranted('ROLE_HR')]
     public function attendanceCsv(AttendanceRepository $repo, Request $request): StreamedResponse
     {
         $records = $repo->findBy([], ['date' => 'DESC']);
@@ -89,6 +90,7 @@ class ExportController extends AbstractController
     /* ─── Leave CSV ─── */
 
     #[Route('/leave/csv', name: 'app_export_leave_csv')]
+    #[IsGranted('ROLE_HR')]
     public function leaveCsv(LeaveRepository $repo): StreamedResponse
     {
         $records = $repo->findBy([], ['start_date' => 'DESC']);
@@ -126,11 +128,19 @@ class ExportController extends AbstractController
     /* ─── Payroll PDF (HTML-based printable) ─── */
 
     #[Route('/payroll/{id}/pdf', name: 'app_export_payroll_pdf', requirements: ['id' => '\d+'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function payrollPdf(int $id, PayrollRepository $repo): Response
     {
         $payroll = $repo->find($id);
         if (!$payroll) {
             throw $this->createNotFoundException('Payroll not found.');
+        }
+
+        // HR/Admin can view any payslip; everyone else can only view their own
+        if (!$this->isGranted('ROLE_HR')) {
+            if ($payroll->getUser()?->getId() !== $this->getUser()?->getId()) {
+                throw $this->createAccessDeniedException('You can only view your own payslip.');
+            }
         }
 
         return $this->render('export/payroll_pdf.html.twig', [

@@ -2,25 +2,34 @@
 
 namespace App\Controller;
 
+use App\Entity\Contract;
 use App\Entity\Interview;
+use App\Entity\Offer;
+use App\Entity\User;
 use App\Form\InterviewType;
+use App\Repository\ContractRepository;
 use App\Repository\InterviewRepository;
+use App\Service\N8nWebhookService;
+use App\Service\NotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Knp\Component\Pager\PaginatorInterface;
 
 #[Route('/interviews')]
 #[IsGranted('ROLE_USER')]
 class InterviewController extends AbstractController
 {
     #[Route('/', name: 'app_interview_index')]
-    public function index(Request $request, InterviewRepository $repo, PaginatorInterface $paginator): Response
+    public function index(Request $request, InterviewRepository $repo): Response
     {
-        $qb = $repo->createQueryBuilder('i')->orderBy('i.id', 'DESC');
+        $qb = $repo->createQueryBuilder('i')
+            ->leftJoin('i.candidate', 'c')->addSelect('c')
+            ->leftJoin('i.organizer', 'org')->addSelect('org')
+            ->leftJoin('i.offer', 'o')->addSelect('o')
+            ->orderBy('i.date_time', 'DESC');
 
         // Gig workers only see interviews where they are the candidate
         if (!$this->isGranted('ROLE_HR')) {
@@ -35,15 +44,14 @@ class InterviewController extends AbstractController
 
         $q = $request->query->get('q');
         if ($q) {
-            $qb->andWhere('LOWER(i.candidate_name) LIKE :q OR LOWER(i.position) LIKE :q')
+            $qb->andWhere('LOWER(c.first_name) LIKE :q OR LOWER(c.last_name) LIKE :q OR LOWER(o.title) LIKE :q')
                ->setParameter('q', '%' . mb_strtolower($q) . '%');
         }
 
-        $pagination = $paginator->paginate($qb, $request->query->getInt('page', 1), 15);
+        $interviews = $qb->getQuery()->getResult();
 
         return $this->render('interview/index.html.twig', [
-            'interviews' => $pagination,
-            'pagination' => $pagination,
+            'interviews' => $interviews,
         ]);
     }
 
@@ -52,6 +60,28 @@ class InterviewController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $interview = new Interview();
+
+        // Pre-fill organizer with current HR user
+        $interview->setOrganizer($this->getUser());
+
+        // Pre-fill candidate from query param (e.g. after accepting an application)
+        $candidateId = $request->query->get('candidate');
+        if ($candidateId) {
+            $candidate = $em->getRepository(User::class)->find($candidateId);
+            if ($candidate) {
+                $interview->setCandidate($candidate);
+            }
+        }
+
+        // Pre-fill offer from query param
+        $offerId = $request->query->get('offer');
+        if ($offerId) {
+            $offer = $em->getRepository(Offer::class)->find($offerId);
+            if ($offer) {
+                $interview->setOffer($offer);
+            }
+        }
+
         $form = $this->createForm(InterviewType::class, $interview);
         $form->handleRequest($request);
 
@@ -106,6 +136,111 @@ class InterviewController extends AbstractController
             $em->flush();
             $this->addFlash('success', 'Interview deleted.');
         }
+        return $this->redirectToRoute('app_interview_index');
+    }
+
+    #[Route('/{id}/accept', name: 'app_interview_accept', methods: ['POST'])]
+    #[IsGranted('ROLE_HR')]
+    public function accept(
+        Request $request,
+        Interview $interview,
+        EntityManagerInterface $em,
+        N8nWebhookService $n8n,
+        NotificationService $notifier,
+        ContractRepository $contractRepo
+    ): Response {
+        if (!$this->isCsrfTokenValid('accept' . $interview->getId(), $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_interview_index');
+        }
+
+        if ($interview->getStatus() !== 'PENDING') {
+            $this->addFlash('error', 'Only pending interviews can be accepted.');
+            return $this->redirectToRoute('app_interview_index');
+        }
+
+        $interview->setStatus('ACCEPTED');
+
+        // ── Auto-create a DRAFT contract if none exists yet for this applicant+offer ──
+        $candidate = $interview->getCandidate();
+        $offer     = $interview->getOffer();
+        $contract  = null;
+
+        if ($candidate && $offer) {
+            $existing = $contractRepo->findOneBy([
+                'applicant' => $candidate,
+                'offer'     => $offer,
+            ]);
+
+            if (!$existing) {
+                $contract = new Contract();
+                $contract->setApplicant($candidate);
+                $contract->setOffer($offer);
+                $contract->setOwner($this->getUser());
+                $contract->setStatus('DRAFT');
+                $contract->setCreatedAt(new \DateTime());
+                $contract->setCurrency('USD');
+                if ($offer->getAmount()) {
+                    $contract->setAmount($offer->getAmount());
+                }
+                $em->persist($contract);
+            } else {
+                $contract = $existing;
+            }
+        }
+
+        $em->flush();
+
+        // ── Notify candidate ──
+        if ($candidate) {
+            $notifier->interviewAccepted(
+                $candidate,
+                $interview->getId(),
+                $offer ? $offer->getTitle() : 'your interview',
+                $contract?->getId()
+            );
+        }
+
+        // ── Fire n8n orchestration webhook (non-blocking, retried) ──
+        if ($candidate && $offer && $contract) {
+            $acceptedBy = $this->getUser() instanceof User
+                ? $this->getUser()->getFirstName() . ' ' . $this->getUser()->getLastName()
+                : 'HR';
+
+            $n8n->interviewAccepted(
+                $interview->getId(),
+                $candidate->getId(),
+                $candidate->getFirstName() . ' ' . $candidate->getLastName(),
+                $candidate->getEmail() ?? '',
+                $offer->getId(),
+                $offer->getTitle(),
+                $contract->getId(),
+                $acceptedBy
+            );
+        }
+
+        $this->addFlash('success', 'Interview accepted — a draft contract has been created.');
+        return $this->redirectToRoute('app_interview_index');
+    }
+
+    #[Route('/{id}/decline', name: 'app_interview_decline', methods: ['POST'])]
+    #[IsGranted('ROLE_HR')]
+    public function decline(Request $request, Interview $interview, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('decline' . $interview->getId(), $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_interview_index');
+        }
+
+        if ($interview->getStatus() !== 'PENDING') {
+            $this->addFlash('error', 'Only pending interviews can be declined.');
+            return $this->redirectToRoute('app_interview_index');
+        }
+
+        $interview->setStatus('REJECTED');
+        $em->flush();
+
+        $this->addFlash('success', 'Interview declined.');
         return $this->redirectToRoute('app_interview_index');
     }
 }

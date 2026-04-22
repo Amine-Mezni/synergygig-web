@@ -7,6 +7,7 @@ use App\Form\AttendanceType;
 use App\Repository\AttendanceRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -54,12 +55,22 @@ class AttendanceController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $attendance = new Attendance();
+        $attendance->setDate(new \DateTime());
         $form = $this->createForm(AttendanceType::class, $attendance);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $errors = $this->validateAttendance($attendance);
+            if (!empty($errors)) {
+                foreach ($errors as $err) {
+                    $this->addFlash('error', $err);
+                }
+                return $this->render('attendance/form.html.twig', [
+                    'form' => $form->createView(),
+                    'is_edit' => false,
+                ]);
+            }
             $attendance->setCreatedAt(new \DateTime());
-            // Auto-detect late status
             $this->detectLateStatus($attendance);
             $em->persist($attendance);
             $em->flush();
@@ -91,6 +102,17 @@ class AttendanceController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $errors = $this->validateAttendance($attendance);
+            if (!empty($errors)) {
+                foreach ($errors as $err) {
+                    $this->addFlash('error', $err);
+                }
+                return $this->render('attendance/form.html.twig', [
+                    'form' => $form->createView(),
+                    'is_edit' => true,
+                    'record' => $attendance,
+                ]);
+            }
             $this->detectLateStatus($attendance);
             $em->flush();
             $this->addFlash('success', 'Attendance record updated.');
@@ -114,6 +136,67 @@ class AttendanceController extends AbstractController
             $this->addFlash('success', 'Attendance record deleted.');
         }
         return $this->redirectToRoute('app_attendance_index');
+    }
+
+    // ── HR Approve ──
+    #[Route('/{id}/approve', name: 'app_attendance_approve', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_HR')]
+    public function approve(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('approve' . $attendance->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_attendance_index');
+        }
+        $attendance->setApprovalStatus('APPROVED');
+        $attendance->setRejectionReason(null);
+        $em->flush();
+        $this->addFlash('success', 'Attendance approved for ' . $attendance->getUser()?->getFirstName() . ' ' . $attendance->getUser()?->getLastName() . '.');
+        return $this->redirectToRoute('app_attendance_index');
+    }
+
+    // ── HR Reject ──
+    #[Route('/{id}/reject', name: 'app_attendance_reject', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_HR')]
+    public function reject(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('reject' . $attendance->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_attendance_index');
+        }
+        $reason = trim($request->request->get('rejection_reason', ''));
+        $attendance->setApprovalStatus('REJECTED');
+        $attendance->setRejectionReason($reason ?: null);
+        $em->flush();
+        $this->addFlash('warning', 'Attendance record rejected.');
+        return $this->redirectToRoute('app_attendance_index');
+    }
+
+    // ── Heartbeat (updates check_out = now, called every 3 min by JS) ──
+    #[Route('/heartbeat', name: 'app_attendance_heartbeat', methods: ['POST'])]
+    public function heartbeat(EntityManagerInterface $em, AttendanceRepository $repo): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user) { return $this->json(['status' => 'no-user'], 401); }
+        $record = $repo->findOneBy(['user' => $user, 'date' => new \DateTime('today')]);
+        if ($record && $record->getCheckIn()) {
+            $record->setCheckOut(new \DateTime());
+            $em->flush();
+        }
+        return $this->json(['status' => 'ok']);
+    }
+
+    // ── Auto checkout (sendBeacon on page unload) ──
+    #[Route('/auto-checkout', name: 'app_attendance_auto_checkout', methods: ['POST'])]
+    public function autoCheckout(EntityManagerInterface $em, AttendanceRepository $repo): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user) { return $this->json(['status' => 'no-user'], 401); }
+        $record = $repo->findOneBy(['user' => $user, 'date' => new \DateTime('today')]);
+        if ($record && $record->getCheckIn()) {
+            $record->setCheckOut(new \DateTime());
+            $em->flush();
+        }
+        return $this->json(['status' => 'ok']);
     }
 
     // ── Check-in ──
@@ -151,11 +234,10 @@ class AttendanceController extends AbstractController
 
         $existing->setCheckIn($now);
         $existing->setStatus('PRESENT');
+        $existing->setApprovalStatus('PENDING');
         $this->detectLateStatus($existing);
-
         $em->flush();
         $this->addFlash('success', 'Checked in at ' . $now->format('H:i') . ($existing->getStatus() === 'LATE' ? ' (Late)' : ''));
-
         return $this->redirectToRoute('app_attendance_index');
     }
 
@@ -182,22 +264,47 @@ class AttendanceController extends AbstractController
             return $this->redirectToRoute('app_attendance_index');
         }
 
-        if ($existing->getCheckOut()) {
-            $this->addFlash('warning', 'You have already checked out today.');
-            return $this->redirectToRoute('app_attendance_index');
-        }
-
+        // Always update check_out to latest time (one-record-per-day rule)
         $now = new \DateTime();
         $existing->setCheckOut($now);
         $em->flush();
 
         $hours = $this->calculateHours($existing);
         $this->addFlash('success', sprintf('Checked out at %s — worked %.1f hours', $now->format('H:i'), $hours));
-
         return $this->redirectToRoute('app_attendance_index');
     }
 
     // ── Business logic ──
+
+    private function validateAttendance(Attendance $attendance): array
+    {
+        $errors = [];
+        if (!$attendance->getUser()) {
+            $errors[] = 'Please select an employee.';
+        }
+        if (!$attendance->getDate()) {
+            $errors[] = 'Date is required.';
+        } else {
+            $now = new \DateTime();
+            $minDate = new \DateTime('-1 year');
+            $maxDate = new \DateTime('+7 days');
+            if ($attendance->getDate() < $minDate) {
+                $errors[] = 'Date cannot be more than 1 year in the past.';
+            }
+            if ($attendance->getDate() > $maxDate) {
+                $errors[] = 'Date cannot be more than 7 days in the future.';
+            }
+        }
+        if (!$attendance->getStatus()) {
+            $errors[] = 'Please select a status.';
+        }
+        $checkIn = $attendance->getCheckIn();
+        $checkOut = $attendance->getCheckOut();
+        if ($checkIn && $checkOut && $checkOut <= $checkIn) {
+            $errors[] = 'Check-out time must be after check-in time.';
+        }
+        return $errors;
+    }
 
     private function detectLateStatus(Attendance $attendance): void
     {

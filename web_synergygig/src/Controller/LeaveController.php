@@ -56,22 +56,52 @@ class LeaveController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $leave = new Leave();
+        $isHr = $this->isGranted('ROLE_HR');
+
         // Non-HR users can only create leaves for themselves
-        if (!$this->isGranted('ROLE_HR')) {
+        if (!$isHr) {
             $leave->setUser($this->getUser());
+            $leave->setStatus('PENDING');
         }
-        $form = $this->createForm(LeaveType::class, $leave);
+        $form = $this->createForm(LeaveType::class, $leave, ['is_hr' => $isHr]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Enforce: non-HR users can only create for themselves
-            if (!$this->isGranted('ROLE_HR')) {
+            // Enforce: non-HR users can only create for themselves with PENDING
+            if (!$isHr) {
                 $leave->setUser($this->getUser());
+                $leave->setStatus('PENDING');
             }
+
+            // Server-side validation
+            $errors = $this->validateLeave($leave);
+            if (!empty($errors)) {
+                foreach ($errors as $err) {
+                    $this->addFlash('error', $err);
+                }
+                return $this->render('leave/form.html.twig', [
+                    'form' => $form->createView(),
+                    'is_edit' => false,
+                ]);
+            }
+
             $leave->setCreatedAt(new \DateTime());
             if (!$leave->getStatus()) {
                 $leave->setStatus('PENDING');
             }
+
+            // Handle optional file attachment
+            $file = $form->get('attachmentFile')->getData();
+            if ($file) {
+                $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/leaves';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0775, true);
+                }
+                $filename = uniqid() . '.' . $file->guessExtension();
+                $file->move($uploadDir, $filename);
+                $leave->setAttachment($filename);
+            }
+
             $em->persist($leave);
             $em->flush();
             $this->addFlash('success', 'Leave request submitted.');
@@ -110,8 +140,10 @@ class LeaveController extends AbstractController
     #[Route('/{id}/edit', name: 'app_leave_edit', requirements: ['id' => '\d+'])]
     public function edit(Request $request, Leave $leave, EntityManagerInterface $em): Response
     {
+        $isHr = $this->isGranted('ROLE_HR');
+
         // Only HR or the leave owner can edit; only PENDING leaves can be edited by non-HR
-        if (!$this->isGranted('ROLE_HR')) {
+        if (!$isHr) {
             if ($leave->getUser()?->getId() !== $this->getUser()?->getId()) {
                 throw $this->createAccessDeniedException('You can only edit your own leave requests.');
             }
@@ -120,10 +152,40 @@ class LeaveController extends AbstractController
                 return $this->redirectToRoute('app_leave_show', ['id' => $leave->getId()]);
             }
         }
-        $form = $this->createForm(LeaveType::class, $leave);
+        $form = $this->createForm(LeaveType::class, $leave, ['is_hr' => $isHr]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // Enforce: non-HR cannot change user or status
+            if (!$isHr) {
+                $leave->setUser($this->getUser());
+                $leave->setStatus('PENDING');
+            }
+
+            $errors = $this->validateLeave($leave);
+            if (!empty($errors)) {
+                foreach ($errors as $err) {
+                    $this->addFlash('error', $err);
+                }
+                return $this->render('leave/form.html.twig', [
+                    'form' => $form->createView(),
+                    'is_edit' => true,
+                    'leave' => $leave,
+                ]);
+            }
+
+            // Handle optional file attachment
+            $file = $form->get('attachmentFile')->getData();
+            if ($file) {
+                $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/leaves';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0775, true);
+                }
+                $filename = uniqid() . '.' . $file->guessExtension();
+                $file->move($uploadDir, $filename);
+                $leave->setAttachment($filename);
+            }
+
             $em->flush();
             $this->addFlash('success', 'Leave request updated.');
             return $this->redirectToRoute('app_leave_index');
@@ -233,7 +295,55 @@ class LeaveController extends AbstractController
             $em->flush();
             $this->addFlash('success', 'Leave request deleted.');
         }
+
         return $this->redirectToRoute('app_leave_index');
+    }
+
+    private function validateLeave(Leave $leave): array
+    {
+        $errors = [];
+
+        if (!$leave->getUser()) {
+            $errors[] = 'An employee must be selected.';
+        }
+
+        if (!$leave->getType()) {
+            $errors[] = 'Leave type is required.';
+        }
+
+        $start = $leave->getStartDate();
+        $end = $leave->getEndDate();
+
+        if (!$start) {
+            $errors[] = 'Start date is required.';
+        }
+        if (!$end) {
+            $errors[] = 'End date is required.';
+        }
+
+        if ($start && $end) {
+            if ($end < $start) {
+                $errors[] = 'End date must be after or equal to start date.';
+            }
+
+            $now = new \DateTime();
+            $minDate = (clone $now)->modify('-1 year');
+            $maxDate = (clone $now)->modify('+1 year');
+
+            if ($start < $minDate || $start > $maxDate) {
+                $errors[] = 'Start date must be within a reasonable range (1 year past/future).';
+            }
+            if ($end < $minDate || $end > $maxDate) {
+                $errors[] = 'End date must be within a reasonable range (1 year past/future).';
+            }
+        }
+
+        $reason = $leave->getReason();
+        if (!$reason || strlen(trim($reason)) < 5) {
+            $errors[] = 'Reason must be at least 5 characters.';
+        }
+
+        return $errors;
     }
 
     /**

@@ -96,6 +96,12 @@ class DashboardController extends AbstractController
             $appChart[$s] = $appRepo->count(['status' => $s]);
         }
 
+        // Chart data: department headcount
+        $deptChart = [];
+        foreach ($deptRepo->findAll() as $dept) {
+            $deptChart[$dept->getName()] = $userRepo->count(['department' => $dept]);
+        }
+
         return $this->render('dashboard/index.html.twig', [
             'stats' => [
                 'users' => $totalUsers,
@@ -123,6 +129,7 @@ class DashboardController extends AbstractController
             'roleChart' => $roleChart,
             'offerChart' => $offerChart,
             'appChart' => $appChart,
+            'deptChart' => $deptChart,
             'quote' => $quote,
             'recent_users' => $userRepo->findBy([], ['id' => 'DESC'], 5),
             'recent_departments' => $deptRepo->findBy([], ['id' => 'DESC'], 5),

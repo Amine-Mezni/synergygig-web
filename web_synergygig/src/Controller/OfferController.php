@@ -4,109 +4,138 @@ namespace App\Controller;
 
 use App\Entity\Offer;
 use App\Entity\JobApplication;
-use App\Form\OfferType;
 use App\Repository\OfferRepository;
 use App\Repository\JobApplicationRepository;
-use App\Repository\UserRepository;
-use App\Service\OfferAiInsightService;
-use App\Service\ApplicationMatchService;
+use App\Repository\ContractRepository;
+use App\Service\ExchangeRateService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Knp\Component\Pager\PaginatorInterface;
 
+/**
+ * Unified Offers & Contracts Hub — all tabs in one page.
+ */
 #[Route('/offers')]
 class OfferController extends AbstractController
 {
     #[Route('/', name: 'app_offer_index')]
-    public function index(Request $request, OfferRepository $repo, JobApplicationRepository $appRepo, PaginatorInterface $paginator): Response
-    {
-        $qb = $repo->createQueryBuilder('o')->orderBy('o.id', 'DESC');
-
-        $q = $request->query->get('q');
-        if ($q) {
-            $qb->andWhere('LOWER(o.title) LIKE :q OR LOWER(o.description) LIKE :q')
-               ->setParameter('q', '%' . mb_strtolower($q) . '%');
-        }
-
-        $status = $request->query->get('status');
-        if ($status) {
-            $qb->andWhere('o.status = :status')->setParameter('status', $status);
-        }
-
-        $type = $request->query->get('type');
-        if ($type) {
-            $qb->andWhere('o.offer_type = :type')->setParameter('type', $type);
-        }
-
-        $sort = $request->query->get('order_by', 'recent');
-        switch ($sort) {
-            case 'budget_asc':  $qb->orderBy('o.amount', 'ASC'); break;
-            case 'budget_desc': $qb->orderBy('o.amount', 'DESC'); break;
-            case 'oldest':      $qb->orderBy('o.id', 'ASC'); break;
-            default:            $qb->orderBy('o.id', 'DESC'); break;
-        }
-
-        $pagination = $paginator->paginate($qb, $request->query->getInt('page', 1), 15);
-
-        // Track which offers the current user already applied to
-        $appliedOfferIds = [];
+    public function index(
+        Request $request,
+        OfferRepository $repo,
+        JobApplicationRepository $appRepo,
+        ContractRepository $contractRepo,
+        ExchangeRateService $exchangeRateService
+    ): Response {
         $user = $this->getUser();
+
+        // ── Tab 1: Marketplace (OPEN offers) ──
+        $offers = $repo->createQueryBuilder('o')
+            ->where('o.status = :status')
+            ->setParameter('status', 'OPEN')
+            ->orderBy('o.id', 'DESC')
+            ->getQuery()->getResult();
+
+        $appliedOfferIds = [];
         if ($user) {
-            $applications = $appRepo->findBy(['applicant' => $user]);
-            foreach ($applications as $app) {
+            $apps = $appRepo->findBy(['applicant' => $user]);
+            foreach ($apps as $app) {
                 if ($app->getOffer()) {
                     $appliedOfferIds[] = $app->getOffer()->getId();
                 }
             }
         }
 
-        return $this->render('offer/index.html.twig', [
-            'offers' => $pagination,
-            'pagination' => $pagination,
-            'appliedOfferIds' => $appliedOfferIds,
-        ]);
-    }
-
-    #[Route('/new', name: 'app_offer_new')]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
-    public function new(Request $request, EntityManagerInterface $em): Response
-    {
-        $offer = new Offer();
-        $form = $this->createForm(OfferType::class, $offer);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $offer->setCreatedAt(new \DateTime());
-            if (!$offer->getOwner() && $this->getUser()) {
-                $offer->setOwner($this->getUser());
-            }
-            $em->persist($offer);
-            $em->flush();
-            $this->addFlash('success', 'Offer created.');
-            return $this->redirectToRoute('app_offer_index');
+        // ── Tab 2: My Offers (PROJECT_OWNER) ──
+        $myOffers = [];
+        $myOfferCounts = ['draft' => 0, 'open' => 0, 'closed' => 0, 'total' => 0];
+        if ($user && $this->isGranted('ROLE_PROJECT_OWNER')) {
+            $myOffers = $repo->createQueryBuilder('o')
+                ->where('o.owner = :user')
+                ->setParameter('user', $user)
+                ->orderBy('o.id', 'DESC')
+                ->getQuery()->getResult();
+            $myOfferCounts = [
+                'draft' => $repo->count(['owner' => $user, 'status' => 'DRAFT']),
+                'open' => $repo->count(['owner' => $user, 'status' => 'OPEN']),
+                'closed' => $repo->count(['owner' => $user, 'status' => 'CLOSED']),
+                'total' => $repo->count(['owner' => $user]),
+            ];
         }
 
-        return $this->render('offer/form.html.twig', [
-            'form' => $form->createView(),
-            'is_edit' => false,
+        // ── Tab 3: Applications ──
+        $myApplications = [];
+        $appCounts = ['pending' => 0, 'accepted' => 0, 'rejected' => 0, 'total' => 0];
+        if ($user) {
+            if ($this->isGranted('ROLE_GIG_WORKER')) {
+                $myApplications = $appRepo->createQueryBuilder('a')
+                    ->leftJoin('a.offer', 'o')->addSelect('o')
+                    ->where('a.applicant = :user')
+                    ->setParameter('user', $user)
+                    ->orderBy('a.appliedAt', 'DESC')
+                    ->getQuery()->getResult();
+            } elseif ($this->isGranted('ROLE_HR')) {
+                $myApplications = $appRepo->createQueryBuilder('a')
+                    ->leftJoin('a.offer', 'o')->addSelect('o')
+                    ->leftJoin('a.applicant', 'u')->addSelect('u')
+                    ->orderBy('a.appliedAt', 'DESC')
+                    ->setMaxResults(50)
+                    ->getQuery()->getResult();
+            } elseif ($this->isGranted('ROLE_PROJECT_OWNER')) {
+                $myApplications = $appRepo->createQueryBuilder('a')
+                    ->leftJoin('a.offer', 'o')->addSelect('o')
+                    ->leftJoin('a.applicant', 'u')->addSelect('u')
+                    ->where('o.owner = :user')
+                    ->setParameter('user', $user)
+                    ->orderBy('a.appliedAt', 'DESC')
+                    ->getQuery()->getResult();
+            }
+            foreach ($myApplications as $a) {
+                $s = $a->getStatus();
+                if ($s === 'PENDING') $appCounts['pending']++;
+                elseif ($s === 'ACCEPTED') $appCounts['accepted']++;
+                elseif ($s === 'REJECTED') $appCounts['rejected']++;
+                $appCounts['total']++;
+            }
+        }
+
+        // ── Tab 4: Contracts ──
+        $contracts = [];
+        if ($user) {
+            $cqb = $contractRepo->createQueryBuilder('c')->orderBy('c.id', 'DESC');
+            if (!$this->isGranted('ROLE_HR')) {
+                $cqb->andWhere('c.owner = :user OR c.applicant = :user')->setParameter('user', $user);
+            }
+            $contracts = $cqb->setMaxResults(50)->getQuery()->getResult();
+        }
+
+        // ── Currencies for dropdown ──
+        $currencies = $exchangeRateService->getCommonCurrencies();
+
+        return $this->render('offer/hub.html.twig', [
+            'offers' => $offers,
+            'appliedOfferIds' => $appliedOfferIds,
+            'myOffers' => $myOffers,
+            'myOfferCounts' => $myOfferCounts,
+            'myApplications' => $myApplications,
+            'appCounts' => $appCounts,
+            'contracts' => $contracts,
+            'currencies' => $currencies,
         ]);
     }
 
     #[Route('/{id}', name: 'app_offer_show', requirements: ['id' => '\d+'])]
-    public function show(
-        Offer $offer,
-        JobApplicationRepository $appRepo,
-        OfferAiInsightService $aiInsightService,
-        ApplicationMatchService $matchService
-    ): Response {
+    public function show(Offer $offer, JobApplicationRepository $appRepo): Response
+    {
+        // HR should use the HR offers review page, not the marketplace detail
+        if ($this->isGranted('ROLE_HR')) {
+            return $this->redirectToRoute('app_hr_offers');
+        }
+
         $user = $this->getUser();
-        $existingApplication = null;
         $alreadyApplied = false;
-        $matchData = null;
+        $existingApplication = null;
 
         if ($user) {
             $existingApplication = $appRepo->findOneBy([
@@ -114,23 +143,19 @@ class OfferController extends AbstractController
                 'applicant' => $user,
             ]);
             $alreadyApplied = $existingApplication !== null;
-            $matchData = $matchService->matchOfferToUser($offer, (int) $user->getId());
         }
-
-        $aiInsight = $aiInsightService->analyzeOffer($offer);
 
         return $this->render('offer/show.html.twig', [
             'offer' => $offer,
             'alreadyApplied' => $alreadyApplied,
             'existingApplication' => $existingApplication,
-            'aiInsight' => $aiInsight,
-            'matchData' => $matchData,
         ]);
     }
 
-    #[Route('/{id}/apply', name: 'app_offer_apply', requirements: ['id' => '\d+'])]
+    #[Route('/{id}/apply', name: 'app_offer_apply', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function apply(
         Offer $offer,
+        Request $request,
         EntityManagerInterface $em,
         JobApplicationRepository $appRepo
     ): Response {
@@ -154,12 +179,9 @@ class OfferController extends AbstractController
             'offer' => $offer,
             'applicant' => $user,
         ]);
-
         if ($existing) {
-            return $this->render('offer/apply_success.html.twig', [
-                'offer' => $offer,
-                'alreadyApplied' => true,
-            ]);
+            $this->addFlash('warning', 'You have already applied to this offer.');
+            return $this->redirectToRoute('app_offer_show', ['id' => $offer->getId()]);
         }
 
         $application = new JobApplication();
@@ -168,76 +190,15 @@ class OfferController extends AbstractController
         $application->setStatus('PENDING');
         $application->setAppliedAt(new \DateTime());
 
+        $coverLetter = trim($request->request->get('cover_letter', ''));
+        if ($coverLetter !== '') {
+            $application->setCoverLetter($coverLetter);
+        }
+
         $em->persist($application);
         $em->flush();
 
-        return $this->render('offer/apply_success.html.twig', [
-            'offer' => $offer,
-            'alreadyApplied' => false,
-        ]);
-    }
-
-    #[Route('/{id}/publish', name: 'app_offer_publish', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
-    public function publish(Offer $offer, EntityManagerInterface $em): Response
-    {
-        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
-            throw $this->createAccessDeniedException('You can only publish your own offers.');
-        }
-        $offer->setStatus('OPEN');
-        $em->flush();
-        $this->addFlash('success', 'Offer published.');
-        return $this->redirectToRoute('app_offer_index');
-    }
-
-    #[Route('/{id}/close', name: 'app_offer_close', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
-    public function close(Offer $offer, EntityManagerInterface $em): Response
-    {
-        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
-            throw $this->createAccessDeniedException('You can only close your own offers.');
-        }
-        $offer->setStatus('CLOSED');
-        $em->flush();
-        $this->addFlash('success', 'Offer closed.');
-        return $this->redirectToRoute('app_offer_index');
-    }
-
-    #[Route('/{id}/edit', name: 'app_offer_edit', requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
-    public function edit(Request $request, Offer $offer, EntityManagerInterface $em): Response
-    {
-        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
-            throw $this->createAccessDeniedException('You can only edit your own offers.');
-        }
-        $form = $this->createForm(OfferType::class, $offer);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
-            $this->addFlash('success', 'Offer updated.');
-            return $this->redirectToRoute('app_offer_index');
-        }
-
-        return $this->render('offer/form.html.twig', [
-            'form' => $form->createView(),
-            'is_edit' => true,
-            'offer' => $offer,
-        ]);
-    }
-
-    #[Route('/{id}/delete', name: 'app_offer_delete', methods: ['POST'])]
-    #[IsGranted('ROLE_PROJECT_OWNER')]
-    public function delete(Request $request, Offer $offer, EntityManagerInterface $em): Response
-    {
-        if (!$this->isGranted('ROLE_ADMIN') && $offer->getOwner() !== $this->getUser()) {
-            throw $this->createAccessDeniedException('You can only delete your own offers.');
-        }
-        if ($this->isCsrfTokenValid('delete' . $offer->getId(), $request->request->get('_token'))) {
-            $em->remove($offer);
-            $em->flush();
-            $this->addFlash('success', 'Offer deleted.');
-        }
-        return $this->redirectToRoute('app_offer_index');
+        $this->addFlash('success', 'Application submitted successfully!');
+        return $this->redirectToRoute('app_offer_show', ['id' => $offer->getId()]);
     }
 }
