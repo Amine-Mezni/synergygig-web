@@ -148,7 +148,8 @@
     }
 
     .offer-submit-btn,
-    .offer-cancel-btn {
+    .offer-cancel-btn,
+    .offer-list-btn {
         min-width: 180px;
         height: 52px;
         padding: 0 22px;
@@ -171,6 +172,7 @@
 
     .offer-submit-btn:hover {
         transform: translateY(-2px);
+        color: #fff;
     }
 
     .offer-cancel-btn {
@@ -184,6 +186,17 @@
         color: #fff;
     }
 
+    .offer-list-btn {
+        background: rgba(34,211,238,0.10);
+        color: #67e8f9;
+        border: 1px solid rgba(34,211,238,0.25);
+    }
+
+    .offer-list-btn:hover {
+        background: rgba(34,211,238,0.16);
+        color: #a5f3fc;
+    }
+
     @media (max-width: 768px) {
         .offer-edit-card {
             padding: 20px;
@@ -195,7 +208,8 @@
         }
 
         .offer-submit-btn,
-        .offer-cancel-btn {
+        .offer-cancel-btn,
+        .offer-list-btn {
             width: 100%;
         }
     }
@@ -206,7 +220,7 @@
 <div class="offer-edit-wrap">
     <div class="offer-edit-header">
         <h1>Modifier une offre</h1>
-        <p>Modifiez les informations de votre offre avec une mise en page claire et professionnelle.</p>
+        <p>Modifiez les informations de votre offre avec une présentation claire, moderne et professionnelle.</p>
     </div>
 
     <div class="offer-edit-card">
@@ -280,7 +294,8 @@
 
         <div class="offer-actions">
             <button type="submit" class="offer-submit-btn">Enregistrer les modifications</button>
-            <a href="{{ path('app_project_owner_offer_list') }}" class="offer-cancel-btn">Retour à mes offres</a>
+            <a href="{{ path('app_project_owner_offer_list') }}" class="offer-list-btn">Voir les offres modifiées</a>
+            <a href="{{ path('app_project_owner_offer_list') }}" class="offer-cancel-btn">Retour</a>
         </div>
 
         {{ form_end(form) }}

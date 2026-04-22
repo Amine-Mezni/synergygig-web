@@ -95,13 +95,26 @@ public function new(
         'form' => $form->createView(),
     ]);
 }
-    #[Route('/project-owner/offers/{id}/edit', name: 'app_project_owner_offer_edit')]
+  #[Route('/project-owner/offers/{id}/edit', name: 'app_project_owner_offer_edit', methods: ['GET', 'POST'])]
 public function edit(
     Request $request,
     Offers $offer,
     EntityManagerInterface $entityManager,
     SluggerInterface $slugger
 ): Response {
+    /** @var \App\Entity\Users|null $user */
+    $user = $this->getUser();
+
+    if (!$user) {
+        $this->addFlash('error', 'Vous devez être connecté pour modifier une offre.');
+        return $this->redirectToRoute('app_login');
+    }
+
+    if ($offer->getCreatedBy()?->getId() !== $user->getId()) {
+        $this->addFlash('error', 'Vous n’êtes pas autorisé à modifier cette offre.');
+        return $this->redirectToRoute('app_project_owner_offer_list');
+    }
+
     $form = $this->createForm(ProjectOwnerOfferType::class, $offer);
     $form->handleRequest($request);
 
@@ -119,9 +132,11 @@ public function edit(
                         $this->getParameter('offers_images_directory'),
                         $newFilename
                     );
+
                     $offer->setImageUrl($newFilename);
                 } catch (FileException $e) {
                     $this->addFlash('error', 'Erreur lors de l’upload de l’image.');
+
                     return $this->render('project_owner/offer/edit.html.twig', [
                         'form' => $form->createView(),
                         'offer' => $offer,
@@ -131,11 +146,10 @@ public function edit(
 
             try {
                 $entityManager->flush();
+
                 $this->addFlash('success', 'Offre modifiée avec succès.');
 
-                return $this->redirectToRoute('app_project_owner_offer_edit', [
-                    'id' => $offer->getId(),
-                ]);
+                return $this->redirectToRoute('app_project_owner_offer_list');
             } catch (\Exception $e) {
                 $this->addFlash('error', 'Les modifications n’ont pas pu être enregistrées.');
             }
@@ -144,7 +158,7 @@ public function edit(
         }
     }
 
-    return $this->render('project_owner/offer/edit.html.twig', [
+    return $this->render('project_owner/offer/edit_project_owner.html.twig', [
         'form' => $form->createView(),
         'offer' => $offer,
     ]);
