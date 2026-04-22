@@ -42,24 +42,7 @@ class LoginFormAuthenticator extends AbstractLoginFormAuthenticator
         );
     }
 
-    public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
-    {
-        $user = $token->getUser();
-
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return new RedirectResponse($this->urlGenerator->generate('app_admin_dashboard'));
-        }
-
-        if (in_array('ROLE_HR', $user->getRoles(), true)) {
-            return new RedirectResponse($this->urlGenerator->generate('app_home'));
-        }
-
-        if (in_array('ROLE_GIG_WORKER', $user->getRoles(), true)) {
-            return new RedirectResponse($this->urlGenerator->generate('app_front_offers'));
-        }
-
-        return new RedirectResponse($this->urlGenerator->generate('app_front_offers'));
-    }
+   
 
     protected function getLoginUrl(Request $request): string
     {
