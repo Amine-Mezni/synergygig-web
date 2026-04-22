@@ -1,0 +1,389 @@
+﻿[
+    {
+        "Name": "bridge",
+        "Id": "81eb8451c9c918e6064b3173d4fb4c7ce99a0e92dc8a02c49d74aec6ae07e4e6",
+        "Created": "2026-02-20T22:04:34.13267708Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.17.0.0/16",
+                    "Gateway": "172.17.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {
+            "com.docker.network.bridge.default_bridge": "true",
+            "com.docker.network.bridge.enable_icc": "true",
+            "com.docker.network.bridge.enable_ip_masquerade": "true",
+            "com.docker.network.bridge.host_binding_ipv4": "0.0.0.0",
+            "com.docker.network.bridge.name": "docker0",
+            "com.docker.network.driver.mtu": "1500"
+        },
+        "Labels": {},
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.17.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "monitoring_shared",
+        "Id": "355bcb16e3307ca88a34246d7d255f58197a26763176dda6843bec5e1976af86",
+        "Created": "2026-02-04T02:59:00.111921029Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.22.0.0/16",
+                    "Gateway": "172.22.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {
+            "com.docker.compose.config-hash": "c795668395ae62bcd0a862591b0bdfd15f80b762492a59f32efbf230efabccdc",
+            "com.docker.compose.network": "shared",
+            "com.docker.compose.project": "monitoring",
+            "com.docker.compose.version": "5.0.2"
+        },
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.22.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "proxy",
+        "Id": "200a235bfcacdfef028d42c9229d35b7f09f2636cddfe05f037001ac786675eb",
+        "Created": "2026-02-04T02:52:25.057449391Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "172.24.0.0/16",
+                    "Gateway": "172.24.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {},
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.24.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "proxy-manager_default",
+        "Id": "fef654a6180084282f7e93870f1d178d95d0ff2c3107f920fac5cb2c83a5d9af",
+        "Created": "2026-02-03T23:31:56.599287269Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/16",
+                    "Gateway": "172.18.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {
+            "com.docker.compose.config-hash": "f66004a0dca48125b9bc99a03042cc999c6caa7b0cc4e07c1606390db612f511",
+            "com.docker.compose.network": "default",
+            "com.docker.compose.project": "proxy-manager",
+            "com.docker.compose.version": "5.0.2"
+        },
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.18.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "shared",
+        "Id": "51f579920aa44ea1710a0326a1aa1d48264535a18980fb9d92260205d44111b3",
+        "Created": "2026-02-04T02:07:19.885648784Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "172.21.0.0/16",
+                    "Gateway": "172.21.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {},
+        "Containers": {
+            "0a1d059d0fb50e02f0fb9ee21c2257d79e0d1cba1d72a2676ebfcd0fb6fac1df": {
+                "Name": "phpmyadmin",
+                "EndpointID": "86ec6141b38f6f7372ff45ac79ccf99343e2cc1948cf2a4224d1fe7b67f8f95f",
+                "MacAddress": "e2:99:f0:e0:51:1c",
+                "IPv4Address": "172.21.0.3/16",
+                "IPv6Address": ""
+            },
+            "398843fa3133100f43da95ae3cd9309215724f7aefbfcc1f2055923d7c0dda61": {
+                "Name": "synergygig-api-rest",
+                "EndpointID": "d8f6f16a2b583fede9f88dc9b8e75dda97baf1014e083b79ffa50026f4a277b3",
+                "MacAddress": "1e:28:72:ed:f1:e8",
+                "IPv4Address": "172.21.0.6/16",
+                "IPv6Address": ""
+            },
+            "3b071b026a87b79f7174cc2cabff5549d27a5a0a240a6832aaff3ecea164a0af": {
+                "Name": "nginx-proxy-manager",
+                "EndpointID": "3d727d53d29dad619b613b29a433b3382868faf3cde5e758279a22f4ef74fe92",
+                "MacAddress": "2a:a3:80:e3:68:16",
+                "IPv4Address": "172.21.0.7/16",
+                "IPv6Address": ""
+            },
+            "74a61b6d89c55288621ac956e9cccda1b38099a8f7c19cf99163ca9f11df9fab": {
+                "Name": "n8n",
+                "EndpointID": "9df4eecc4a63ecc8ec3affeb4a70c16d1a2c0337f0542010dc148456405eea3f",
+                "MacAddress": "56:bf:62:ff:10:5f",
+                "IPv4Address": "172.21.0.4/16",
+                "IPv6Address": ""
+            },
+            "a061b403a7a362dfddf9f6574c88d4f393e8f2eeba62e8496c7f9abaa366cc7d": {
+                "Name": "synergygig-mysql",
+                "EndpointID": "8c5bee4dc37c131374f6e1c805e0d1682a8a3744f2f47fe4a082f1964ff0a902",
+                "MacAddress": "22:19:62:5f:cd:a0",
+                "IPv4Address": "172.21.0.2/16",
+                "IPv6Address": ""
+            },
+            "e71442a942e8d1820c13143cac1437ce16125340e3d01d7c912ce134f236e912": {
+                "Name": "synergygig-ai",
+                "EndpointID": "a872c37412fbca685d582481ba31f6e837c2bb375cc9bcb1747f6391707ad481",
+                "MacAddress": "66:4c:18:c3:05:a9",
+                "IPv4Address": "172.21.0.5/16",
+                "IPv6Address": ""
+            }
+        },
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.21.0.0/16": {
+                        "IPsInUse": 9,
+                        "DynamicIPsAvailable": 65527
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "site_default",
+        "Id": "0f9c268d6b1bcdcf1bde59aa23d8af10cd606ec558ebdf548c994bbce12350f9",
+        "Created": "2026-02-03T23:43:24.312831426Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.19.0.0/16",
+                    "Gateway": "172.19.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {
+            "com.docker.compose.config-hash": "2df86aff95875cc959c82ff7bdcf8166f442cbe36ebb7dfbbe6b7af2c6f285ff",
+            "com.docker.compose.network": "default",
+            "com.docker.compose.project": "site",
+            "com.docker.compose.version": "5.0.2"
+        },
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.19.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "web_synergygig_synergygig_network",
+        "Id": "1822e0a1066a11f1be5a5d62830be12551e6bf8f331f47b14e20960280a83356",
+        "Created": "2026-04-01T18:54:57.428283183Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.23.0.0/16",
+                    "Gateway": "172.23.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {
+            "com.docker.compose.config-hash": "87112858e0f97c0059ebf4e46640a4eddf356be9e7000e704e567d4b4d988190",
+            "com.docker.compose.network": "synergygig_network",
+            "com.docker.compose.project": "web_synergygig",
+            "com.docker.compose.version": "5.0.2"
+        },
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.23.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    },
+    {
+        "Name": "web_synergygig_web_network",
+        "Id": "275436c575f3431e77c4b2361ef6ed5aaa8bc4a90eac5ee5484ad3d9eda3428b",
+        "Created": "2026-03-30T19:11:31.647986426Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.20.0.0/16",
+                    "Gateway": "172.20.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {
+            "com.docker.compose.config-hash": "ec301e55f1a70f8946857bf1c6915b5551976f4590ff98654cc36a37ddbb834c",
+            "com.docker.compose.network": "web_network",
+            "com.docker.compose.project": "web_synergygig",
+            "com.docker.compose.version": "5.0.2"
+        },
+        "Containers": {},
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.20.0.0/16": {
+                        "IPsInUse": 3,
+                        "DynamicIPsAvailable": 65533
+                    }
+                }
+            }
+        }
+    }
+]

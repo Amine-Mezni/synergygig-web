@@ -1,0 +1,21 @@
+# Exclude non-essential files from Docker build
+.git
+.gitignore
+*.md
+docs/
+n8n_workflows/
+n8n-workflows/
+sql/
+target/
+deploy/
+*.py
+!python/*.py
+!web_synergygig/python/*.py
+docker-compose.yml
+Dockerfile
+config.properties
+config.properties.example
+pom.xml
+*.tex
+*.code-workspace
+sounds/

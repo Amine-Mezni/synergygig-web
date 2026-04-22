@@ -1,0 +1,99 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block page_title %}{{ project.name }}{% endblock %}
+
+{% block header_actions %}
+    <a href="{{ path('app_project_kanban', {id: project.id}) }}" class="btn btn-primary btn-sm">📋 Kanban Board</a>
+    {% if is_granted('ROLE_ADMIN') or (project.owner and project.owner.id == app.user.id) %}
+    <a href="{{ path('app_project_edit', {id: project.id}) }}" class="btn btn-ghost btn-sm">Edit</a>
+    {% endif %}
+    <a href="{{ path('app_project_index') }}" class="btn btn-ghost btn-sm">Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="bento-grid bento-grid--stats">
+    <div class="card card--glow-blue">
+        <div class="card-body" style="text-align:center">
+            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Status</div>
+            {% set sc = {'PLANNING': 'blue', 'IN_PROGRESS': 'orange', 'ON_HOLD': 'purple', 'COMPLETED': 'green', 'CANCELLED': 'red'} %}
+            <span class="badge badge--{{ sc[project.status] ?? 'blue' }}" style="font-size:0.85rem">{{ project.status ?? 'N/A' }}</span>
+        </div>
+    </div>
+    <div class="card card--glow-green">
+        <div class="card-body" style="text-align:center">
+            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Owner</div>
+            {% if project.owner %}
+                <div class="avatar" style="margin:0 auto 0.5rem">{{ project.owner.firstName|first }}{{ project.owner.lastName|first }}</div>
+                <div style="font-weight:600">{{ project.owner.firstName }} {{ project.owner.lastName }}</div>
+            {% else %}<div class="text-muted">—</div>{% endif %}
+        </div>
+    </div>
+    <div class="card card--glow-purple">
+        <div class="card-body" style="text-align:center">
+            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Department</div>
+            <div style="font-size:1.1rem;font-weight:600">{{ project.department ? project.department.name : '—' }}</div>
+        </div>
+    </div>
+    <div class="card card--glow-orange">
+        <div class="card-body" style="text-align:center">
+            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.25rem">Tasks</div>
+            <div style="font-size:1.5rem;font-weight:700">{{ tasks|length }}</div>
+        </div>
+    </div>
+</div>
+
+{% if project.description %}
+<div class="card" style="margin-top:1.5rem">
+    <div class="card-header"><h3>Description</h3></div>
+    <div class="card-body"><p>{{ project.description }}</p></div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:1.5rem">
+    <div class="card-header"><h3>Details</h3></div>
+    <div class="card-body">
+        <table class="table">
+            <tr><td class="text-muted" style="width:180px">Start Date</td><td>{{ project.startDate ? project.startDate|date('M d, Y') : '—' }}</td></tr>
+            <tr><td class="text-muted">Deadline</td><td>{{ project.deadline ? project.deadline|date('M d, Y') : '—' }}</td></tr>
+            <tr><td class="text-muted">Created</td><td>{{ project.createdAt ? project.createdAt|date('M d, Y H:i') : '—' }}</td></tr>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Tasks</h3>
+        {% if is_granted('ROLE_ADMIN') or (project.owner and project.owner.id == app.user.id) %}
+        <a href="{{ path('app_task_new') }}" class="btn btn-primary btn-sm">+ Add Task</a>
+        {% endif %}
+    </div>
+    {% if tasks|length > 0 %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr><th>Title</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th></tr>
+            </thead>
+            <tbody>
+                {% for t in tasks %}
+                <tr>
+                    <td><a href="{{ path('app_task_show', {id: t.id}) }}" style="color:var(--accent-blue)">{{ t.title }}</a></td>
+                    <td>{% if t.assignedTo %}{{ t.assignedTo.firstName }} {{ t.assignedTo.lastName }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                        {% set tsc = {'TODO': 'blue', 'IN_PROGRESS': 'orange', 'DONE': 'green'} %}
+                        <span class="badge badge--{{ tsc[t.status] ?? 'blue' }}">{{ t.status ?? 'N/A' }}</span>
+                    </td>
+                    <td>
+                        {% set pc = {'LOW': 'green', 'MEDIUM': 'blue', 'HIGH': 'orange'} %}
+                        <span class="badge badge--{{ pc[t.priority] ?? 'blue' }}">{{ t.priority ?? '—' }}</span>
+                    </td>
+                    <td>{{ t.dueDate ? t.dueDate|date('M d, Y') : '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body"><p class="text-muted">No tasks for this project yet.</p></div>
+    {% endif %}
+</div>
+{% endblock %}
