@@ -33,7 +33,7 @@
     {% if users is not empty %}
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-lg)">
             {% for user in users %}
-            <div class="card" style="padding:0;overflow:hidden;position:relative">
+            <div class="card" style="padding:0;overflow:visible;position:relative">
                 {# 3-dot menu #}
                 <details class="crud-actions-menu" style="position:absolute;top:var(--space-sm);right:var(--space-sm)">
                     <summary class="btn btn-ghost btn-sm" title="Actions" style="padding:4px">
@@ -69,7 +69,12 @@
                     <div class="text-muted" style="font-size:.75rem">{{ user.email }}</div>
 
                     <div style="display:flex;align-items:center;gap:.75rem;margin:var(--space-md) 0">
-                        <div class="avatar avatar--lg" style="width:52px;height:52px;font-size:1.25rem">{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}</div>
+                        {% if user.avatar_path %}
+                            <img src="{{ asset('uploads/avatars/' ~ user.avatar_path) }}" alt="{{ user.first_name }}"
+                                 style="width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border-color)">
+                        {% else %}
+                            <div class="avatar avatar--lg" style="width:52px;height:52px;font-size:1.25rem;flex-shrink:0">{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}</div>
+                        {% endif %}
                         <div>
                             {% set role_color = { 'ADMIN': 'red', 'HR': 'purple', 'MANAGER': 'blue', 'EMPLOYEE': 'green', 'FREELANCER': 'orange' } %}
                             <span class="badge badge--{{ role_color[user.role] ?? 'blue' }}">{{ user.role ?? 'EMPLOYEE' }}</span>

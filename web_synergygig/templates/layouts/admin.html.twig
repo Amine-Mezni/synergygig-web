@@ -99,13 +99,14 @@
                     {% endif %}
                 </div>
 
-                {# ── Recruitment ── #}
+                {# ── Recruitment (HR, GIG_WORKER, PROJECT_OWNER, ADMIN) ── #}
+                {% if is_granted('ROLE_HR') or is_granted('ROLE_GIG_WORKER') or is_granted('ROLE_PROJECT_OWNER') or is_granted('ROLE_ADMIN') %}
                 <div class="nav-section" style="--section-i:3">
                     <div class="nav-section-title">
                         <span class="nav-section-dot" style="background:var(--accent-green,#10b981)"></span>
                         Recruitment
                     </div>
-                    {% if is_granted('ROLE_HR') or is_granted('ROLE_GIG_WORKER') %}
+                    {% if is_granted('ROLE_HR') %}
                     <a href="{{ path('app_interview_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_interview' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         Interviews
@@ -113,19 +114,21 @@
                     {% endif %}
                     <a href="{{ path('app_offer_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_offer' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-                        Offers
+                        Offers & Contracts
                     </a>
-                    {% if is_granted('ROLE_HR') or is_granted('ROLE_PROJECT_OWNER') %}
+                    {% if is_granted('ROLE_HR') %}
+                    <a href="{{ path('app_hr_offers') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_hr_offer' ? 'active' }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/></svg>
+                        Review Offers
+                    </a>
                     <a href="{{ path('app_application_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_application' and app.request.attributes.get('_route') != 'app_my_applications' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         Applications
                     </a>
                     {% endif %}
-                    <a href="{{ path('app_my_applications') }}" class="nav-item {{ app.request.attributes.get('_route') == 'app_my_applications' ? 'active' }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        My Applications
-                    </a>
+
                 </div>
+                {% endif %}
 
                 {# ── Project Owner (PROJECT_OWNER only) ── #}
                 {% if is_granted('ROLE_PROJECT_OWNER') %}
@@ -147,7 +150,7 @@
                         <span class="nav-section-dot" style="background:var(--accent-purple,#a78bfa)"></span>
                         Work
                     </div>
-                    <a href="{{ path('app_project_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_project' ? 'active' }}">
+                    <a href="{{ path('app_project_index') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_project' and not (app.request.attributes.get('_route') starts with 'app_project_owner') ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                         Projects
                     </a>
@@ -197,6 +200,12 @@
                     <a href="{{ path('app_job_scanner') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_job_scanner' ? 'active' }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         Job Scanner
+                    </a>
+                    {% endif %}
+                    {% if is_granted('ROLE_GIG_WORKER') %}
+                    <a href="{{ path('app_external_jobs') }}" class="nav-item {{ app.request.attributes.get('_route') starts with 'app_external_jobs' ? 'active' }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        External Jobs
                     </a>
                     {% endif %}
                     {% if is_granted('ROLE_HR') %}
@@ -334,6 +343,19 @@
         </div>
     </div>
     <audio id="incomingRingtone" src="/sounds/ringtone.mp3" loop preload="auto"></audio>
+
+    {# ── Reusable Confirm Modal ── #}
+    <div id="confirmModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+        <div style="background:var(--bg-secondary,#1a1a2e);border:1px solid var(--glass-border,#333);border-radius:16px;padding:2rem;max-width:420px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.5);text-align:center">
+            <div id="confirmIcon" style="width:48px;height:48px;border-radius:12px;margin:0 auto .75rem;display:flex;align-items:center;justify-content:center;font-size:1.5rem"></div>
+            <h3 id="confirmTitle" style="margin:0 0 .5rem;font-size:1.1rem;color:var(--text-primary,#fff)"></h3>
+            <p id="confirmMessage" style="margin:0 0 1.5rem;font-size:.875rem;color:var(--text-secondary,#999)"></p>
+            <div style="display:flex;gap:.75rem;justify-content:center">
+                <button id="confirmCancel" class="btn btn-secondary btn-sm" style="min-width:100px;padding:.5rem 1rem">Cancel</button>
+                <button id="confirmOk" class="btn btn-sm" style="min-width:100px;padding:.5rem 1rem"></button>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block javascripts %}
@@ -577,6 +599,56 @@
     // Initial check after 2s
     setTimeout(pollIncomingCalls, 2000);
 
+    // ===== Confirm Modal =====
+    var modal      = document.getElementById('confirmModal');
+    var modalIcon  = document.getElementById('confirmIcon');
+    var modalTitle = document.getElementById('confirmTitle');
+    var modalMsg   = document.getElementById('confirmMessage');
+    var modalOk    = document.getElementById('confirmOk');
+    var modalCancel= document.getElementById('confirmCancel');
+    var pendingForm = null;
+
+    window.showConfirm = function(form, opts) {
+        pendingForm = form;
+        var type = opts.type || 'info';
+        var colors = {success:'#10b981',danger:'#ef4444',warning:'#f59e0b',info:'#6366f1'};
+        var icons  = {success:'✓',danger:'✕',warning:'⚠',info:'?'};
+        modalIcon.style.background = (colors[type]||colors.info) + '20';
+        modalIcon.style.color = colors[type]||colors.info;
+        modalIcon.textContent = icons[type]||icons.info;
+        modalTitle.textContent = opts.title || 'Confirm';
+        modalMsg.textContent = opts.message || 'Are you sure?';
+        modalOk.textContent = opts.okText || 'Confirm';
+        modalOk.style.background = colors[type]||colors.info;
+        modalOk.style.color = '#fff';
+        modal.style.display = 'flex';
+    };
+
+    if (modalCancel) modalCancel.addEventListener('click', function() {
+        modal.style.display = 'none';
+        pendingForm = null;
+    });
+    if (modalOk) modalOk.addEventListener('click', function() {
+        modal.style.display = 'none';
+        if (pendingForm) pendingForm.submit();
+        pendingForm = null;
+    });
+    if (modal) modal.addEventListener('click', function(e) {
+        if (e.target === modal) { modal.style.display = 'none'; pendingForm = null; }
+    });
+
 })();
 </script>
+
+{# ── Auto Attendance: Heartbeat (updates check_out every 3 min while user is active) ── #}
+{% if app.user %}
+<script>
+(function() {
+    var hbUrl = '{{ path("app_attendance_heartbeat") }}';
+    function beat() { fetch(hbUrl, { method: 'POST', credentials: 'same-origin' }).catch(function(){}); }
+    beat();
+    setInterval(beat, 3 * 60 * 1000);
+})();
+</script>
+{% endif %}
 {% endblock %}

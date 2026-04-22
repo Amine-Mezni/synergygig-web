@@ -16,6 +16,40 @@
 
 {% block content %}
     <div style="max-width: 640px;">
+
+        {# ── Avatar Upload Card ── #}
+        {% if is_edit %}
+        <div class="card" style="margin-bottom:var(--space-lg);padding:var(--space-lg)">
+            <div style="font-weight:600;margin-bottom:var(--space-md);font-size:.9375rem">Profile Photo</div>
+            <div style="display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap">
+                <div style="flex-shrink:0">
+                    {% if user.avatar_path %}
+                        <img id="avatar-preview" src="{{ asset('uploads/avatars/' ~ user.avatar_path) }}" alt="Avatar"
+                             style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--border-color)">
+                    {% else %}
+                        <div id="avatar-preview-initials" style="width:90px;height:90px;border-radius:50%;background:var(--color-primary,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;color:#fff;border:3px solid var(--border-color)">
+                            {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                        </div>
+                        <img id="avatar-preview" src="" alt="" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--border-color);display:none">
+                    {% endif %}
+                </div>
+                <div style="flex:1">
+                    <form method="post" action="{{ path('app_user_upload_avatar', {id: user.id}) }}" enctype="multipart/form-data">
+                        <input type="hidden" name="_token" value="{{ csrf_token('avatar-' ~ user.id) }}">
+                        <label style="display:inline-flex;align-items:center;gap:.5rem;padding:7px 14px;border-radius:8px;border:1px dashed var(--border-color);cursor:pointer;font-size:.85rem;color:var(--text-muted);transition:border-color .2s"
+                               onmouseover="this.style.borderColor='var(--color-primary,#7c3aed)'" onmouseout="this.style.borderColor='var(--border-color)'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Choose photo
+                            <input type="file" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="previewAvatar(this)">
+                        </label>
+                        <button type="submit" id="avatar-upload-btn" class="btn btn-primary btn-sm" style="margin-left:.5rem;display:none">Upload</button>
+                        <div class="text-muted" style="font-size:.75rem;margin-top:.4rem">JPG, PNG, GIF or WEBP · max 5 MB</div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card">
             {{ form_start(form, {'attr': {'novalidate': 'novalidate'}}) }}
 
@@ -100,4 +134,23 @@
             {{ form_end(form) }}
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+function previewAvatar(input) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = document.getElementById('avatar-preview');
+        const initials = document.getElementById('avatar-preview-initials');
+        if (img) { img.src = e.target.result; img.style.display = 'block'; }
+        if (initials) initials.style.display = 'none';
+    };
+    reader.readAsDataURL(input.files[0]);
+    const btn = document.getElementById('avatar-upload-btn');
+    if (btn) btn.style.display = 'inline-flex';
+}
+</script>
 {% endblock %}

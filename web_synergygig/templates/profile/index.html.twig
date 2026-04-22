@@ -22,13 +22,21 @@
 
         {# Avatar with ring #}
         <div style="display:inline-block;padding:3px;border-radius:50%;background:linear-gradient(135deg,var(--accent-primary),var(--accent-secondary));margin-bottom:var(--space-md)">
-            <div class="avatar" style="width:96px;height:96px;font-size:2.5rem;border:3px solid var(--bg-primary)">{{ user.firstName|first|upper }}{{ user.lastName|first|upper }}</div>
+            {% if user.avatar_path %}
+                <img src="{{ asset('uploads/avatars/' ~ user.avatar_path) }}" alt="{{ user.firstName }}"
+                     style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--bg-primary);display:block">
+            {% else %}
+                <div class="avatar" style="width:96px;height:96px;font-size:2.5rem;border:3px solid var(--bg-primary)">{{ user.firstName|first|upper }}{{ user.lastName|first|upper }}</div>
+            {% endif %}
         </div>
 
-        <div class="text-muted" style="font-size:.8125rem;margin-bottom:var(--space-md)">71% profile complete</div>
+        <div class="text-muted" style="font-size:.8125rem;margin-bottom:var(--space-md)">{{ user.avatar_path ? '100' : '71' }}% profile complete</div>
 
         <div style="margin-bottom:var(--space-lg)">
-            <a href="{{ path('app_profile_edit') }}" class="btn btn-secondary btn-sm">Upload Photo</a>
+            <a href="{{ path('app_profile_edit') }}" class="btn btn-secondary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                {{ user.avatar_path ? 'Change Photo' : 'Upload Photo' }}
+            </a>
         </div>
 
         <div style="font-weight:600;color:var(--text-primary);font-size:1.125rem">{{ user.firstName }} {{ user.lastName }}</div>
@@ -76,6 +84,88 @@
         {% endfor %}
     </div>
 </div>
+
+{% if is_granted('ROLE_GIG_WORKER') %}
+{# ── Email Verification (Hunter.io) ── #}
+<div class="card" style="padding:var(--space-xl);margin-bottom:var(--space-xl)">
+    <div style="font-weight:600;color:var(--text-primary);margin-bottom:2px">📧 Email Verification</div>
+    <div class="text-muted" style="font-size:.75rem;margin-bottom:var(--space-lg)">Verify any email address before reaching out — powered by Hunter.io</div>
+
+    <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-md)">
+        <input type="email" id="hunterEmail" class="form-control" placeholder="Enter email to verify..." style="flex:1">
+        <button id="hunterVerifyBtn" class="btn btn-primary btn-sm" onclick="verifyEmailHunter()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Verify
+        </button>
+    </div>
+
+    <div id="hunterResult" style="display:none">
+        <div style="padding:var(--space-md);background:var(--bg-secondary);border-radius:var(--radius-md);border:1px solid var(--border-primary)">
+            <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-sm)">
+                <span id="hunterStatusBadge" class="badge"></span>
+                <span id="hunterEmail2" style="font-weight:600;color:var(--text-primary)"></span>
+                <span id="hunterScore" style="margin-left:auto;font-size:0.8rem;font-weight:700"></span>
+            </div>
+            <div id="hunterDetails" style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem 1rem;font-size:0.8rem;color:var(--text-secondary)"></div>
+        </div>
+    </div>
+    <div id="hunterError" style="display:none;padding:var(--space-sm);background:rgba(239,68,68,0.1);border-radius:var(--radius-sm);color:#ef4444;font-size:0.85rem;margin-top:var(--space-sm)"></div>
+</div>
+
+<script>
+async function verifyEmailHunter() {
+    const input = document.getElementById('hunterEmail');
+    const email = input.value.trim();
+    if (!email) { input.style.borderColor='#ff4444'; return; }
+    input.style.borderColor='';
+
+    const btn = document.getElementById('hunterVerifyBtn');
+    btn.disabled = true; btn.textContent = 'Verifying...';
+    document.getElementById('hunterResult').style.display = 'none';
+    document.getElementById('hunterError').style.display = 'none';
+
+    try {
+        const resp = await fetch('{{ path("app_verify_email_hunter") }}', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ email: email })
+        });
+        const data = await resp.json();
+        if (data.error) {
+            document.getElementById('hunterError').textContent = data.error;
+            document.getElementById('hunterError').style.display = '';
+        } else {
+            const colors = { deliverable:'green', risky:'orange', undeliverable:'red', unknown:'blue' };
+            const bc = colors[data.result] || 'blue';
+            document.getElementById('hunterStatusBadge').className = 'badge badge--' + bc;
+            document.getElementById('hunterStatusBadge').textContent = (data.result || 'unknown').toUpperCase();
+            document.getElementById('hunterEmail2').textContent = data.email;
+            document.getElementById('hunterScore').textContent = 'Score: ' + data.score + '/100';
+            document.getElementById('hunterScore').style.color = data.score >= 70 ? '#10b981' : data.score >= 40 ? '#f59e0b' : '#ef4444';
+
+            const checks = [
+                ['MX Records', data.mx_records],
+                ['SMTP Server', data.smtp_server],
+                ['SMTP Check', data.smtp_check],
+                ['Accept All', data.accept_all],
+                ['Disposable', data.disposable],
+                ['Webmail', data.webmail],
+                ['Block', data.block],
+            ];
+            document.getElementById('hunterDetails').innerHTML = checks.map(function(c) {
+                return '<span>' + c[0] + ': ' + (c[1] ? '✅' : '❌') + '</span>';
+            }).join('');
+            document.getElementById('hunterResult').style.display = '';
+        }
+    } catch(e) {
+        document.getElementById('hunterError').textContent = 'Network error';
+        document.getElementById('hunterError').style.display = '';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Verify';
+    }
+}
+</script>
+{% endif %}
 
 {# ── Biometric Authentication (matching Java) ── #}
 <div class="card" style="padding:var(--space-xl)">
