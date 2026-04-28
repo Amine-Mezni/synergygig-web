@@ -132,6 +132,32 @@
     padding:0.15rem 0.5rem; border-radius:4px; font-size:0.7rem; font-weight:700;
     min-width:28px; text-align:center;
 }
+/* Match score badge (red dot with %) */
+.ej-score-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:0.2rem 0.55rem; border-radius:20px; font-size:0.72rem; font-weight:700;
+    border:1px solid; white-space:nowrap; flex-shrink:0;
+}
+.ej-score-badge--none  { background:rgba(107,114,128,.1); color:#6b7280; border-color:rgba(107,114,128,.25); }
+.ej-score-badge--low   { background:rgba(239,68,68,.12);  color:#ef4444; border-color:rgba(239,68,68,.35); }
+.ej-score-badge--avg   { background:rgba(245,158,11,.12); color:#f59e0b; border-color:rgba(245,158,11,.35); }
+.ej-score-badge--good  { background:rgba(16,185,129,.12); color:#10b981; border-color:rgba(16,185,129,.35); }
+.ej-score-badge--great { background:rgba(99,102,241,.12); color:#6366f1; border-color:rgba(99,102,241,.35); }
+.ej-score-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.ej-score-dot--low   { background:#ef4444; box-shadow:0 0 5px rgba(239,68,68,.6); }
+.ej-score-dot--avg   { background:#f59e0b; box-shadow:0 0 5px rgba(245,158,11,.6); }
+.ej-score-dot--good  { background:#10b981; box-shadow:0 0 5px rgba(16,185,129,.6); }
+.ej-score-dot--great { background:#6366f1; box-shadow:0 0 5px rgba(99,102,241,.6); }
+.ej-match-bar { height:3px; border-radius:2px; background:var(--bg-secondary); margin-top:6px; overflow:hidden; }
+.ej-match-bar-fill { height:100%; border-radius:2px; transition:width .5s ease; }
+.ej-first-match-banner {
+    margin-bottom:0.75rem; padding:0.55rem 1rem; border-radius:8px;
+    background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(16,185,129,.08));
+    border:1px solid rgba(99,102,241,.2);
+    display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:600;
+    color:var(--text-primary);
+}
+.ej-first-match-banner span.pct { color:#6366f1; font-size:1rem; }
 .ej-badge-remotive { background:rgba(99,102,241,0.15); color:#6366f1; }
 .ej-badge-arbeitnow { background:rgba(16,185,129,0.15); color:#10b981; }
 .ej-badge-remoteok { background:rgba(239,68,68,0.15); color:#ef4444; }
@@ -248,6 +274,7 @@
     const sourceStats  = document.getElementById('ejSourceStats');
 
     let searching = false;
+    let cvScores = []; // parallel scores array indexed by job position
 
     function showState(s) {
         emptyState.style.display   = s === 'empty'   ? '' : 'none';
@@ -311,12 +338,15 @@
                 document.querySelector('.ej-empty-title').textContent = 'No jobs found for "' + query + '"';
                 document.querySelector('.ej-empty-subtitle').textContent = 'Try a different keyword, source, or category';
             } else {
-                buildCards(data.results);
+                cvScores = [];
+                buildCards(data.results, []);
                 buildSourceStats(data.results);
                 const count = data.count || data.results.length;
                 resultsCount.textContent = count + ' remote job' + (count > 1 ? 's' : '') + ' found';
                 headerStatus.textContent = count + ' result' + (count > 1 ? 's' : '');
                 showState('results');
+                // Score jobs against CV in background
+                scoreJobsAgainstCV(data.results);
             }
         } catch (e) {
             showState('empty');
@@ -342,9 +372,26 @@
         }
     }
 
-    function buildCards(jobs) {
+    function buildCards(jobs, scores) {
+        scores = scores || [];
         resultsList.innerHTML = '';
-        jobs.forEach(function(job) {
+
+        // First-match banner (best scored job)
+        if (scores.length > 0) {
+            const best = scores.reduce((a, b) => (a.score > b.score ? a : b), scores[0]);
+            if (best && best.score > 0) {
+                const banner = document.createElement('div');
+                banner.className = 'ej-first-match-banner';
+                const dotCls = scoreDotClass(best.score);
+                banner.innerHTML = '<div class="ej-score-dot ' + dotCls + '"></div>'
+                    + '<span class="pct">' + best.score + '%</span>'
+                    + ' <span>best compatibility match based on your CV</span>';
+                resultsList.appendChild(banner);
+            }
+        }
+
+        jobs.forEach(function(job, idx) {
+            const scoreInfo = scores[idx] || null;
             const card = document.createElement('div');
             card.className = 'ej-job-card';
             if (job.url) { card.onclick = function() { window.open(job.url, '_blank'); }; }
@@ -365,6 +412,17 @@
                 badgeHtml += '<span class="ej-badge-salary">' + esc(job.salary) + '</span> ';
             }
 
+            // Score badge (right side)
+            let scoreBadge = '';
+            if (scoreInfo) {
+                const dotCls  = scoreDotClass(scoreInfo.score);
+                const bdgCls  = scoreBadgeClass(scoreInfo.score);
+                scoreBadge = '<span class="ej-score-badge ' + bdgCls + '" title="' + escAttr(scoreInfo.label) + '">'
+                    + '<span class="ej-score-dot ' + dotCls + '"></span>'
+                    + scoreInfo.score + '%'
+                    + '</span>';
+            }
+
             // Meta row
             let metaHtml = '';
             if (job.company) metaHtml += '<span>🏢 ' + esc(job.company) + '</span>';
@@ -378,11 +436,22 @@
                 tagsHtml = '<div class="ej-tags">' + job.tags.slice(0, 6).map(t => '<span class="ej-tag">' + esc(t) + '</span>').join('') + '</div>';
             }
 
+            // Match bar (shown when score present)
+            let matchBarHtml = '';
+            if (scoreInfo) {
+                const barColor = scoreBarColor(scoreInfo.score);
+                matchBarHtml = '<div class="ej-match-bar"><div class="ej-match-bar-fill" style="width:' + scoreInfo.score + '%;background:' + barColor + '"></div></div>';
+            }
+
             card.innerHTML =
-                '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">'
-                    + badgeHtml
-                    + '<span class="ej-job-title">' + esc(job.title) + '</span>'
+                '<div style="display:flex;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;justify-content:space-between">'
+                    + '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;flex:1;min-width:0">'
+                        + badgeHtml
+                        + '<span class="ej-job-title">' + esc(job.title) + '</span>'
+                    + '</div>'
+                    + (scoreBadge ? '<div style="flex-shrink:0">' + scoreBadge + '</div>' : '')
                 + '</div>'
+                + matchBarHtml
                 + '<div class="ej-meta-row">' + metaHtml + '</div>'
                 + (job.description ? '<div class="ej-snippet">' + esc(job.description) + '</div>' : '')
                 + tagsHtml
@@ -390,6 +459,40 @@
 
             resultsList.appendChild(card);
         });
+    }
+
+    function scoreDotClass(score) {
+        if (score >= 70) return 'ej-score-dot--great';
+        if (score >= 50) return 'ej-score-dot--good';
+        if (score >= 30) return 'ej-score-dot--avg';
+        return 'ej-score-dot--low';
+    }
+    function scoreBadgeClass(score) {
+        if (score >= 70) return 'ej-score-badge--great';
+        if (score >= 50) return 'ej-score-badge--good';
+        if (score >= 30) return 'ej-score-badge--avg';
+        return 'ej-score-badge--low';
+    }
+    function scoreBarColor(score) {
+        if (score >= 70) return '#6366f1';
+        if (score >= 50) return '#10b981';
+        if (score >= 30) return '#f59e0b';
+        return '#ef4444';
+    }
+
+    function scoreJobsAgainstCV(jobs) {
+        fetch('{{ path('app_external_jobs_score') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobs: jobs })
+        })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (!data || !data.hasCV) return;
+            cvScores = data.scores || [];
+            buildCards(jobs, cvScores);
+        })
+        .catch(() => {/* silent fail */});
     }
 
     function formatDate(dateStr) {

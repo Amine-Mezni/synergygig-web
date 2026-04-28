@@ -428,6 +428,32 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getGithubId(): ?string { return $this->github_id; }
     public function setGithubId(?string $v): self { $this->github_id = $v; return $this; }
 
+    // ── CV / Resume ──
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $cv_path = null;
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $cv_original_name = null;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $cv_uploaded_at = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $cv_skills_text = null;
+
+    public function getCvPath(): ?string { return $this->cv_path; }
+    public function setCvPath(?string $v): self { $this->cv_path = $v; return $this; }
+
+    public function getCvOriginalName(): ?string { return $this->cv_original_name; }
+    public function setCvOriginalName(?string $v): self { $this->cv_original_name = $v; return $this; }
+
+    public function getCvUploadedAt(): ?\DateTimeInterface { return $this->cv_uploaded_at; }
+    public function setCvUploadedAt(?\DateTimeInterface $v): self { $this->cv_uploaded_at = $v; return $this; }
+
+    public function getCvSkillsText(): ?string { return $this->cv_skills_text; }
+    public function setCvSkillsText(?string $v): self { $this->cv_skills_text = $v; return $this; }
+
     // ── UserInterface methods ──
 
     public function getUserIdentifier(): string

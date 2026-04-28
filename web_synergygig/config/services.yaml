@@ -41,3 +41,7 @@ services:
     App\Service\HunterService:
         arguments:
             $hunterApiKey: '%env(default:hunter_api_key_default:HUNTER_API_KEY)%'
+
+    App\Service\GitHubService:
+        arguments:
+            $token: '%env(default::GITHUB_TOKEN)%'

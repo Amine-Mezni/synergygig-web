@@ -177,4 +177,18 @@ class Project
         return $this;
     }
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $github_repo = null;
+
+    public function getGithubRepo(): ?string
+    {
+        return $this->github_repo;
+    }
+
+    public function setGithubRepo(?string $github_repo): self
+    {
+        $this->github_repo = $github_repo;
+        return $this;
+    }
+
 }

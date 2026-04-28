@@ -306,4 +306,32 @@ class Task
         return $this->setReview_date($review_date);
     }
 
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $github_issue_number = null;
+
+    public function getGithubIssueNumber(): ?int
+    {
+        return $this->github_issue_number;
+    }
+
+    public function setGithubIssueNumber(?int $github_issue_number): self
+    {
+        $this->github_issue_number = $github_issue_number;
+        return $this;
+    }
+
+    #[ORM\Column(type: 'string', length: 512, nullable: true)]
+    private ?string $github_issue_url = null;
+
+    public function getGithubIssueUrl(): ?string
+    {
+        return $this->github_issue_url;
+    }
+
+    public function setGithubIssueUrl(?string $github_issue_url): self
+    {
+        $this->github_issue_url = $github_issue_url;
+        return $this;
+    }
+
 }

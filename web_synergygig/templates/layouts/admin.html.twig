@@ -3,7 +3,7 @@
 {% block html_class %}admin-shell{% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/layout.css?v=9">
 {% endblock %}
 
 {% block body %}
@@ -11,11 +11,13 @@
     <div class="ambient ambient--1"></div>
     <div class="ambient ambient--2"></div>
 
-    <div class="layout">
-        {# ── Sidebar ── #}
-        <aside class="sidebar">
+    {# ── Sidebar (outside .layout to avoid iOS Safari position:fixed clip bug) ── #}
+    <aside class="sidebar">
             <div class="sidebar-header">
                 <a href="{{ path('app_dashboard') }}" class="brand">SynergyGig.</a>
+                <button type="button" class="sidebar-close-btn" id="sidebarCloseBtn" title="Close menu" aria-label="Close navigation">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
             </div>
 
             <nav class="sidebar-nav" id="sidebarNav">
@@ -249,11 +251,12 @@
                     </div>
                 </div>
             </div>
-        </aside>
+    </aside>
 
-        {# Mobile overlay backdrop #}
-        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    {# Mobile overlay backdrop #}
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
+    <div class="layout">
         {# ── Main Area ── #}
         <div class="main">
             <header class="header">
@@ -482,37 +485,6 @@
         });
     }
 
-    // ===== Mobile Sidebar Toggle =====
-    var mobileBtn = document.getElementById('mobileMenuBtn');
-    var sidebar = document.querySelector('.sidebar');
-    var overlay = document.getElementById('sidebarOverlay');
-    if (mobileBtn && sidebar && overlay) {
-        function openMobileSidebar() {
-            sidebar.classList.add('sidebar--open');
-            overlay.classList.add('sidebar-overlay--visible');
-            document.body.style.overflow = 'hidden';
-        }
-        function closeMobileSidebar() {
-            sidebar.classList.remove('sidebar--open');
-            overlay.classList.remove('sidebar-overlay--visible');
-            document.body.style.overflow = '';
-        }
-        mobileBtn.addEventListener('click', function() {
-            if (sidebar.classList.contains('sidebar--open')) {
-                closeMobileSidebar();
-            } else {
-                openMobileSidebar();
-            }
-        });
-        overlay.addEventListener('click', closeMobileSidebar);
-        // Close on nav item click (mobile)
-        sidebar.querySelectorAll('.nav-item').forEach(function(item) {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 768) closeMobileSidebar();
-            });
-        });
-    }
-
     // ===== Theme Toggle (Light / Dark) =====
     var themeBtn = document.getElementById('themeToggleBtn');
     function getStoredTheme() {
@@ -641,6 +613,51 @@
 </script>
 
 {# ── Auto Attendance: Heartbeat (updates check_out every 3 min while user is active) ── #}
+<script>
+// ===== Mobile Sidebar Toggle (standalone — isolated from main IIFE) =====
+(function() {
+    function init() {
+        var btn     = document.getElementById('mobileMenuBtn');
+        var closeBtn = document.getElementById('sidebarCloseBtn');
+        var sidebar = document.querySelector('aside.sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (!btn || !sidebar) return;
+
+        function openSidebar() {
+            sidebar.classList.add('sidebar--open');
+            sidebar.style.webkitTransform = 'translateX(0)';
+            sidebar.style.transform = 'translateX(0)';
+            if (overlay) overlay.classList.add('sidebar-overlay--visible');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSidebar() {
+            sidebar.classList.remove('sidebar--open');
+            sidebar.style.webkitTransform = '';
+            sidebar.style.transform = '';
+            if (overlay) overlay.classList.remove('sidebar-overlay--visible');
+            document.body.style.overflow = '';
+        }
+
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            sidebar.classList.contains('sidebar--open') ? closeSidebar() : openSidebar();
+        });
+        if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+        if (overlay)  overlay.addEventListener('click', closeSidebar);
+        sidebar.querySelectorAll('.nav-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 1024) closeSidebar();
+            });
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
+
 {% if app.user %}
 <script>
 (function() {

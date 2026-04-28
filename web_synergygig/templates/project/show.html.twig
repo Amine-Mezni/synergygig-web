@@ -359,6 +359,50 @@
     </div>
 </div>
 
+{# ── GitHub Issues Panel (Project Manager / Admin only) ── #}
+{% if is_granted('ROLE_ADMIN') or (project.owner and project.owner.id == app.user.id) %}
+<div class="card" style="margin-top:1.5rem" id="github-panel">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <h3>🐙 GitHub Issues</h3>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+            <input id="githubRepoInput" type="text" class="form-control form-control-sm"
+                   placeholder="owner/repo"
+                   value="{{ project.githubRepo ?? '' }}"
+                   style="width:200px"
+                   title="Link a GitHub repository (format: owner/repo)">
+            <button id="btnGithubLinkRepo" class="btn btn-ghost btn-sm" type="button">🔗 Link Repo</button>
+            <button id="btnGithubListIssues" class="btn btn-ghost btn-sm" type="button">📋 List Issues</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="githubStatus" style="display:none;margin-bottom:.75rem;font-weight:600"></div>
+        <div id="githubIssuesBox" style="display:none">
+            <table class="table table-sm" style="font-size:.85rem">
+                <thead><tr><th>#</th><th>Title</th><th>State</th><th>Link</th></tr></thead>
+                <tbody id="githubIssuesList"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:1rem">
+            <h5 style="font-size:.9rem;font-weight:700;margin-bottom:.5rem">Push Task to GitHub Issue</h5>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                <select id="githubTaskSelect" class="form-control form-control-sm" style="max-width:300px">
+                    <option value="">-- select a task --</option>
+                    {% for task in tasks %}
+                        <option value="{{ task.id }}"
+                            {% if task.githubIssueNumber %}data-issue="{{ task.githubIssueNumber }}" data-url="{{ task.githubIssueUrl }}"{% endif %}>
+                            #{{ task.id }} {{ task.title|e }}{% if task.githubIssueNumber %} ✅ (GH #{{ task.githubIssueNumber }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button id="btnGithubCreateIssue" class="btn btn-primary btn-sm" type="button">➕ Create Issue</button>
+                <button id="btnGithubCloseIssue" class="btn btn-ghost btn-sm" type="button">✔ Close Issue</button>
+                <a id="githubIssueLink" href="#" target="_blank" style="display:none;font-size:.8rem">🔗 View Issue</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {# ── AI Toolkit (Project Manager / Admin only) ── #}
 {% if is_granted('ROLE_ADMIN') or (project.owner and project.owner.id == app.user.id) %}
 <div class="card" style="margin-top:1.5rem" id="ai-toolkit">
@@ -724,6 +768,145 @@
             printJson({ error: error.message });
         } finally {
             btnCalendar.disabled = false;
+        }
+    });
+})();
+</script>
+
+<script>
+// ── GitHub Issues Integration ───────────────────────────────
+(function () {
+    const projectId = {{ project.id }};
+    const baseUrl = '/projects/' + projectId;
+
+    const statusEl    = document.getElementById('githubStatus');
+    const issuesBox   = document.getElementById('githubIssuesBox');
+    const issuesList  = document.getElementById('githubIssuesList');
+    const repoInput   = document.getElementById('githubRepoInput');
+    const taskSelect  = document.getElementById('githubTaskSelect');
+    const issueLink   = document.getElementById('githubIssueLink');
+
+    if (!statusEl) return; // panel not rendered (no permission)
+
+    function setStatus(msg, color) {
+        statusEl.textContent = msg;
+        statusEl.style.color = color || 'inherit';
+        statusEl.style.display = 'block';
+    }
+
+    function updateTaskOption(taskId, issueNumber, issueUrl) {
+        const opt = taskSelect.querySelector('option[value="' + taskId + '"]');
+        if (opt) {
+            opt.dataset.issue = issueNumber;
+            opt.dataset.url   = issueUrl;
+            opt.textContent   = opt.textContent.replace(/ ✅.*$/, '') + ' ✅ (GH #' + issueNumber + ')';
+        }
+    }
+
+    taskSelect?.addEventListener('change', function () {
+        const opt = this.options[this.selectedIndex];
+        const url = opt?.dataset?.url;
+        if (url) {
+            issueLink.href = url;
+            issueLink.style.display = 'inline';
+        } else {
+            issueLink.style.display = 'none';
+        }
+    });
+
+    document.getElementById('btnGithubLinkRepo')?.addEventListener('click', async function () {
+        const repo = repoInput.value.trim();
+        if (!repo) { setStatus('Enter a repo in owner/repo format.', 'var(--color-danger)'); return; }
+        this.disabled = true;
+        setStatus('Linking repo…', 'var(--color-primary)');
+        try {
+            const resp = await fetch(baseUrl + '/github/set-repo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ repo }),
+            });
+            const data = await resp.json();
+            if (data.success) {
+                setStatus('✅ Repo linked: ' + data.repo, 'var(--color-success)');
+            } else {
+                setStatus('❌ ' + (data.error || 'Failed to link repo.'), 'var(--color-danger)');
+            }
+        } catch (e) {
+            setStatus('❌ ' + e.message, 'var(--color-danger)');
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    document.getElementById('btnGithubListIssues')?.addEventListener('click', async function () {
+        this.disabled = true;
+        issuesBox.style.display = 'none';
+        setStatus('Loading issues…', 'var(--color-primary)');
+        try {
+            const resp = await fetch(baseUrl + '/github/issues');
+            const data = await resp.json();
+            if (data.error) { setStatus('❌ ' + data.error, 'var(--color-danger)'); return; }
+            issuesList.innerHTML = '';
+            if (!data.issues?.length) {
+                setStatus('No open issues found.', 'inherit');
+                return;
+            }
+            data.issues.forEach(issue => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>#${issue.number}</td><td>${issue.title}</td><td>${issue.state}</td><td><a href="${issue.html_url}" target="_blank">View</a></td>`;
+                issuesList.appendChild(tr);
+            });
+            issuesBox.style.display = 'block';
+            setStatus('Showing ' + data.issues.length + ' issue(s).', 'inherit');
+        } catch (e) {
+            setStatus('❌ ' + e.message, 'var(--color-danger)');
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    document.getElementById('btnGithubCreateIssue')?.addEventListener('click', async function () {
+        const taskId = taskSelect.value;
+        if (!taskId) { setStatus('Select a task first.', 'var(--color-danger)'); return; }
+        this.disabled = true;
+        setStatus('Creating GitHub issue…', 'var(--color-primary)');
+        try {
+            const resp = await fetch(baseUrl + '/tasks/' + taskId + '/github/create-issue', { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                setStatus('✅ Issue #' + data.issue_number + ' created.', 'var(--color-success)');
+                updateTaskOption(taskId, data.issue_number, data.issue_url);
+                issueLink.href = data.issue_url;
+                issueLink.style.display = 'inline';
+            } else {
+                setStatus('❌ ' + (data.error || 'Failed.'), 'var(--color-danger)');
+            }
+        } catch (e) {
+            setStatus('❌ ' + e.message, 'var(--color-danger)');
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    document.getElementById('btnGithubCloseIssue')?.addEventListener('click', async function () {
+        const taskId = taskSelect.value;
+        if (!taskId) { setStatus('Select a task first.', 'var(--color-danger)'); return; }
+        const opt = taskSelect.options[taskSelect.selectedIndex];
+        if (!opt.dataset.issue) { setStatus('This task has no linked GitHub issue.', 'var(--color-danger)'); return; }
+        this.disabled = true;
+        setStatus('Closing GitHub issue…', 'var(--color-primary)');
+        try {
+            const resp = await fetch(baseUrl + '/tasks/' + taskId + '/github/close-issue', { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                setStatus('✅ Issue closed.', 'var(--color-success)');
+            } else {
+                setStatus('❌ ' + (data.error || 'Failed.'), 'var(--color-danger)');
+            }
+        } catch (e) {
+            setStatus('❌ ' + e.message, 'var(--color-danger)');
+        } finally {
+            this.disabled = false;
         }
     });
 })();

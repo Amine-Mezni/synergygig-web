@@ -20,12 +20,17 @@ class AIService
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
-        string $zaiApiKey = '',
-        string $zaiApiKeyBackup = '',
-        string $groqApiKey = '',
-        string $openrouterApiKey = '',
-        string $opencodeApiKey = '',
+        ?string $zaiApiKey = '',
+        ?string $zaiApiKeyBackup = '',
+        ?string $groqApiKey = '',
+        ?string $openrouterApiKey = '',
+        ?string $opencodeApiKey = '',
     ) {
+        $zaiApiKey        = $zaiApiKey ?? '';
+        $zaiApiKeyBackup  = $zaiApiKeyBackup ?? '';
+        $groqApiKey       = $groqApiKey ?? '';
+        $openrouterApiKey = $openrouterApiKey ?? '';
+        $opencodeApiKey   = $opencodeApiKey ?? '';
         $this->providers = [
             // Primary Z.AI key (working)
             ['name' => 'Z.AI glm-5',              'url' => 'https://api.z.ai/api/paas/v4/chat/completions',   'key' => $zaiApiKey,        'model' => 'glm-5'],

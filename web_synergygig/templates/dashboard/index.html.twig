@@ -60,7 +60,7 @@
     {% endif %}
 
     {# ── Weather + Account Row ── #}
-    <div style="display:grid;grid-template-columns:3fr 2fr;gap:var(--space-lg);margin-bottom:var(--space-xl)">
+    <div class="bento-grid bento-grid--weather" style="margin-bottom:var(--space-xl)">
         {# Weather Card #}
         <div class="card" style="padding:var(--space-xl)">
             <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:var(--space-lg)">
@@ -273,6 +273,7 @@
 {% endblock %}
 
 {% block javascripts %}
+{{ parent() }}
 {% if is_granted('ROLE_HR') %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>

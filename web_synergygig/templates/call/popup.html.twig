@@ -100,6 +100,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .call-ended-overlay__text{font-size:18px;font-weight:500;color:rgba(255,255,255,.8)}
 .call-ended-overlay__duration{font-size:14px;color:rgba(255,255,255,.4)}
 
+/* ─── Live Transcription ─── */
+.call-subtitle{position:absolute;bottom:96px;left:0;right:0;z-index:18;text-align:center;padding:0 20px;pointer-events:none;display:none}
+.call-subtitle.active{display:block}
+@keyframes subtitle-in{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes subtitle-out{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-8px) scale(.97)}}
+.call-subtitle__text{display:inline-block;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);color:#fff;font-size:14px;line-height:1.5;padding:6px 18px;border-radius:24px;max-width:82%;word-break:break-word;animation:subtitle-in .35s cubic-bezier(.2,.8,.3,1) both}
+.call-subtitle__text.fading{animation:subtitle-out .65s ease forwards}
+.call-subtitle__interim{opacity:.55;font-style:italic}
+.call-transcript-panel{position:absolute;bottom:96px;left:14px;right:14px;z-index:22;max-height:190px;overflow-y:auto;background:rgba(8,8,18,.88);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px 8px;display:none;flex-direction:column;gap:2px;scroll-behavior:smooth}
+.call-transcript-panel.active{display:flex}
+.call-transcript-entry{font-size:12px;line-height:1.5;color:rgba(255,255,255,.82)}
+.call-transcript-entry--me{color:#90DDF0}
+.call-transcript-entry--translated{color:rgba(255,215,80,.75);font-size:11px;margin-top:1px}
+.call-transcript-label{font-size:10px;color:rgba(255,255,255,.38);margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.call-transcript-label:first-child{margin-top:0}
+.call-btn--cc-active{background:rgba(144,221,240,.2) !important;color:#90DDF0 !important;border:1px solid rgba(144,221,240,.45) !important}
+.call-btn--cc-active:hover{background:rgba(144,221,240,.32) !important}
+.call-cc-unsupported{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(220,38,38,.85);color:#fff;font-size:12px;padding:6px 14px;border-radius:20px;z-index:30;white-space:nowrap;animation:fade-in .3s ease}
+.call-lang-picker{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);background:rgba(8,8,18,.94);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:10px 10px 8px;z-index:28;display:none;flex-wrap:wrap;gap:5px;max-width:290px;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+.call-lang-picker.active{display:flex}
+.call-lang-opt{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.78);border-radius:20px;padding:4px 13px;font-size:11px;cursor:pointer;transition:background .18s,color .18s;white-space:nowrap}
+.call-lang-opt:hover{background:rgba(255,255,255,.15)}
+.call-lang-opt--active{background:rgba(255,215,80,.18) !important;color:rgba(255,215,80,.9) !important;border-color:rgba(255,215,80,.4) !important}
+.call-subtitle__translated{display:block;font-size:12px;color:rgba(255,215,80,.85);font-style:italic;margin-top:2px}
+.call-ended-overlay__download{margin-top:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:7px 20px;font-size:12px;cursor:pointer;transition:background .2s,border-color .2s;display:none}
+.call-ended-overlay__download.visible{display:inline-block}
+.call-ended-overlay__download:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.38)}
+
 /* ─── Responsive ─── */
 @media(max-width:480px){
     .call-local{width:100px;height:75px;bottom:90px;right:12px}
@@ -118,7 +146,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
      data-call-status="{{ call.status }}"
      data-is-caller="{{ isCaller ? '1' : '0' }}"
      data-user-id="{{ app.user.id }}"
-     data-csrf="{{ csrfToken }}">
+     data-csrf="{{ csrfToken }}"
+     data-peer-name="{{ peerName|e('html_attr') }}">
 
     <!-- Header -->
     <div class="call-header">
@@ -170,6 +199,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <span id="screenShareLabel">You are sharing your screen</span>
     </div>
 
+    <!-- Live Subtitle Bar -->
+    <div class="call-subtitle" id="callSubtitle">
+        <span class="call-subtitle__text"><span id="subtitleFinal"></span><span class="call-subtitle__interim" id="subtitleInterim"></span></span>
+    </div>
+
+    <!-- Transcript Panel (full history) -->
+    <div class="call-transcript-panel" id="transcriptPanel"></div>
+
+    <!-- Language Picker -->
+    <div class="call-lang-picker" id="langPicker">
+        <button class="call-lang-opt call-lang-opt--active" data-lang="off">Off</button>
+        <button class="call-lang-opt" data-lang="ar">Arabic</button>
+        <button class="call-lang-opt" data-lang="zh">Chinese</button>
+        <button class="call-lang-opt" data-lang="fr">French</button>
+        <button class="call-lang-opt" data-lang="de">German</button>
+        <button class="call-lang-opt" data-lang="es">Spanish</button>
+        <button class="call-lang-opt" data-lang="pt">Portuguese</button>
+        <button class="call-lang-opt" data-lang="ja">Japanese</button>
+        <button class="call-lang-opt" data-lang="ko">Korean</button>
+        <button class="call-lang-opt" data-lang="ru">Russian</button>
+        <button class="call-lang-opt" data-lang="it">Italian</button>
+        <button class="call-lang-opt" data-lang="hi">Hindi</button>
+        <button class="call-lang-opt" data-lang="tr">Turkish</button>
+    </div>
+
     <!-- Local PiP -->
     <div class="call-local {{ call.callType == 'AUDIO' ? 'call-local--audio' : '' }}" id="localContainer">
         <video id="localVideo" autoplay playsinline muted></video>
@@ -193,6 +247,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </button>
 
+        <button class="call-btn call-btn--default" id="btnCC" data-label="CC" title="Live Captions">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="5" width="22" height="14" rx="2" ry="2"/><path d="M7 9h3v2H8v2h2v2H7v-2H6v-2h1z"/><path d="M13 9h3v2h-2v2h2v2h-3v-2h-1v-2h1z"/></svg>
+        </button>
+
+        <button class="call-btn call-btn--default" id="btnTranslate" data-label="Translate" title="Auto Translate">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </button>
+
         <button class="call-btn call-btn--end" id="btnEnd" data-label="End" title="End Call">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         </button>
@@ -205,6 +267,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         </div>
         <div class="call-ended-overlay__text" id="endedText">Call ended</div>
         <div class="call-ended-overlay__duration" id="endedDuration"></div>
+        <button class="call-ended-overlay__download" id="btnDownload">⬇ Download Transcript</button>
     </div>
 </div>
 
@@ -228,10 +291,9 @@ const CALL_ID     = parseInt(el.dataset.callId);
 const CALL_TYPE   = el.dataset.callType;          // VIDEO | AUDIO
 const IS_CALLER   = el.dataset.isCaller === '1';
 const USER_ID     = parseInt(el.dataset.userId);
-
+const PEER_NAME   = el.dataset.peerName || 'Unknown';
 const ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' }
 ];
 
@@ -247,6 +309,7 @@ const screenBadge     = document.getElementById('screenShareBadge');
 const endedOverlay    = document.getElementById('endedOverlay');
 const endedText       = document.getElementById('endedText');
 const endedDuration   = document.getElementById('endedDuration');
+const btnDownload     = document.getElementById('btnDownload');
 const controls        = document.getElementById('callControls');
 
 const btnMute   = document.getElementById('btnMute');
@@ -255,6 +318,16 @@ const btnScreen = document.getElementById('btnScreen');
 const btnEnd    = document.getElementById('btnEnd');
 const btnAccept = document.getElementById('btnAccept');
 const btnReject = document.getElementById('btnReject');
+const btnCC     = document.getElementById('btnCC');
+
+/* ─── Transcription DOM refs ─── */
+const callSubtitle    = document.getElementById('callSubtitle');
+const subtitleFinal   = document.getElementById('subtitleFinal');
+const subtitleInterim = document.getElementById('subtitleInterim');
+const transcriptPanel = document.getElementById('transcriptPanel');
+const subtitleTextEl  = callSubtitle ? callSubtitle.querySelector('.call-subtitle__text') : null;
+let subtitleFadeTimer = null;
+let subtitleClearTimer = null;
 
 /* ─── Sound refs ─── */
 const snd = {
@@ -269,18 +342,235 @@ const snd = {
 /* ───────────────────────────────────────────
    STATE
    ─────────────────────────────────────────── */
-let localStream  = null;
-let screenStream = null;
-let pc           = null;        // RTCPeerConnection
-let pollTimer    = null;
-let lastSignalId = 0;
-let isMuted      = false;
-let isCameraOff  = false;
-let isScreenOn   = false;
-let callState    = el.dataset.callStatus;  // RINGING | CONNECTED | ENDED
-let timerInterval= null;
-let seconds      = 0;
-let callEnded    = false;
+let localStream       = null;
+let screenStream      = null;
+let pc                = null;        // RTCPeerConnection
+let pollTimer         = null;
+let lastSignalId      = 0;
+let isMuted           = false;
+let isCameraOff       = false;
+let isScreenOn        = false;
+let callState         = el.dataset.callStatus;  // RINGING | CONNECTED | ENDED
+let timerInterval     = null;
+let seconds           = 0;
+let callEnded         = false;
+let isPolling         = false;
+let iceCandidateBuffer = [];
+
+/* ───────────────────────────────────────────
+   TRANSCRIPTION STATE & HELPERS
+   ─────────────────────────────────────────── */
+let recognizer        = null;
+let isCCOn            = false;
+let translateTo       = 'off';
+const transcriptLog   = [];   // {label, text}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function subtitleDuration(text) {
+    // ~250 wpm reading = 240ms/word; clamp 2s–6s
+    const words = text.trim().split(/\s+/).length;
+    return Math.max(2000, Math.min(6000, words * 280));
+}
+
+async function translateText(text) {
+    if (translateTo === 'off' || !text) return null;
+    try {
+        const res = await fetch(
+            'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=autodetect|' + translateTo
+        );
+        const data = await res.json();
+        if (data.responseStatus === 200) {
+            const t = data.responseData.translatedText;
+            return (t && t !== text) ? t : null;
+        }
+    } catch(e) {}
+    return null;
+}
+
+async function addTranscriptEntry(label, text) {
+    const entry = { label, text, time: new Date().toLocaleTimeString(), translated: null };
+    transcriptLog.push(entry);
+    const duration = subtitleDuration(text);
+    // Restart animation by removing, forcing reflow, re-adding element
+    clearTimeout(subtitleFadeTimer);
+    clearTimeout(subtitleClearTimer);
+    if (subtitleTextEl) {
+        subtitleTextEl.classList.remove('fading');
+        subtitleTextEl.style.animation = 'none';
+        void subtitleTextEl.offsetHeight; // reflow
+        subtitleTextEl.style.animation = '';
+    }
+    subtitleFinal.textContent = text;
+    subtitleTextEl && (subtitleTextEl.querySelector('.call-subtitle__translated') || null)?.remove();
+    // Schedule speed-based fade
+    subtitleFadeTimer = setTimeout(() => {
+        if (subtitleTextEl) subtitleTextEl.classList.add('fading');
+        subtitleClearTimer = setTimeout(() => {
+            subtitleFinal.textContent = '';
+            subtitleInterim.textContent = '';
+            const tl = subtitleTextEl?.querySelector('.call-subtitle__translated');
+            if (tl) tl.remove();
+            if (subtitleTextEl) subtitleTextEl.classList.remove('fading');
+        }, 650);
+    }, duration);
+    // Append original to history panel
+    const labelEl = document.createElement('div');
+    labelEl.className = 'call-transcript-label';
+    labelEl.textContent = label;
+    const textEl = document.createElement('div');
+    textEl.className = 'call-transcript-entry' + (label === 'Me' ? ' call-transcript-entry--me' : '');
+    textEl.textContent = text;
+    transcriptPanel.appendChild(labelEl);
+    transcriptPanel.appendChild(textEl);
+    transcriptPanel.scrollTop = transcriptPanel.scrollHeight;
+    // Translate async — update subtitle + append translation to panel
+    if (translateTo !== 'off') {
+        const translated = await translateText(text);
+        if (translated) {
+            entry.translated = translated;
+            // Update live subtitle with translation
+            subtitleFinal.textContent = translated;
+            let tlSubEl = subtitleTextEl?.querySelector('.call-subtitle__translated');
+            if (!tlSubEl && subtitleTextEl) {
+                tlSubEl = document.createElement('span');
+                tlSubEl.className = 'call-subtitle__translated';
+                subtitleTextEl.appendChild(tlSubEl);
+            }
+            // Append translation row to panel
+            const tlEl = document.createElement('div');
+            tlEl.className = 'call-transcript-entry call-transcript-entry--translated';
+            tlEl.textContent = '→ ' + translated;
+            transcriptPanel.appendChild(tlEl);
+            transcriptPanel.scrollTop = transcriptPanel.scrollHeight;
+        }
+    }
+}
+
+function downloadSummary() {
+    if (!transcriptLog.length) return;
+    const lines = [];
+    const dateStr = new Date().toLocaleString();
+    lines.push('╔══════════════════════════════════════╗');
+    lines.push('║      SynergyGig — Call Transcript    ║');
+    lines.push('╚══════════════════════════════════════╝');
+    lines.push('');
+    lines.push('Date       : ' + dateStr);
+    lines.push('Participant: ' + PEER_NAME);
+    lines.push('Duration   : ' + fmtTime(seconds));
+    lines.push('Type       : ' + CALL_TYPE);
+    if (translateTo !== 'off') lines.push('Translated : ' + translateTo.toUpperCase());
+    lines.push('');
+    lines.push('──────────────────────────────────────');
+    lines.push('');
+    transcriptLog.forEach(e => {
+        lines.push('[' + e.time + '] ' + e.label.toUpperCase());
+        lines.push(e.text);
+        if (e.translated) lines.push('  → ' + e.translated);
+        lines.push('');
+    });
+    lines.push('──────────────────────────────────────');
+    lines.push('Generated by SynergyGig on ' + dateStr);
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transcript-' + PEER_NAME.replace(/\s+/g, '_') + '-' + Date.now() + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+if (btnDownload) {
+    btnDownload.addEventListener('click', downloadSummary);
+}
+
+function startTranscription() {
+    if (!SR) return;
+    recognizer = new SR();
+    recognizer.continuous = true;
+    recognizer.interimResults = true;
+    recognizer.lang = navigator.language || 'en-US';
+    recognizer.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+                const txt = e.results[i][0].transcript.trim();
+                if (txt) addTranscriptEntry('Me', txt);
+                subtitleInterim.textContent = '';
+            } else {
+                interim += e.results[i][0].transcript;
+            }
+        }
+        subtitleInterim.textContent = interim;
+    };
+    recognizer.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            isCCOn = false;
+            btnCC.classList.remove('call-btn--cc-active');
+            callSubtitle.classList.remove('active');
+            transcriptPanel.classList.remove('active');
+        }
+    };
+    recognizer.onend = () => { if (isCCOn && !callEnded) recognizer.start(); };
+    recognizer.start();
+}
+
+function stopTranscription() {
+    if (recognizer) {
+        recognizer.onend = null;
+        try { recognizer.stop(); } catch(e){}
+        recognizer = null;
+    }
+    clearTimeout(subtitleFadeTimer);
+    clearTimeout(subtitleClearTimer);
+    if (subtitleTextEl) subtitleTextEl.classList.remove('fading');
+    subtitleFinal.textContent = '';
+    subtitleInterim.textContent = '';
+}
+
+const btnTranslate = document.getElementById('btnTranslate');
+const langPicker   = document.getElementById('langPicker');
+
+if (btnTranslate && langPicker) {
+    btnTranslate.addEventListener('click', () => {
+        langPicker.classList.toggle('active');
+    });
+    langPicker.querySelectorAll('.call-lang-opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+            translateTo = btn.dataset.lang;
+            langPicker.querySelectorAll('.call-lang-opt').forEach(b => b.classList.remove('call-lang-opt--active'));
+            btn.classList.add('call-lang-opt--active');
+            btnTranslate.classList.toggle('call-btn--cc-active', translateTo !== 'off');
+            langPicker.classList.remove('active');
+        });
+    });
+    // Close picker when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!langPicker.contains(e.target) && e.target !== btnTranslate) {
+            langPicker.classList.remove('active');
+        }
+    });
+}
+
+if (btnCC) {
+    btnCC.addEventListener('click', () => {
+        if (!SR) {
+            const msg = document.createElement('div');
+            msg.className = 'call-cc-unsupported';
+            msg.textContent = 'Live captions require Chrome or Edge';
+            document.querySelector('.call-popup').appendChild(msg);
+            setTimeout(() => msg.remove(), 3000);
+            return;
+        }
+        isCCOn = !isCCOn;
+        btnCC.classList.toggle('call-btn--cc-active', isCCOn);
+        callSubtitle.classList.toggle('active', isCCOn);
+        transcriptPanel.classList.toggle('active', isCCOn);
+        if (isCCOn) { startTranscription(); } else { stopTranscription(); }
+    });
+}
 
 /* ───────────────────────────────────────────
    HELPERS
@@ -387,7 +677,8 @@ async function sendSignal(type, payload) {
 }
 
 async function pollSignals() {
-    if (callEnded) return;
+    if (callEnded || isPolling) return;
+    isPolling = true;
     try {
         const data = await apiGet('/call/signal/poll/' + CALL_ID + '?after=' + lastSignalId);
 
@@ -399,7 +690,7 @@ async function pollSignals() {
 
         // If we were RINGING and now CONNECTED (other side accepted)
         if (callState === 'RINGING' && data.callStatus === 'CONNECTED') {
-            onCallConnected();
+            await onCallConnected();
         }
 
         // Process signals
@@ -409,6 +700,8 @@ async function pollSignals() {
         }
     } catch(e) {
         console.error('Poll error:', e);
+    } finally {
+        isPolling = false;
     }
 }
 
@@ -420,10 +713,25 @@ async function handleSignal(sig) {
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             await sendSignal('answer', answer);
+            // Drain buffered ICE candidates now that remote description is set
+            for (const c of iceCandidateBuffer) {
+                try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+            }
+            iceCandidateBuffer = [];
         } else if (sig.type === 'answer') {
             await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+            // Drain buffered ICE candidates
+            for (const c of iceCandidateBuffer) {
+                try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+            }
+            iceCandidateBuffer = [];
         } else if (sig.type === 'ice') {
-            await pc.addIceCandidate(new RTCIceCandidate(sig.payload));
+            if (pc.remoteDescription) {
+                await pc.addIceCandidate(new RTCIceCandidate(sig.payload));
+            } else {
+                // Buffer until remote description is set
+                iceCandidateBuffer.push(sig.payload);
+            }
         }
     } catch(e) {
         console.error('Handle signal error:', e);
@@ -436,14 +744,8 @@ async function handleSignal(sig) {
 async function startCallerFlow() {
     playSound(snd.outgoing);
     await getLocalMedia();
-    createPeerConnection();
-
-    // Create offer
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await sendSignal('offer', offer);
-
-    // Start polling
+    // Do NOT create PC or offer yet — wait for callee to accept.
+    // The offer is sent in onCallConnected() once the callee accepts.
     pollTimer = setInterval(pollSignals, 800);
 }
 
@@ -457,16 +759,14 @@ async function startCalleeFlow() {
 async function acceptCall() {
     stopAllSounds();
 
-    // Accept on server
+    // Accept on server (status → CONNECTED)
     await apiPost('/call/' + CALL_ID + '/accept-ajax');
 
-    // Get media and create PC
+    // Get media and create PC — caller will detect CONNECTED and send the offer
     await getLocalMedia();
     createPeerConnection();
-
-    // Callee starts connected state
     callState = 'CONNECTED';
-    onCallConnected();
+    await onCallConnected();  // UI update only (IS_CALLER=false, so no offer sent)
 
     // Hide accept/reject, show controls
     const incomingActions = document.getElementById('incomingActions');
@@ -474,7 +774,7 @@ async function acceptCall() {
     controls.style.display = '';
 }
 
-function onCallConnected() {
+async function onCallConnected() {
     callState = 'CONNECTED';
     stopAllSounds();
     playSound(snd.connected);
@@ -490,11 +790,27 @@ function onCallConnected() {
         seconds++;
         timerEl.textContent = fmtTime(seconds);
     }, 1000);
+
+    // Caller creates the WebRTC offer now that callee has accepted
+    if (IS_CALLER && !pc) {
+        createPeerConnection();
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await sendSignal('offer', offer);
+        } catch(e) {
+            console.error('Offer creation failed:', e);
+        }
+    }
 }
 
 async function endCall(reason) {
     if (callEnded) return;
     callEnded = true;
+
+    // Stop transcription
+    stopTranscription();
+    isCCOn = false;
 
     stopAllSounds();
     playSound(snd.hangup);
@@ -517,6 +833,9 @@ async function endCall(reason) {
     endedText.textContent = reason || 'Call ended';
     if (seconds > 0) {
         endedDuration.textContent = 'Duration: ' + fmtTime(seconds);
+    }
+    if (transcriptLog.length > 0 && btnDownload) {
+        btnDownload.classList.add('visible');
     }
     endedOverlay.classList.add('active');
 
@@ -699,13 +1018,11 @@ window.addEventListener('beforeunload', () => {
     } else if (callState === 'RINGING') {
         await startCalleeFlow();
     } else if (callState === 'CONNECTED') {
-        // Rejoining a connected call
+        // Callee accepted via notification overlay — popup opened after server accepted.
+        // Just create PC and wait for the caller's offer to arrive via polling.
         await getLocalMedia();
         createPeerConnection();
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await sendSignal('offer', offer);
-        onCallConnected();
+        await onCallConnected();  // UI update (IS_CALLER=false, no offer sent)
         pollTimer = setInterval(pollSignals, 800);
     }
 })();

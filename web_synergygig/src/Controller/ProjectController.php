@@ -10,6 +10,7 @@ use App\Repository\ProjectRepository;
 use App\Repository\TaskRepository;
 use App\Service\AIService;
 use App\Service\CalendarSyncService;
+use App\Service\GitHubService;
 use App\Service\ProjectRiskService;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Component\Pager\PaginatorInterface;
@@ -527,5 +528,138 @@ class ProjectController extends AbstractController
         return $this->isGranted('ROLE_ADMIN')
             || $this->isGranted('ROLE_HR')
             || $project->getOwner()?->getId() === $user->getId();
+    }
+
+    // ── GitHub Issues Integration ─────────────────────────────────────────────
+
+    /**
+     * POST /projects/{id}/github/set-repo
+     * Body JSON: { "repo": "owner/repo" }
+     * Links a GitHub repo to this project (stored in projects.github_repo).
+     */
+    #[Route('/{id}/github/set-repo', name: 'app_project_github_set_repo', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function githubSetRepo(
+        Project $project,
+        Request $request,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User || !$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+        $data = json_decode($request->getContent(), true) ?? [];
+        $repo = trim($data['repo'] ?? '');
+        if (!$repo || !preg_match('#^[\w.\-]+/[\w.\-]+$#', $repo)) {
+            return $this->json(['error' => 'Invalid repo format. Use "owner/repo".'], 400);
+        }
+        $project->setGithubRepo($repo);
+        $em->flush();
+        return $this->json(['success' => true, 'repo' => $repo]);
+    }
+
+    /**
+     * GET /projects/{id}/github/issues
+     * Returns open GitHub issues for the linked repo.
+     */
+    #[Route('/{id}/github/issues', name: 'app_project_github_issues', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function githubListIssues(
+        Project $project,
+        GitHubService $gitHub
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User || !$this->canViewProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+        $repo = $project->getGithubRepo();
+        if (!$repo) {
+            return $this->json(['error' => 'No GitHub repo linked to this project.'], 400);
+        }
+        $issues = $gitHub->listIssues($repo);
+        return $this->json(['issues' => $issues]);
+    }
+
+    /**
+     * POST /projects/{id}/tasks/{taskId}/github/create-issue
+     * Creates a GitHub issue from a task and stores the issue number+URL on the task.
+     */
+    #[Route('/{id}/tasks/{taskId}/github/create-issue', name: 'app_project_github_create_issue', methods: ['POST'], requirements: ['id' => '\d+', 'taskId' => '\d+'])]
+    public function githubCreateIssue(
+        Project $project,
+        int $taskId,
+        Request $request,
+        TaskRepository $taskRepo,
+        EntityManagerInterface $em,
+        GitHubService $gitHub
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User || !$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+        $repo = $project->getGithubRepo();
+        if (!$repo) {
+            return $this->json(['error' => 'No GitHub repo linked to this project. Link one first.'], 400);
+        }
+        /** @var Task|null $task */
+        $task = $taskRepo->find($taskId);
+        if (!$task || $task->getProject()?->getId() !== $project->getId()) {
+            return $this->json(['error' => 'Task not found in this project.'], 404);
+        }
+        if ($task->getGithubIssueNumber()) {
+            return $this->json([
+                'error'      => 'Issue already exists.',
+                'issue_url'  => $task->getGithubIssueUrl(),
+                'issue_number' => $task->getGithubIssueNumber(),
+            ], 400);
+        }
+        $body = $task->getDescription() ?? '';
+        $body .= "\n\n---\n*Synced from SynergyGig task #" . $task->getId() . "*";
+        $labels = ['synergygig'];
+        if ($task->getPriority()) {
+            $labels[] = 'priority:' . strtolower($task->getPriority());
+        }
+        $result = $gitHub->createIssue($repo, $task->getTitle(), $body, $labels);
+        if (!$result) {
+            return $this->json(['error' => 'Failed to create GitHub issue. Check GITHUB_TOKEN.'], 500);
+        }
+        $task->setGithubIssueNumber($result['number']);
+        $task->setGithubIssueUrl($result['html_url']);
+        $em->flush();
+        return $this->json([
+            'success'      => true,
+            'issue_number' => $result['number'],
+            'issue_url'    => $result['html_url'],
+        ]);
+    }
+
+    /**
+     * POST /projects/{id}/tasks/{taskId}/github/close-issue
+     * Closes the linked GitHub issue for a task.
+     */
+    #[Route('/{id}/tasks/{taskId}/github/close-issue', name: 'app_project_github_close_issue', methods: ['POST'], requirements: ['id' => '\d+', 'taskId' => '\d+'])]
+    public function githubCloseIssue(
+        Project $project,
+        int $taskId,
+        TaskRepository $taskRepo,
+        GitHubService $gitHub
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User || !$this->canManageProject($project, $user)) {
+            return $this->json(['error' => 'Access denied.'], 403);
+        }
+        $repo = $project->getGithubRepo();
+        if (!$repo) {
+            return $this->json(['error' => 'No GitHub repo linked.'], 400);
+        }
+        /** @var Task|null $task */
+        $task = $taskRepo->find($taskId);
+        if (!$task || $task->getProject()?->getId() !== $project->getId()) {
+            return $this->json(['error' => 'Task not found.'], 404);
+        }
+        $issueNumber = $task->getGithubIssueNumber();
+        if (!$issueNumber) {
+            return $this->json(['error' => 'Task has no linked GitHub issue.'], 400);
+        }
+        $ok = $gitHub->closeIssue($repo, $issueNumber);
+        return $this->json(['success' => $ok]);
     }
 }

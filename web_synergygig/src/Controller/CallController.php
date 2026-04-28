@@ -165,7 +165,8 @@ class CallController extends AbstractController
         CallSignalRepository $signalRepo
     ): JsonResponse {
         $user = $this->getUser();
-        if ($call->getCaller() !== $user && $call->getCallee() !== $user) {
+        $userId = $user->getId();
+        if ($call->getCaller()?->getId() !== $userId && $call->getCallee()?->getId() !== $userId) {
             return $this->json(['error' => 'Unauthorized'], 403);
         }
         if (in_array($call->getStatus(), ['RINGING', 'CONNECTED'])) {

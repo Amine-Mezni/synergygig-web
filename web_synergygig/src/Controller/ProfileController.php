@@ -10,6 +10,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 class ProfileController extends AbstractController
@@ -118,5 +120,144 @@ class ProfileController extends AbstractController
         }
 
         return $this->redirectToRoute('app_profile');
+    }
+
+    /* ─── CV Upload ─── */
+    #[Route('/profile/upload-cv', name: 'app_profile_upload_cv', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function uploadCv(Request $request, EntityManagerInterface $em): Response
+    {
+        $user = $this->getUser();
+        if (!$this->isCsrfTokenValid('cv-upload', $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_profile');
+        }
+
+        $file = $request->files->get('cv_file');
+        if (!$file || !$file->isValid()) {
+            $this->addFlash('error', 'No file selected or upload failed.');
+            return $this->redirectToRoute('app_profile');
+        }
+
+        $allowedMimes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        if (!in_array($file->getMimeType(), $allowedMimes)) {
+            $this->addFlash('error', 'Only PDF, DOC or DOCX files are allowed.');
+            return $this->redirectToRoute('app_profile');
+        }
+        if ($file->getSize() > 10 * 1024 * 1024) {
+            $this->addFlash('error', 'CV file must be smaller than 10 MB.');
+            return $this->redirectToRoute('app_profile');
+        }
+
+        $uploadDir = $this->getParameter('kernel.project_dir') . '/var/uploads/cvs';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        // Delete old CV if exists
+        if ($user->getCvPath()) {
+            $old = $uploadDir . '/' . $user->getCvPath();
+            if (file_exists($old)) {
+                unlink($old);
+            }
+        }
+
+        $ext = $file->guessExtension() ?? 'pdf';
+        $filename = 'cv_' . $user->getId() . '_' . uniqid() . '.' . $ext;
+        $file->move($uploadDir, $filename);
+
+        $user->setCvPath($filename);
+        $user->setCvOriginalName($file->getClientOriginalName());
+        $user->setCvUploadedAt(new \DateTime());
+
+        // Extract plain text for skills matching (PDF only via pdftotext if available)
+        $skillsText = null;
+        $filePath = $uploadDir . '/' . $filename;
+        if ($ext === 'pdf') {
+            $out = [];
+            @exec('pdftotext ' . escapeshellarg($filePath) . ' -', $out, $code);
+            if ($code === 0 && !empty($out)) {
+                $skillsText = implode(' ', $out);
+            }
+        }
+        // Fallback: use the CV skills textarea if provided
+        $manualSkills = trim($request->request->get('cv_skills_manual', ''));
+        if ($manualSkills) {
+            $skillsText = $manualSkills;
+        }
+        if ($skillsText) {
+            $user->setCvSkillsText(substr($skillsText, 0, 65535));
+        }
+
+        $em->flush();
+        $this->addFlash('success', 'CV uploaded successfully.');
+        return $this->redirectToRoute('app_profile');
+    }
+
+    /* ─── CV Download ─── */
+    #[Route('/profile/cv/download', name: 'app_profile_cv_download')]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function downloadCv(): Response
+    {
+        $user = $this->getUser();
+        if (!$user->getCvPath()) {
+            throw $this->createNotFoundException('No CV uploaded.');
+        }
+
+        $filePath = $this->getParameter('kernel.project_dir') . '/var/uploads/cvs/' . $user->getCvPath();
+        if (!file_exists($filePath)) {
+            throw $this->createNotFoundException('CV file not found.');
+        }
+
+        $response = new BinaryFileResponse($filePath);
+        $response->setContentDisposition(
+            ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            $user->getCvOriginalName() ?? $user->getCvPath()
+        );
+        return $response;
+    }
+
+    /* ─── CV Delete ─── */
+    #[Route('/profile/cv/delete', name: 'app_profile_cv_delete', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function deleteCv(Request $request, EntityManagerInterface $em): Response
+    {
+        $user = $this->getUser();
+        if (!$this->isCsrfTokenValid('cv-delete', $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('app_profile');
+        }
+
+        if ($user->getCvPath()) {
+            $filePath = $this->getParameter('kernel.project_dir') . '/var/uploads/cvs/' . $user->getCvPath();
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            $user->setCvPath(null);
+            $user->setCvOriginalName(null);
+            $user->setCvUploadedAt(null);
+            $user->setCvSkillsText(null);
+            $em->flush();
+            $this->addFlash('success', 'CV removed.');
+        }
+        return $this->redirectToRoute('app_profile');
+    }
+
+    /* ─── CV Keywords API (for job scoring) ─── */
+    #[Route('/api/cv/keywords', name: 'app_api_cv_keywords', methods: ['GET'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function cvKeywords(): \Symfony\Component\HttpFoundation\JsonResponse
+    {
+        $user = $this->getUser();
+        $text = $user->getCvSkillsText() ?? ($user->getBio() ?? '');
+        return $this->json([
+            'hasCV'  => $user->getCvPath() !== null,
+            'name'   => $user->getCvOriginalName(),
+            'text'   => $text,
+        ]);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Service\ExternalJobService;
 use App\Service\ExchangeRateService;
 use App\Service\HunterService;
+use App\Service\CvJobMatchService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,6 +18,7 @@ class ExternalJobController extends AbstractController
         private ExternalJobService $jobService,
         private ExchangeRateService $exchangeRateService,
         private HunterService $hunterService,
+        private CvJobMatchService $cvJobMatch,
     ) {}
 
     // ── External Job Feeds ──
@@ -51,6 +53,34 @@ class ExternalJobController extends AbstractController
             'results' => $jobs,
             'count'   => count($jobs),
         ]);
+    }
+
+    #[Route('/external-jobs/score', name: 'app_external_jobs_score', methods: ['POST'])]
+    public function scoreJobs(Request $request): JsonResponse
+    {
+        $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
+
+        $user = $this->getUser();
+        $cvText = $user->getCvSkillsText() ?? ($user->getBio() ?? '');
+
+        if (!$cvText) {
+            return $this->json(['hasCV' => false, 'scores' => []]);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $jobs = $data['jobs'] ?? [];
+
+        $scores = [];
+        foreach ($jobs as $i => $job) {
+            $result = $this->cvJobMatch->score(
+                $cvText,
+                $job['title'] ?? '',
+                ($job['description'] ?? '') . ' ' . implode(' ', $job['tags'] ?? [])
+            );
+            $scores[$i] = $result;
+        }
+
+        return $this->json(['hasCV' => true, 'scores' => $scores]);
     }
 
     // ── Currency Converter ──
