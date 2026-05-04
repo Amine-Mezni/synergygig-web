@@ -2893,3 +2893,4 @@ public class TrainingController {
 }
 // API Update
 // Bundle config
+// Optimized queries
