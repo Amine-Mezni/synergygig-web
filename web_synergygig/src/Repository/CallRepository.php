@@ -30,6 +30,34 @@ class CallRepository extends ServiceEntityRepository {
             ->getResult();
     }
 
+    /** Find incoming RINGING calls by raw callee user ID (used by JWT API). */
+    public function findIncomingForUserById(int $userId): array {
+        return $this->createQueryBuilder('c')
+            ->join('c.callee', 'u')
+            ->where('u.id = :uid')
+            ->andWhere('c.status = :status')
+            ->setParameter('uid', $userId)
+            ->setParameter('status', 'RINGING')
+            ->orderBy('c.created_at', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** Find active (RINGING or CONNECTED) call for a user by ID. */
+    public function findActiveCallById(int $userId): ?Call {
+        return $this->createQueryBuilder('c')
+            ->join('c.caller', 'ca')
+            ->leftJoin('c.callee', 'ce')
+            ->where('ca.id = :uid OR ce.id = :uid')
+            ->andWhere('c.status IN (:statuses)')
+            ->setParameter('uid', $userId)
+            ->setParameter('statuses', ['RINGING', 'CONNECTED'])
+            ->orderBy('c.created_at', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findCallHistory($user, int $limit = 50): array {
         return $this->createQueryBuilder('c')
             ->where('c.caller = :user OR c.callee = :user')

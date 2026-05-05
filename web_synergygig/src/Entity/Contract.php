@@ -28,7 +28,7 @@ class Contract
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Offer::class)]
+    #[ORM\ManyToOne(targetEntity: Offer::class, inversedBy: 'contracts')]
     #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id')]
     private ?Offer $offer = null;
 

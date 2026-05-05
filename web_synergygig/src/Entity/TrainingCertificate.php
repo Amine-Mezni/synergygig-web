@@ -28,7 +28,7 @@ class TrainingCertificate
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: TrainingEnrollment::class)]
+    #[ORM\ManyToOne(targetEntity: TrainingEnrollment::class, inversedBy: 'certificates')]
     #[ORM\JoinColumn(name: 'enrollment_id', referencedColumnName: 'id')]
     private ?TrainingEnrollment $enrollment = null;
 
@@ -58,7 +58,7 @@ class TrainingCertificate
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: TrainingCourse::class)]
+    #[ORM\ManyToOne(targetEntity: TrainingCourse::class, inversedBy: 'certificates')]
     #[ORM\JoinColumn(name: 'course_id', referencedColumnName: 'id')]
     private ?TrainingCourse $course = null;
 

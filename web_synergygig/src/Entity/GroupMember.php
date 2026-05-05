@@ -28,7 +28,7 @@ class GroupMember
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: CommunityGroup::class)]
+    #[ORM\ManyToOne(targetEntity: CommunityGroup::class, inversedBy: 'groupMembers')]
     #[ORM\JoinColumn(name: 'group_id', referencedColumnName: 'id')]
     private ?CommunityGroup $group = null;
 

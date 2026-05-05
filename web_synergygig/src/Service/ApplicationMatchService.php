@@ -61,7 +61,8 @@ class ApplicationMatchService
             }
         }
 
-        $score = $maxScore > 0 ? (int) round(($weightedScore / $maxScore) * 100) : 0;
+        // $maxScore is always > 0 here because we return early for empty $expectedSkills
+        $score = (int) round(($weightedScore / $maxScore) * 100);
 
         $label = match (true) {
             $score >= 85 => 'Excellent match',

@@ -28,7 +28,7 @@ class Task
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Project::class)]
+    #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
     #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id')]
     private ?Project $project = null;
 

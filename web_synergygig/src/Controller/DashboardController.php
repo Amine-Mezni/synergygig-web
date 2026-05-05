@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\DTO\DepartmentHeadcountDto;
+use App\DTO\StatusCountDto;
 use App\Repository\UserRepository;
 use App\Repository\DepartmentRepository;
 use App\Repository\ProjectRepository;
@@ -18,6 +20,7 @@ use App\Repository\LeaveRepository;
 use App\Repository\PayrollRepository;
 use App\Repository\ChatRoomRepository;
 use App\Repository\MessageRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -53,53 +56,105 @@ class DashboardController extends AbstractController
         PayrollRepository $payrollRepo,
         ChatRoomRepository $chatRoomRepo,
         MessageRepository $messageRepo,
+        EntityManagerInterface $em,
     ): Response {
         $totalUsers = $userRepo->count([]);
-        $employees = $userRepo->count(['role' => 'EMPLOYEE']);
-        $gig = $userRepo->count(['role' => 'GIG_WORKER']);
-        $interviews = $interviewRepo->count(['status' => 'PENDING']);
 
         $quote = self::QUOTES[array_rand(self::QUOTES)];
 
         // Chart data: tasks by status
         $taskStatuses = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
-        $taskChart = [];
-        foreach ($taskStatuses as $s) {
-            $taskChart[$s] = $taskRepo->count(['status' => $s]);
+        $taskChart = array_fill_keys($taskStatuses, 0);
+        $taskRows = $taskRepo->createQueryBuilder('t')
+            ->select('NEW App\\DTO\\StatusCountDto(t.status, COUNT(t.id))')
+            ->groupBy('t.status')
+            ->getQuery()
+            ->getResult();
+        foreach ($taskRows as $row) {
+            if ($row instanceof StatusCountDto && $row->label !== null) {
+                $taskChart[$row->label] = $row->total;
+            }
         }
 
         // Chart data: leaves by status
         $leaveStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
-        $leaveChart = [];
-        foreach ($leaveStatuses as $s) {
-            $leaveChart[$s] = $leaveRepo->count(['status' => $s]);
+        $leaveChart = array_fill_keys($leaveStatuses, 0);
+        $leaveRows = $leaveRepo->createQueryBuilder('l')
+            ->select('NEW App\\DTO\\StatusCountDto(l.status, COUNT(l.id))')
+            ->groupBy('l.status')
+            ->getQuery()
+            ->getResult();
+        foreach ($leaveRows as $row) {
+            if ($row instanceof StatusCountDto && $row->label !== null) {
+                $leaveChart[$row->label] = $row->total;
+            }
         }
 
         // Chart data: users by role
         $roles = ['ADMIN', 'HR_MANAGER', 'PROJECT_OWNER', 'EMPLOYEE', 'GIG_WORKER'];
-        $roleChart = [];
-        foreach ($roles as $r) {
-            $roleChart[$r] = $userRepo->count(['role' => $r]);
+        $roleChart = array_fill_keys($roles, 0);
+        $roleRows = $userRepo->createQueryBuilder('u')
+            ->select('NEW App\\DTO\\StatusCountDto(u.role, COUNT(u.id))')
+            ->groupBy('u.role')
+            ->getQuery()
+            ->getResult();
+        foreach ($roleRows as $row) {
+            if ($row instanceof StatusCountDto && $row->label !== null) {
+                $roleChart[$row->label] = $row->total;
+            }
         }
+        $employees = $roleChart['EMPLOYEE'];
+        $gig = $roleChart['GIG_WORKER'];
 
         // Chart data: offers by status
         $offerStatuses = ['DRAFT', 'OPEN', 'CLOSED', 'CANCELLED'];
-        $offerChart = [];
-        foreach ($offerStatuses as $s) {
-            $offerChart[$s] = $offerRepo->count(['status' => $s]);
+        $offerChart = array_fill_keys($offerStatuses, 0);
+        $offerRows = $offerRepo->createQueryBuilder('o')
+            ->select('NEW App\\DTO\\StatusCountDto(o.status, COUNT(o.id))')
+            ->groupBy('o.status')
+            ->getQuery()
+            ->getResult();
+        foreach ($offerRows as $row) {
+            if ($row instanceof StatusCountDto && $row->label !== null) {
+                $offerChart[$row->label] = $row->total;
+            }
         }
 
         // Chart data: applications by status
         $appStatuses = ['PENDING', 'REVIEWED', 'ACCEPTED', 'REJECTED'];
-        $appChart = [];
-        foreach ($appStatuses as $s) {
-            $appChart[$s] = $appRepo->count(['status' => $s]);
+        $appChart = array_fill_keys($appStatuses, 0);
+        $appRows = $appRepo->createQueryBuilder('a')
+            ->select('NEW App\\DTO\\StatusCountDto(a.status, COUNT(a.id))')
+            ->groupBy('a.status')
+            ->getQuery()
+            ->getResult();
+        foreach ($appRows as $row) {
+            if ($row instanceof StatusCountDto && $row->label !== null) {
+                $appChart[$row->label] = $row->total;
+            }
         }
 
-        // Chart data: department headcount
+        $interviewPending = $interviewRepo->createQueryBuilder('i')
+            ->select('COUNT(i.id)')
+            ->where('i.status = :status')
+            ->setParameter('status', 'PENDING')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        // Chart data: department headcount (DTO hydration avoids array hydration and N+1 loops)
         $deptChart = [];
-        foreach ($deptRepo->findAll() as $dept) {
-            $deptChart[$dept->getName()] = $userRepo->count(['department' => $dept]);
+        $deptRows = $userRepo->createQueryBuilder('u')
+            ->select('NEW App\\DTO\\DepartmentHeadcountDto(d.name, COUNT(u.id))')
+            ->join('u.department', 'd')
+            ->groupBy('d.id, d.name')
+            ->orderBy('d.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        foreach ($deptRows as $row) {
+            if ($row instanceof DepartmentHeadcountDto) {
+                $deptChart[$row->departmentName] = $row->employeeCount;
+            }
         }
 
         return $this->render('dashboard/index.html.twig', [
@@ -107,21 +162,21 @@ class DashboardController extends AbstractController
                 'users' => $totalUsers,
                 'employees' => $employees,
                 'gig_workers' => $gig,
-                'interviews' => $interviews,
+                'interviews' => (int) $interviewPending,
                 'departments' => $deptRepo->count([]),
                 'projects' => $projectRepo->count([]),
-                'offers' => $offerRepo->count([]),
-                'offers_open' => $offerRepo->count(['status' => 'OPEN']),
-                'offers_draft' => $offerRepo->count(['status' => 'DRAFT']),
+                'offers' => array_sum($offerChart),
+                'offers_open' => $offerChart['OPEN'],
+                'offers_draft' => $offerChart['DRAFT'],
                 'contracts' => $contractRepo->count([]),
-                'applications' => $appRepo->count([]),
-                'apps_pending' => $appRepo->count(['status' => 'PENDING']),
-                'apps_accepted' => $appRepo->count(['status' => 'ACCEPTED']),
-                'tasks' => $taskRepo->count([]),
+                'applications' => array_sum($appChart),
+                'apps_pending' => $appChart['PENDING'],
+                'apps_accepted' => $appChart['ACCEPTED'],
+                'tasks' => array_sum($taskChart),
                 'training' => $trainingRepo->count([]),
                 'chat_rooms' => $chatRoomRepo->count([]),
                 'messages' => $messageRepo->count([]),
-                'pending_leaves' => $leaveRepo->count(['status' => 'PENDING']),
+                'pending_leaves' => $leaveChart['PENDING'],
                 'pending_payroll' => $payrollRepo->count(['status' => 'PENDING']),
             ],
             'taskChart' => $taskChart,

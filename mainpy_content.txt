@@ -1,0 +1,876 @@
+=== NPM WebSocket support in proxy conf ===
+# ------------------------------------------------------------
+
+# rest.benzaitsue.work.gd
+
+# ------------------------------------------------------------
+
+
+
+
+
+
+
+map $scheme $hsts_header {
+
+    https   "max-age=63072000; preload";
+
+}
+
+
+
+server {
+
+  set $forward_scheme http;
+
+  set $server         "synergygig-api-rest";
+
+  set $port           8000;
+
+
+
+  listen 80;
+
+listen [::]:80;
+
+
+
+listen 443 ssl;
+
+listen [::]:443 ssl;
+
+
+
+
+
+  server_name rest.benzaitsue.work.gd;
+
+
+
+  http2 on;
+
+
+
+
+
+  # Let's Encrypt SSL
+
+  include conf.d/include/letsencrypt-acme-challenge.conf;
+
+  include conf.d/include/ssl-cache.conf;
+
+  include conf.d/include/ssl-ciphers.conf;
+
+  ssl_certificate /etc/letsencrypt/live/npm-13/fullchain.pem;
+
+  ssl_certificate_key /etc/letsencrypt/live/npm-13/privkey.pem;
+
+
+
+
+
+
+
+
+
+    # Force SSL
+
+    include conf.d/include/force-ssl.conf;
+
+
+
+
+
+proxy_set_header Upgrade $http_upgrade;
+
+proxy_set_header Connection $http_connection;
+
+proxy_http_version 1.1;
+
+
+
+
+
+  access_log /data/logs/proxy-host-6_access.log proxy;
+
+  error_log /data/logs/proxy-host-6_error.log warn;
+
+
+
+
+
+  location / {
+
+
+
+    proxy_set_header Upgrade $http_upgrade;
+
+    proxy_set_header Connection $http_connection;
+
+    proxy_http_version 1.1;
+
+
+
+    # Proxy!
+
+    include conf.d/include/proxy.conf;
+
+  }
+
+
+
+
+
+  # Custom
+
+  include /data/nginx/custom/server_proxy[.]conf;
+
+}
+
+=== synergygig-api-rest main.py (FULL) ===
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+import mysql.connector
+from mysql.connector import pooling
+import os
+import random, uuid
+import string
+import time
+import bcrypt
+
+
+# ---- BCrypt helpers ----
+def hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        # Fallback: plaintext comparison (for un-migrated passwords)
+        return plain == hashed
+
+app = FastAPI(title="SynergyGig API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database connection pool
+db_config = {
+    "host": os.getenv("DB_HOST", "synergygig-mysql"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "MORTALkombat9pd6S##E"),
+    "database": os.getenv("DB_NAME", "finale_synergygig"),
+}
+
+pool = pooling.MySQLConnectionPool(
+    pool_name="synergygig_pool",
+    pool_size=10,
+    **db_config
+)
+
+# ==================== OTP CONFIG ====================
+
+# In-memory OTP store: { email: { "otp": "123456", "expires": timestamp } }
+otp_store = {}
+verification_tokens = {}  # {token: email}
+
+def generate_otp(length=6):
+    return ''.join(random.choices(string.digits, k=length))
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
+def get_db():
+    conn = pool.get_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+# ==================== MODELS ====================
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    first_name: str
+    last_name: str
+    role: str
+
+class UserUpdate(BaseModel):
+    email: str
+    password: str
+    first_name: str
+    last_name: str
+    role: str
+    avatar_path: Optional[str] = None
+
+class RoleUpdate(BaseModel):
+    role: str
+
+class AvatarUpdate(BaseModel):
+    avatar_path: str
+
+class FaceEncodingUpdate(BaseModel):
+    face_encoding: Optional[str] = None
+
+class ChatRoomCreate(BaseModel):
+    name: str
+    type: Optional[str] = "group"
+    created_by: Optional[int] = 0
+
+class MessageCreate(BaseModel):
+    sender_id: int
+    room_id: int
+    content: str
+
+class MessageUpdate(BaseModel):
+    content: str
+
+class InterviewCreate(BaseModel):
+    organizer_id: int
+    candidate_id: int
+    date_time: str
+    status: str = "PENDING"
+    meet_link: Optional[str] = None
+
+class InterviewUpdate(BaseModel):
+    date_time: str
+    status: str
+    meet_link: Optional[str] = None
+
+# ==================== HELPERS ====================
+
+def row_to_user(row):
+    return {
+        "id": row[0], "email": row[1], "password": row[2],
+        "first_name": row[3], "last_name": row[4], "role": row[5],
+        "created_at": row[6].isoformat() if row[6] else None,
+        "profile_image": row[7], "is_online": bool(row[8]) if row[8] is not None else False, "avatar_path": row[9], "face_encoding": row[10],
+        "is_verified": bool(row[11]) if len(row) > 11 else True, "is_active": bool(row[12]) if len(row) > 12 else True
+    }
+
+def row_to_chatroom(row):
+    return {
+        "id": row[0], "name": row[1],
+        "created_at": row[2].isoformat() if row[2] else None
+    }
+
+def row_to_message(row):
+    return {
+        "id": row[0], "sender_id": row[1], "room_id": row[2],
+        "content": row[3],
+        "timestamp": row[4].isoformat() if row[4] else None
+    }
+
+def row_to_interview(row):
+    return {
+        "id": row[0], "organizer_id": row[1], "candidate_id": row[2],
+        "date_time": row[3].isoformat() if row[3] else None,
+        "status": row[4], "meet_link": row[5]
+    }
+
+# ==================== HEALTH ====================
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "service": "synergygig-api", "timestamp": datetime.now().isoformat()}
+
+# ==================== AUTH ====================
+
+@app.post("/api/auth/login")
+def login(data: UserLogin, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE email=%s", (data.email,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    stored_pw = row[2]  # password column
+    if not verify_password(data.password, stored_pw):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return row_to_user(row)
+
+@app.post("/api/auth/signup", status_code=201)
+def signup(data: UserCreate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users WHERE email=%s", (data.email,))
+    if cur.fetchone()[0] > 0:
+        cur.close()
+        raise HTTPException(status_code=409, detail="Email already exists")
+    cur.execute(
+        "INSERT INTO users (email, password, first_name, last_name, role) VALUES (%s, %s, %s, %s, %s)",
+        (data.email, data.password, data.first_name, data.last_name, data.role)
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    cur.close()
+    return {"id": new_id, "message": "User created"}
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(data: ForgotPasswordRequest, conn=Depends(get_db)):
+    """Check email exists, generate OTP, return it (client sends the email)."""
+    cur = conn.cursor()
+    cur.execute("SELECT first_name FROM users WHERE email=%s", (data.email,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="No account found with that email")
+
+    otp_code = generate_otp()
+    otp_store[data.email] = {"otp": otp_code, "expires": time.time() + 60}  # 5 min
+
+    return {"message": "OTP generated", "otp": otp_code, "first_name": row[0]}
+
+@app.post("/api/auth/verify-otp")
+def verify_otp(data: VerifyOtpRequest):
+    """Verify an OTP without resetting password (for UI step validation)."""
+    stored = otp_store.get(data.email)
+    if not stored:
+        raise HTTPException(status_code=400, detail="No OTP requested for this email")
+    if time.time() > stored["expires"]:
+        del otp_store[data.email]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    if stored["otp"] != data.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP code")
+    return {"message": "OTP verified", "valid": True}
+
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPasswordRequest, conn=Depends(get_db)):
+    """Verify OTP and reset password."""
+    stored = otp_store.get(data.email)
+    if not stored:
+        raise HTTPException(status_code=400, detail="No OTP requested for this email")
+    if time.time() > stored["expires"]:
+        del otp_store[data.email]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    if stored["otp"] != data.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP code")
+
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET password=%s WHERE email=%s", (data.new_password, data.email))
+    conn.commit()
+    cur.close()
+
+    del otp_store[data.email]
+    return {"message": "Password reset successfully"}
+
+# ==================== USERS ====================
+
+@app.get("/api/users")
+def get_users(conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users")
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_user(r) for r in rows]
+
+@app.get("/api/users/{user_id}")
+def get_user(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    return row_to_user(row)
+
+@app.get("/api/users/email-exists/{email}")
+def email_exists(email: str, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users WHERE email=%s", (email,))
+    count = cur.fetchone()[0]
+    cur.close()
+    return {"exists": count > 0}
+
+@app.get("/api/users/role/{role}")
+def get_users_by_role(role: str, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE role=%s", (role,))
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_user(r) for r in rows]
+
+@app.put("/api/users/{user_id}")
+def update_user(user_id: int, data: UserUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET email=%s, password=%s, first_name=%s, last_name=%s, role=%s, avatar_path=%s WHERE id=%s",
+        (data.email, data.password, data.first_name, data.last_name, data.role, data.avatar_path, user_id)
+    )
+    conn.commit()
+    cur.close()
+    return {"message": "User updated"}
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "User deleted"}
+
+@app.put("/api/users/{user_id}/role")
+def update_role(user_id: int, data: RoleUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET role=%s WHERE id=%s", (data.role, user_id))
+    conn.commit()
+    cur.close()
+    return {"message": "Role updated"}
+
+@app.put("/api/users/{user_id}/avatar")
+def update_avatar(user_id: int, data: AvatarUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET avatar_path=%s WHERE id=%s", (data.avatar_path, user_id))
+    conn.commit()
+    cur.close()
+    return {"message": "Avatar updated"}
+
+@app.put("/api/users/{user_id}/face-encoding")
+def update_face_encoding(user_id: int, data: FaceEncodingUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET face_encoding=%s WHERE id=%s", (data.face_encoding, user_id))
+    conn.commit()
+    cur.close()
+    return {"message": "Face encoding updated"}
+
+# ==================== CHAT ROOMS ====================
+
+@app.get("/api/chatrooms")
+def get_chatrooms(conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM chat_rooms ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_chatroom(r) for r in rows]
+
+@app.post("/api/chatrooms", status_code=201)
+def create_chatroom(data: ChatRoomCreate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    ctype = data.type if hasattr(data, 'type') and data.type else "group"
+    created_by = data.created_by if hasattr(data, 'created_by') and data.created_by else 0
+    cur.execute("INSERT INTO chat_rooms (name, type, created_by) VALUES (%s, %s, %s)", (data.name, ctype, created_by))
+    conn.commit()
+    new_id = cur.lastrowid
+    cur.close()
+    return {"id": new_id, "message": "Chat room created"}
+
+@app.put("/api/chatrooms/{room_id}")
+def update_chatroom(room_id: int, data: ChatRoomCreate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE chat_rooms SET name=%s WHERE id=%s", (data.name, room_id))
+    conn.commit()
+    cur.close()
+    return {"message": "Chat room updated"}
+
+@app.delete("/api/chatrooms/{room_id}")
+def delete_chatroom(room_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("DELETE FROM chat_rooms WHERE id=%s", (room_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "Chat room deleted"}
+
+@app.get("/api/chatrooms/by-name/{name}")
+def get_chatroom_by_name(name: str, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM chat_rooms WHERE name=%s", (name,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    return row_to_chatroom(row)
+
+# ==================== MESSAGES ====================
+
+@app.get("/api/messages")
+def get_messages(conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM messages")
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_message(r) for r in rows]
+
+@app.get("/api/messages/room/{room_id}")
+def get_messages_by_room(room_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM messages WHERE room_id=%s ORDER BY timestamp ASC", (room_id,))
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_message(r) for r in rows]
+
+@app.post("/api/messages", status_code=201)
+def create_message(data: MessageCreate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO messages (sender_id, room_id, content) VALUES (%s, %s, %s)",
+        (data.sender_id, data.room_id, data.content)
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    cur.close()
+    return {"id": new_id, "message": "Message sent"}
+
+@app.put("/api/messages/{message_id}")
+def update_message(message_id: int, data: MessageUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE messages SET content=%s WHERE id=%s", (data.content, message_id))
+    conn.commit()
+    cur.close()
+    return {"message": "Message updated"}
+
+@app.delete("/api/messages/{message_id}")
+def delete_message(message_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("DELETE FROM messages WHERE id=%s", (message_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "Message deleted"}
+
+
+
+class ToggleActiveUpdate(BaseModel):
+    is_active: bool
+
+@app.put("/api/users/{user_id}/active")
+def toggle_active(user_id: int, data: ToggleActiveUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET is_active=%s WHERE id=%s", (data.is_active, user_id))
+    conn.commit()
+    cur.close()
+    return {"message": "User " + ("activated" if data.is_active else "frozen")}
+
+
+
+class ToggleOnlineUpdate(BaseModel):
+    is_online: bool
+
+@app.put('/api/users/{user_id}/online')
+def toggle_online(user_id: int, data: ToggleOnlineUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute('UPDATE users SET is_online=%s WHERE id=%s', (data.is_online, user_id))
+    conn.commit()
+    cur.close()
+    return {'message': 'Online status updated'}
+
+# ==================== INTERVIEWS ====================
+
+@app.get("/api/interviews")
+def get_interviews(conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM interviews ORDER BY date_time DESC")
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_interview(r) for r in rows]
+
+@app.get("/api/interviews/organizer/{organizer_id}")
+def get_interviews_by_organizer(organizer_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM interviews WHERE organizer_id=%s ORDER BY date_time DESC", (organizer_id,))
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_interview(r) for r in rows]
+
+@app.get("/api/interviews/candidate/{candidate_id}")
+def get_interviews_by_candidate(candidate_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM interviews WHERE candidate_id=%s ORDER BY date_time DESC", (candidate_id,))
+    rows = cur.fetchall()
+    cur.close()
+    return [row_to_interview(r) for r in rows]
+
+@app.post("/api/interviews", status_code=201)
+def create_interview(data: InterviewCreate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO interviews (organizer_id, candidate_id, date_time, status, meet_link) VALUES (%s, %s, %s, %s, %s)",
+        (data.organizer_id, data.candidate_id, data.date_time, data.status, data.meet_link)
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    cur.close()
+    return {"id": new_id, "message": "Interview created"}
+
+@app.put("/api/interviews/{interview_id}")
+def update_interview(interview_id: int, data: InterviewUpdate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE interviews SET date_time=%s, status=%s, meet_link=%s WHERE id=%s",
+        (data.date_time, data.status, data.meet_link, interview_id)
+    )
+    conn.commit()
+    cur.close()
+    return {"message": "Interview updated"}
+
+@app.delete("/api/interviews/{interview_id}")
+def delete_interview(interview_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("DELETE FROM interviews WHERE id=%s", (interview_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "Interview deleted"}
+
+
+# ==================== Email Verification ====================
+
+class SendVerificationRequest(BaseModel):
+    email: str
+
+@app.post("/api/auth/send-verification")
+def send_verification(req: SendVerificationRequest):
+    conn = pool.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, first_name FROM users WHERE email=%s", (req.email,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    token = uuid.uuid4().hex
+    verification_tokens[token] = req.email
+    return {"token": token, "first_name": user[1]}
+
+@app.get("/api/auth/verify/{token}", response_class=HTMLResponse)
+def verify_email(token: str):
+    email = verification_tokens.pop(token, None)
+    if not email:
+        return HTMLResponse(content=build_verify_html(False, ""), status_code=200)
+    conn = pool.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET is_verified=1 WHERE email=%s", (email,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return HTMLResponse(content=build_verify_html(True, email), status_code=200)
+
+def build_verify_html(success: bool, email: str) -> str:
+    if success:
+        icon = "&#10003;"
+        icon_bg = "linear-gradient(135deg, #07393C, #2C666E)"
+        title = "Email Verified!"
+        subtitle = f"<strong style=\"color:#90DDF0\">{email}</strong> has been verified."
+        msg = "You can now sign in to SynergyGig."
+        btn_text = "Go to SynergyGig"
+    else:
+        icon = "&#9888;"
+        icon_bg = "linear-gradient(135deg, #7f1d1d, #dc2626)"
+        title = "Verification Failed"
+        subtitle = "This link is invalid or has already been used."
+        msg = "Please request a new verification email from the app."
+        btn_text = "Close"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SynergyGig - Email Verification</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  *{{margin:0;padding:0;box-sizing:border-box}}
+  body{{
+    font-family:'Inter',sans-serif;
+    background:#0A090C;
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }}
+  .bg{{
+    position:fixed;inset:0;z-index:0;
+    background:radial-gradient(ellipse at 30% 20%,rgba(44,102,110,0.15),transparent 60%),
+               radial-gradient(ellipse at 70% 80%,rgba(7,57,60,0.1),transparent 60%);
+  }}
+  .card{{
+    position:relative;z-index:1;
+    background:#14131A;border:1px solid #1C1B22;border-radius:20px;
+    padding:48px 44px 40px;max-width:420px;width:90%;text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  }}
+  .grad-bar{{
+    height:4px;border-radius:20px 20px 0 0;
+    background:linear-gradient(90deg,#07393C,#2C666E,#07393C);
+    position:absolute;top:0;left:0;right:0;
+  }}
+  .icon-circle{{
+    width:72px;height:72px;border-radius:50%;margin:0 auto 24px;
+    display:flex;align-items:center;justify-content:center;
+    background:{icon_bg};
+    box-shadow:0 8px 30px rgba(44,102,110,0.3);
+  }}
+  .icon-circle span{{font-size:32px;color:#F0EDEE}}
+  h1{{color:#F0EDEE;font-size:22px;font-weight:700;margin-bottom:8px}}
+  .sub{{color:#9E9EA8;font-size:13px;line-height:1.6;margin-bottom:24px}}
+  .msg{{
+    background:#0F0E11;border-radius:10px;padding:14px 18px;
+    border-left:3px solid #2C666E;margin-bottom:28px;
+    color:#9E9EA8;font-size:12px;line-height:1.5;text-align:left;
+  }}
+  .btn{{
+    display:inline-block;padding:12px 36px;border-radius:10px;
+    background:linear-gradient(135deg,#07393C,#2C666E);
+    color:#F0EDEE;font-weight:600;font-size:14px;text-decoration:none;
+    transition:all .2s;cursor:pointer;border:none;
+  }}
+  .btn:hover{{
+    background:linear-gradient(135deg,#2C666E,#90DDF0);color:#0A090C;
+    box-shadow:0 6px 24px rgba(144,221,240,0.25);
+  }}
+  .footer{{color:#6B6B78;font-size:11px;margin-top:28px}}
+  @keyframes fadeUp{{
+    from{{opacity:0;transform:translateY(20px)}}
+    to{{opacity:1;transform:translateY(0)}}
+  }}
+  .card{{animation:fadeUp .5s ease-out}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="card">
+  <div class="grad-bar"></div>
+  <div class="icon-circle"><span>{icon}</span></div>
+  <h1>{title}</h1>
+  <p class="sub">{subtitle}</p>
+  <div class="msg">{msg}</div>
+  <button class="btn" onclick="window.close()">{btn_text}</button>
+  <p class="footer">&copy; 2026 SynergyGig &middot; Secure HR Platform</p>
+</div>
+</body>
+</html>"""
+
+
+# ==================== CALLS ====================
+
+def row_to_call(row):
+    return {
+        "id": row[0], "caller_id": row[1], "callee_id": row[2], "room_id": row[3],
+        "status": row[4],
+        "started_at": row[5].isoformat() if row[5] else None,
+        "ended_at": row[6].isoformat() if row[6] else None,
+        "created_at": row[7].isoformat() if row[7] else None
+    }
+
+class CallCreate(BaseModel):
+    caller_id: int
+    callee_id: int
+    room_id: Optional[int] = None
+
+@app.post("/api/calls")
+def create_call(data: CallCreate, conn=Depends(get_db)):
+    cur = conn.cursor()
+    # Cancel any existing ringing calls from this caller to this callee
+    cur.execute("UPDATE calls SET status='missed' WHERE caller_id=%s AND callee_id=%s AND status='ringing'",
+                (data.caller_id, data.callee_id))
+    cur.execute("INSERT INTO calls (caller_id, callee_id, room_id) VALUES (%s, %s, %s)",
+                (data.caller_id, data.callee_id, data.room_id))
+    conn.commit()
+    call_id = cur.lastrowid
+    cur.close()
+    return {"id": call_id, "status": "ringing"}
+
+@app.get("/api/calls/{call_id}")
+def get_call(call_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM calls WHERE id=%s", (call_id,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        raise HTTPException(404, "Call not found")
+    return row_to_call(row)
+
+@app.get("/api/calls/incoming/{user_id}")
+def get_incoming_calls(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM calls WHERE callee_id=%s AND status='ringing' ORDER BY created_at DESC LIMIT 1", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        return None
+    return row_to_call(row)
+
+@app.get("/api/calls/active/{user_id}")
+def get_active_call(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM calls WHERE (caller_id=%s OR callee_id=%s) AND status='active' ORDER BY started_at DESC LIMIT 1",
+                (user_id, user_id))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        return None
+    return row_to_call(row)
+
+@app.put("/api/calls/{call_id}/accept")
+def accept_call(call_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE calls SET status='active', started_at=NOW() WHERE id=%s AND status='ringing'", (call_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "Call accepted"}
+
+@app.put("/api/calls/{call_id}/reject")
+def reject_call(call_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE calls SET status='rejected', ended_at=NOW() WHERE id=%s AND status='ringing'", (call_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "Call rejected"}
+
+@app.put("/api/calls/{call_id}/end")
+def end_call(call_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("UPDATE calls SET status='ended', ended_at=NOW() WHERE id=%s AND status IN ('ringing','active')", (call_id,))
+    conn.commit()
+    cur.close()
+    return {"message": "Call ended"}
+
+# ==================== AUDIO WEBSOCKET RELAY ====================
+
+active_call_connections: dict = {}  # {call_id: {user_id: websocket}}
+
+@app.websocket("/ws/audio/{call_id}/{user_id}")
+async def audio_websocket(websocket: WebSocket, call_id: int, user_id: int):
+    await websocket.accept()
+    if call_id not in active_call_connections:
+        active_call_connections[call_id] = {}
+    active_call_connections[call_id][user_id] = websocket
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            for uid, ws in list(active_call_connections.get(call_id, {}).items()):
+                if uid != user_id:
+                    try:
+                        await ws.send_bytes(data)
+                    except Exception:
+                        pass
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        if call_id in active_call_connections:
+            active_call_connections[call_id].pop(user_id, None)
+            if not active_call_connections[call_id]:
+                del active_call_connections[call_id]
+
+Done.

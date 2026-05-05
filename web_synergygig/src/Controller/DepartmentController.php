@@ -85,7 +85,7 @@ class DepartmentController extends AbstractController
             ->orderBy('u.last_name', 'ASC')
             ->getQuery()->getResult();
 
-        $allDepts = $deptRepo->findAll();
+        $allDepts = $deptRepo->findBy([], ['name' => 'ASC'], 200);
 
         return $this->render('department/show.html.twig', [
             'department' => $department,

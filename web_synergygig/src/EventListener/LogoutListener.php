@@ -2,6 +2,7 @@
 
 namespace App\EventListener;
 
+use App\Entity\User;
 use App\Repository\AttendanceRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -25,6 +26,12 @@ class LogoutListener
         $user = $token->getUser();
         if (!$user) {
             return;
+        }
+
+        // Mark user offline on logout
+        if ($user instanceof User) {
+            $user->setIsOnline(false);
+            $user->setOnlineStatus('offline');
         }
 
         $today = new \DateTime('today');

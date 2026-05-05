@@ -87,10 +87,16 @@
                         ID: {{ user.id }}
                     </div>
 
-                    {% if user.is_active %}
-                        <span style="color:var(--color-success);font-size:.8125rem;font-weight:500">● Active</span>
-                    {% else %}
+                    {% if not user.is_active %}
                         <span style="color:var(--color-danger);font-size:.8125rem;font-weight:500">● Inactive</span>
+                    {% else %}
+                        {% set last_ts = user.lastSeenAt ? user.lastSeenAt|date('U') : 0 %}
+                        {% set is_online = ('now'|date('U') - last_ts) < 300 %}
+                        {% if is_online %}
+                            <span style="color:var(--color-success);font-size:.8125rem;font-weight:500">● Online</span>
+                        {% else %}
+                            <span style="color:#888;font-size:.8125rem;font-weight:500">● Offline</span>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>

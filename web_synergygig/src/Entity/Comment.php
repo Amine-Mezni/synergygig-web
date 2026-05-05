@@ -38,7 +38,7 @@ class Comment
 
     public function getReplies(): Collection { return $this->replies; }
 
-    #[ORM\ManyToOne(targetEntity: Post::class)]
+    #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'comments')]
     #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id')]
     private ?Post $post = null;
 
@@ -82,7 +82,7 @@ class Comment
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Comment::class)]
+    #[ORM\ManyToOne(targetEntity: Comment::class, inversedBy: 'replies')]
     #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id')]
     private ?Comment $parent = null;
 

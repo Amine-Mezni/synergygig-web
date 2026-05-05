@@ -38,7 +38,7 @@ class TrainingEnrollment
 
     public function getCertificates(): Collection { return $this->certificates; }
 
-    #[ORM\ManyToOne(targetEntity: TrainingCourse::class)]
+    #[ORM\ManyToOne(targetEntity: TrainingCourse::class, inversedBy: 'enrollments')]
     #[ORM\JoinColumn(name: 'course_id', referencedColumnName: 'id')]
     private ?TrainingCourse $course = null;
 

@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\DTO\DepartmentHeadcountDto;
+use App\DTO\StatusCountDto;
 use App\Repository\UserRepository;
 use App\Repository\DepartmentRepository;
 use App\Repository\AttendanceRepository;
@@ -47,11 +49,13 @@ class HRController extends AbstractController
 
         $today = new \DateTime('today');
         $tomorrow = new \DateTime('tomorrow');
-        $allAttendance = $attendanceRepo->findAll();
-        $todayAttendance = array_filter($allAttendance, function ($a) use ($today, $tomorrow) {
-            $d = $a->getDate();
-            return $d && $d >= $today && $d < $tomorrow;
-        });
+        $todayAttendance = $attendanceRepo->createQueryBuilder('a')
+            ->where('a.date >= :today')
+            ->andWhere('a.date < :tomorrow')
+            ->setParameter('today', $today)
+            ->setParameter('tomorrow', $tomorrow)
+            ->getQuery()
+            ->getResult();
         $presentToday = count($todayAttendance);
 
         $pendingLeaves = $leaveRepo->count(['status' => 'PENDING']);
@@ -103,13 +107,26 @@ class HRController extends AbstractController
         // Stats
         $totalEmployees = $userRepo->count([]);
         $pendingLeaves = $leaveRepo->count(['status' => 'PENDING']);
-        $allAttendance = $attendanceRepo->findAll();
-        $presentToday = count(array_filter($allAttendance, function ($a) use ($today, $tomorrow) {
-            $d = $a->getDate();
-            return $d && $d >= $today && $d < $tomorrow;
-        }));
+        $todayAttendanceList = $attendanceRepo->createQueryBuilder('a')
+            ->where('a.date >= :today')
+            ->andWhere('a.date < :tomorrow')
+            ->setParameter('today', $today)
+            ->setParameter('tomorrow', $tomorrow)
+            ->getQuery()
+            ->getResult();
+        $presentToday = count($todayAttendanceList);
         $pendingPayroll = $payrollRepo->count(['status' => 'PENDING']);
-        $openTasks = $taskRepo->count(['status' => 'TODO']) + $taskRepo->count(['status' => 'IN_PROGRESS']);
+        $openTasks = 0;
+        $taskRows = $taskRepo->createQueryBuilder('t')
+            ->select('NEW App\\DTO\\StatusCountDto(t.status, COUNT(t.id))')
+            ->groupBy('t.status')
+            ->getQuery()
+            ->getResult();
+        foreach ($taskRows as $row) {
+            if ($row instanceof StatusCountDto && in_array($row->label, ['TODO', 'IN_PROGRESS'], true)) {
+                $openTasks += $row->total;
+            }
+        }
 
         // Employees list
         $employees = $userRepo->findBy([], ['id' => 'DESC'], 20);
@@ -120,28 +137,35 @@ class HRController extends AbstractController
         // Open tasks
         $tasks = $taskRepo->findBy([], ['id' => 'DESC'], 15);
 
-        // Today attendance
-        $todayAttendanceList = array_values(array_filter($allAttendance, function ($a) use ($today, $tomorrow) {
-            $d = $a->getDate();
-            return $d && $d >= $today && $d < $tomorrow;
-        }));
-
-        // Department distribution for pie chart
-        $departments = $deptRepo->findAll();
+        // Department distribution for pie chart (single grouped query via DTO hydration)
         $deptDistribution = [];
-        foreach ($departments as $dept) {
-            $count = $userRepo->count(['department' => $dept]);
-            if ($count > 0) {
-                $deptDistribution[$dept->getName()] = $count;
+        $deptRows = $userRepo->createQueryBuilder('u')
+            ->select('NEW App\\DTO\\DepartmentHeadcountDto(d.name, COUNT(u.id))')
+            ->join('u.department', 'd')
+            ->groupBy('d.id, d.name')
+            ->orderBy('d.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+        foreach ($deptRows as $row) {
+            if ($row instanceof DepartmentHeadcountDto && $row->employeeCount > 0) {
+                $deptDistribution[$row->departmentName] = $row->employeeCount;
             }
         }
 
         // Leave type distribution for pie chart
-        $allLeaves = $leaveRepo->findBy(['status' => 'APPROVED']);
         $leaveTypeDistribution = [];
-        foreach ($allLeaves as $leave) {
-            $type = $leave->getType() ?? 'OTHER';
-            $leaveTypeDistribution[$type] = ($leaveTypeDistribution[$type] ?? 0) + 1;
+        $leaveRows = $leaveRepo->createQueryBuilder('l')
+            ->select('NEW App\\DTO\\StatusCountDto(l.type, COUNT(l.id))')
+            ->where('l.status = :status')
+            ->setParameter('status', 'APPROVED')
+            ->groupBy('l.type')
+            ->getQuery()
+            ->getResult();
+        foreach ($leaveRows as $row) {
+            if ($row instanceof StatusCountDto) {
+                $type = $row->label ?? 'OTHER';
+                $leaveTypeDistribution[$type] = $row->total;
+            }
         }
 
         return $this->render('hr/backlog.html.twig', [

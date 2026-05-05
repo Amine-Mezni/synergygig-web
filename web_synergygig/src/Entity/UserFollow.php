@@ -58,6 +58,18 @@ class UserFollow
         return $this;
     }
 
+    /** Alias for setFollowed() — used for semantic clarity in follow/unfollow flows. */
+    public function setFollowing(?User $user): self
+    {
+        return $this->setFollowed($user);
+    }
+
+    /** Alias for getFollowed() — used for semantic clarity in follow/unfollow flows. */
+    public function getFollowing(): ?User
+    {
+        return $this->followed;
+    }
+
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $status = null;
 

@@ -311,8 +311,13 @@ class PayrollController extends AbstractController
     #[IsGranted('ROLE_EMPLOYEE')]
     public function show(Payroll $payroll): Response
     {
+        $currentUser = $this->getUser();
+        if (!$currentUser instanceof User) {
+            throw $this->createAccessDeniedException('You must be logged in.');
+        }
+
         // Employees can only view their own payroll
-        if (!$this->isGranted('ROLE_HR') && $payroll->getUser()?->getId() !== $this->getUser()?->getId()) {
+        if (!$this->isGranted('ROLE_HR') && $payroll->getUser()?->getId() !== $currentUser->getId()) {
             throw $this->createAccessDeniedException('You can only view your own payroll records.');
         }
         return $this->render('payroll/show.html.twig', [
@@ -436,7 +441,7 @@ class PayrollController extends AbstractController
             ->orderBy('u.lastName', 'ASC')
             ->getQuery()->getResult();
 
-        $departments = $em->getRepository(Department::class)->findAll();
+        $departments = $em->getRepository(Department::class)->findBy([], ['name' => 'ASC'], 200);
 
         $deptStats = [];
         foreach ($departments as $dept) {
@@ -476,7 +481,7 @@ class PayrollController extends AbstractController
      */
     private function calculateMonthlyHours(AttendanceRepository $repo, User $user, int $month, int $year): float
     {
-        $monthStart = new \DateTime("$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-01");
+        $monthStart = new \DateTime("$year-" . str_pad((string) $month, 2, '0', STR_PAD_LEFT) . "-01");
         $monthEnd   = (clone $monthStart)->modify('+1 month');
 
         $records = $repo->createQueryBuilder('a')

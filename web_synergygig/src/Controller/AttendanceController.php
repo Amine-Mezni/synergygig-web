@@ -209,7 +209,7 @@ class AttendanceController extends AbstractController
         }
 
         $user = $this->getUser();
-        if (!$user) {
+        if (!$user instanceof \App\Entity\User) {
             $this->addFlash('danger', 'You must be logged in.');
             return $this->redirectToRoute('app_login');
         }
@@ -314,7 +314,8 @@ class AttendanceController extends AbstractController
         }
 
         // Late if check-in after 09:15
-        $lateThreshold = (clone $checkIn)->setTime(9, 15, 0);
+        // Cast to DateTime so setTime() is available (DateTimeInterface has no setTime)
+        $lateThreshold = \DateTime::createFromInterface($checkIn)->setTime(9, 15, 0);
         if ($checkIn > $lateThreshold && $attendance->getStatus() !== 'ABSENT') {
             $attendance->setStatus('LATE');
         }

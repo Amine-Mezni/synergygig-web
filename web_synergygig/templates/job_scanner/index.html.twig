@@ -180,6 +180,17 @@
     display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;
 }
 .js-results-count { font-size:0.9rem; font-weight:600; color:var(--text-primary); }
+
+/* Match score badges */
+.js-match-badge {
+    display:inline-flex; align-items:center; padding:0.15rem 0.55rem;
+    border-radius:999px; font-size:0.72rem; font-weight:700; letter-spacing:0.3px;
+    margin-left:auto; flex-shrink:0;
+}
+.js-match-excellent { background:rgba(34,197,94,0.18); color:#22c55e; border:1px solid rgba(34,197,94,0.35); }
+.js-match-good      { background:rgba(99,102,241,0.18); color:#6366f1; border:1px solid rgba(99,102,241,0.35); }
+.js-match-fair      { background:rgba(234,179,8,0.18);  color:#ca8a04; border:1px solid rgba(234,179,8,0.35); }
+.js-match-low       { background:rgba(239,68,68,0.15);  color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
 </style>
 
 <div class="js-module">
@@ -252,6 +263,59 @@
 </div>
 
 <script>
+// User skills text passed from server
+const USER_SKILLS_TEXT = {{ userSkillsText|json_encode|raw }};
+
+// Skill categories — mirrors Java CvJobMatchService
+const SKILL_CATS = {
+    'Java':           ['java','spring','spring boot','hibernate','maven','gradle','jvm','javafx','junit'],
+    'Python':         ['python','django','flask','fastapi','pandas','numpy','scikit','tensorflow','pytorch','keras'],
+    'JavaScript':     ['javascript','typescript','node','nodejs','react','vue','angular','next.js','webpack','babel'],
+    'PHP':            ['php','symfony','laravel','wordpress','composer','doctrine','twig','psr'],
+    'C#/.NET':        ['c#','.net','asp.net','blazor','entity framework','nuget','dotnet'],
+    'C/C++':          ['c++','embedded','stl','cmake','opencv','boost','qt'],
+    'Mobile':         ['android','ios','swift','kotlin','flutter','react native','xamarin','mobile'],
+    'Database':       ['sql','mysql','postgresql','mongodb','redis','sqlite','oracle','nosql','database','jdbc','orm'],
+    'Cloud/DevOps':   ['aws','azure','gcp','docker','kubernetes','ci/cd','jenkins','gitlab','github actions','terraform','devops','cloud'],
+    'Web Frontend':   ['html','css','scss','sass','bootstrap','tailwind','responsive','ui','ux','figma','design'],
+    'Security':       ['security','oauth','jwt','ssl','tls','penetration','cybersecurity','firewall','encryption','owasp'],
+    'Data Science':   ['data science','machine learning','deep learning','nlp','computer vision','ai','neural','model','dataset','analytics'],
+    'Testing':        ['testing','unit test','integration test','selenium','jest','pytest','tdd','bdd','qa','quality assurance'],
+    'Agile/PM':       ['agile','scrum','kanban','jira','confluence','sprint','backlog','project management'],
+    'Linux/Systems':  ['linux','unix','bash','shell','kernel','server','networking','tcp','http'],
+    'Version Control':['git','github','gitlab','bitbucket','svn','version control'],
+    'API':            ['microservices','rest','graphql','api','soap','grpc','rabbitmq','kafka','message queue'],
+    'HR':             ['hr','human resources','recruitment','payroll','onboarding','performance review','employee','talent','hiring'],
+    'Finance':        ['finance','accounting','budget','invoice','erp','sap','quickbooks','audit','tax','excel'],
+    'Communication':  ['communication','teamwork','leadership','presentation','negotiation','english','french','arabic'],
+    'Ruby/Go/Rust':   ['ruby','rails','golang','go','rust','elixir','erlang'],
+    'Big Data':       ['scala','kotlin','akka','spark','flink','hadoop','big data'],
+    'BI/Low-code':    ['power bi','tableau','looker','salesforce','crm','low-code','no-code','zapier','n8n'],
+    'Research':       ['research','thesis','publication','academic','laboratory','experiment','paper'],
+    'Soft Skills':    ['problem solving','critical thinking','adaptability','creativity','time management','collaboration','mentoring']
+};
+
+function scoreJob(cvText, jobTitle, jobSnippet) {
+    const cv  = (cvText || '').toLowerCase();
+    const job = (jobTitle + ' ' + jobSnippet).toLowerCase();
+    let matched = 0, total = 0;
+    for (const cat in SKILL_CATS) {
+        const kws = SKILL_CATS[cat];
+        const inJob = kws.some(k => job.includes(k));
+        if (!inJob) continue;
+        total++;
+        if (kws.some(k => cv.includes(k))) matched++;
+    }
+    if (total === 0) return null;
+    const score = Math.round((matched / total) * 100);
+    let label;
+    if (score >= 70) label = 'Excellent';
+    else if (score >= 50) label = 'Good';
+    else if (score >= 30) label = 'Fair';
+    else label = 'Low';
+    return { score, label };
+}
+
 (function(){
     const searchField  = document.getElementById('jsSearch');
     const sourceCombo  = document.getElementById('jsSource');
@@ -399,10 +463,21 @@
             metaHtml += '<span' + (loc === 'Not specified' ? ' class="js-meta-muted"' : '') + '>📍 ' + esc(loc) + '</span>';
             if (postedAt) metaHtml += '<span>🕐 ' + formatTimeAgo(postedAt) + '</span>';
 
+            // Match score badge
+            let matchBadgeHtml = '';
+            if (USER_SKILLS_TEXT) {
+                const ms = scoreJob(USER_SKILLS_TEXT, title, snippet);
+                if (ms) {
+                    const cls = 'js-match-' + ms.label.toLowerCase();
+                    matchBadgeHtml = '<span class="js-match-badge ' + cls + '">' + ms.score + '% — ' + ms.label + '</span>';
+                }
+            }
+
             card.innerHTML =
                 '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">'
                     + badgeHtml
                     + '<span class="js-job-title">' + esc(title) + '</span>'
+                    + matchBadgeHtml
                 + '</div>'
                 + '<div class="js-meta-row">' + metaHtml + '</div>'
                 + (snippet ? '<div class="js-snippet">' + esc(snippet) + '</div>' : '')

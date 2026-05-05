@@ -43,7 +43,7 @@ class Message
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: ChatRoom::class)]
+    #[ORM\ManyToOne(targetEntity: ChatRoom::class, inversedBy: 'messages')]
     #[ORM\JoinColumn(name: 'room_id', referencedColumnName: 'id')]
     private ?ChatRoom $room = null;
 

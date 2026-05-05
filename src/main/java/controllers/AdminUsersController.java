@@ -139,7 +139,8 @@ public class AdminUsersController {
         avatarCircle.getChildren().add(avatarLabel);
 
         VBox infoCol = new VBox(4);
-        Label roleBadge = new Label(user.getRole().replace("_", " "));
+        String roleText = user.getRole() != null ? user.getRole().replace("_", " ") : "Unknown";
+        Label roleBadge = new Label(roleText);
         roleBadge.getStyleClass().add("topbar-role-badge");
 
         String dateStr = "-";

@@ -12,6 +12,10 @@ doctrine:
         default_table_options:
             collation: utf8mb4_unicode_ci
             charset: utf8mb4
+        types:
+            enum: Doctrine\DBAL\Types\StringType
+        mapping_types:
+            enum: string
 
     orm:
         auto_generate_proxy_classes: true

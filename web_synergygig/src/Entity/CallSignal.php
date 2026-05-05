@@ -14,7 +14,7 @@ class CallSignal
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Call::class)]
+    #[ORM\ManyToOne(targetEntity: Call::class, inversedBy: 'signals')]
     #[ORM\JoinColumn(name: 'call_id', referencedColumnName: 'id', nullable: false)]
     private ?Call $call = null;
 

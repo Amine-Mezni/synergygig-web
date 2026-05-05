@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Entity\ChatRoom;
 use App\Entity\ChatRoomMember;
 use App\Entity\Message;
@@ -20,6 +21,12 @@ use Symfony\Component\String\Slugger\SluggerInterface;
 #[Route('/chat')]
 class ChatController extends AbstractController
 {
+    private function getAuthenticatedUser(): ?User
+    {
+        $user = $this->getUser();
+        return $user instanceof User ? $user : null;
+    }
+
     /* ──────────────────────────────
        ROOM LIST (Sidebar)
        ────────────────────────────── */
@@ -29,7 +36,11 @@ class ChatController extends AbstractController
         MessageRepository $msgRepo,
         UserRepository $userRepo
     ): Response {
-        $user = $this->getUser();
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
         $memberships = $memberRepo->findBy(['user' => $user]);
         $rooms = [];
         foreach ($memberships as $m) {
@@ -66,7 +77,7 @@ class ChatController extends AbstractController
             'rooms' => $rooms,
             'activeRoom' => null,
             'messages' => [],
-            'users' => $userRepo->findAll(),
+            'users' => $userRepo->findBy([], ['id' => 'DESC'], 200),
         ]);
     }
 
@@ -80,7 +91,11 @@ class ChatController extends AbstractController
         MessageRepository $msgRepo,
         UserRepository $userRepo
     ): Response {
-        $user = $this->getUser();
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
 
         // Verify user is a member of this room
         $isMember = $memberRepo->findOneBy(['room' => $activeRoom, 'user' => $user]);
@@ -139,7 +154,7 @@ class ChatController extends AbstractController
             'activeDisplayName' => $activeDisplayName,
             'messages' => $messages,
             'members' => $members,
-            'users' => $userRepo->findAll(),
+            'users' => $userRepo->findBy([], ['id' => 'DESC'], 200),
         ]);
     }
 
@@ -155,7 +170,11 @@ class ChatController extends AbstractController
         ChatRoomMemberRepository $memberRepo
     ): Response {
         // Verify user is a member of this room
-        $user = $this->getUser();
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
         $membership = $memberRepo->findOneBy(['room' => $room, 'user' => $user]);
         if (!$membership) {
             $this->addFlash('danger', 'You are not a member of this room.');
@@ -171,7 +190,7 @@ class ChatController extends AbstractController
 
         if ($content !== '' || $file) {
             $msg = new Message();
-            $msg->setSender($this->getUser());
+            $msg->setSender($user);
             $msg->setRoom($room);
             $msg->setContent($content !== '' ? $content : null);
             $msg->setTimestamp(new \DateTime());
@@ -207,7 +226,11 @@ class ChatController extends AbstractController
         Request $request,
         EntityManagerInterface $em
     ): Response {
-        $user = $this->getUser();
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
         $name = trim($request->request->get('name', ''));
         if ($name === '') {
             $this->addFlash('warning', 'Room name is required.');
@@ -244,7 +267,11 @@ class ChatController extends AbstractController
         ChatRoomMemberRepository $memberRepo,
         EntityManagerInterface $em
     ): Response {
-        $user = $this->getUser();
+        $user = $this->getAuthenticatedUser();
+        if (!$user) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
         $other = $userRepo->find($id);
         if (!$other || $other->getId() === $user->getId()) {
             $this->addFlash('warning', 'Invalid user.');
@@ -296,7 +323,11 @@ class ChatController extends AbstractController
         EntityManagerInterface $em
     ): Response {
         // Only room OWNER or ADMIN can add members
-        $currentUser = $this->getUser();
+        $currentUser = $this->getAuthenticatedUser();
+        if (!$currentUser) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
         $currentMembership = $memberRepo->findOneBy(['room' => $room, 'user' => $currentUser]);
         if (!$this->isGranted('ROLE_ADMIN') && (!$currentMembership || $currentMembership->getRole() !== 'OWNER')) {
             $this->addFlash('warning', 'Only the room owner can add members.');
@@ -339,7 +370,12 @@ class ChatController extends AbstractController
         EntityManagerInterface $em
     ): Response {
         $roomId = $message->getRoom()->getId();
-        if ($message->getSender()->getId() !== $this->getUser()->getId()) {
+        $currentUser = $this->getAuthenticatedUser();
+        if (!$currentUser) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
+        if ($message->getSender()->getId() !== $currentUser->getId()) {
             $this->addFlash('warning', 'Cannot edit other users\' messages.');
             return $this->redirectToRoute('app_chat_room', ['id' => $roomId]);
         }
@@ -362,8 +398,13 @@ class ChatController extends AbstractController
         EntityManagerInterface $em
     ): Response {
         $roomId = $message->getRoom()->getId();
+        $currentUser = $this->getAuthenticatedUser();
+        if (!$currentUser) {
+            $this->addFlash('danger', 'You must be logged in to access chat.');
+            return $this->redirectToRoute('app_login');
+        }
         // Only the sender or an admin can delete a message
-        if ($message->getSender()->getId() !== $this->getUser()->getId() && !$this->isGranted('ROLE_ADMIN')) {
+        if ($message->getSender()->getId() !== $currentUser->getId() && !$this->isGranted('ROLE_ADMIN')) {
             $this->addFlash('warning', 'You can only delete your own messages.');
             return $this->redirectToRoute('app_chat_room', ['id' => $roomId]);
         }

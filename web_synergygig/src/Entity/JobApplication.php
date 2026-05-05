@@ -38,7 +38,7 @@ class JobApplication
 
     public function getInterviews(): Collection { return $this->interviews; }
 
-    #[ORM\ManyToOne(targetEntity: Offer::class)]
+    #[ORM\ManyToOne(targetEntity: Offer::class, inversedBy: 'jobApplications')]
     #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id')]
     private ?Offer $offer = null;
 

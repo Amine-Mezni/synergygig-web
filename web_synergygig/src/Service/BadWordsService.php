@@ -4,8 +4,6 @@ namespace App\Service;
 
 class BadWordsService
 {
-    private static ?array $cache = [];
-
     // Leetspeak normalization map (same as Java)
     private const LEET_MAP = [
         '@' => 'a', '4' => 'a',

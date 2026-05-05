@@ -7,6 +7,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Attribute\Ignore;
 
 use App\Repository\UserRepository;
 
@@ -45,6 +46,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
+    #[Ignore]
     private ?string $password = null;
 
     public function getPassword(): ?string
@@ -377,6 +379,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[Ignore]
     private ?string $reset_token = null;
 
     public function getResetToken(): ?string

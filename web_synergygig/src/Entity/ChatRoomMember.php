@@ -28,7 +28,7 @@ class ChatRoomMember
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: ChatRoom::class)]
+    #[ORM\ManyToOne(targetEntity: ChatRoom::class, inversedBy: 'members')]
     #[ORM\JoinColumn(name: 'room_id', referencedColumnName: 'id')]
     private ?ChatRoom $room = null;
 

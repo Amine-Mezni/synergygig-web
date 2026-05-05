@@ -123,7 +123,7 @@ class Interview
         return $this->setMeet_link($meet_link);
     }
 
-    #[ORM\ManyToOne(targetEntity: JobApplication::class)]
+    #[ORM\ManyToOne(targetEntity: JobApplication::class, inversedBy: 'interviews')]
     #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id')]
     private ?JobApplication $application = null;
 
@@ -138,7 +138,7 @@ class Interview
         return $this;
     }
 
-    #[ORM\ManyToOne(targetEntity: Offer::class)]
+    #[ORM\ManyToOne(targetEntity: Offer::class, inversedBy: 'interviews')]
     #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id')]
     private ?Offer $offer = null;
 

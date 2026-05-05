@@ -423,11 +423,11 @@ public class DashboardController {
                 int totalUsers = allUsers.size();
 
                 long employees = allUsers.stream()
-                        .filter(u -> u.getRole().equals("EMPLOYEE") || u.getRole().equals("PROJECT_OWNER"))
+                        .filter(u -> "EMPLOYEE".equals(u.getRole()) || "PROJECT_OWNER".equals(u.getRole()))
                         .count();
 
                 long gigWorkers = allUsers.stream()
-                        .filter(u -> u.getRole().equals("GIG_WORKER"))
+                        .filter(u -> "GIG_WORKER".equals(u.getRole()))
                         .count();
 
                 List<Interview> allInterviews = interviewsFuture.join();

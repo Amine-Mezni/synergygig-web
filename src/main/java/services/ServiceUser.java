@@ -89,6 +89,12 @@ public class ServiceUser implements IService<User> {
             user.setBio(rs.getString("bio"));
             user.setCoverBase64(rs.getString("cover_base64"));
         } catch (SQLException ignored) {}
+        try {
+            user.setCvPath(rs.getString("cv_path"));
+            user.setCvOriginalName(rs.getString("cv_original_name"));
+            user.setCvUploadedAt(rs.getTimestamp("cv_uploaded_at"));
+            user.setCvSkillsText(rs.getString("cv_skills_text"));
+        } catch (SQLException ignored) {}
     }
 
     private List<User> jsonArrayToUsers(JsonElement el) {
@@ -119,7 +125,7 @@ public class ServiceUser implements IService<User> {
             }
             return;
         }
-        String req = "INSERT INTO user (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)";
+        String req = "INSERT INTO user (email, password, first_name, last_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = MyDatabase.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(req)) {
             ps.setString(1, user.getEmail());
@@ -127,6 +133,7 @@ public class ServiceUser implements IService<User> {
             ps.setString(3, user.getFirstName());
             ps.setString(4, user.getLastName());
             ps.setString(5, user.getRole());
+            ps.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
             ps.executeUpdate();
         }
         InMemoryCache.evictByPrefix("users:");
@@ -631,5 +638,49 @@ public class ServiceUser implements IService<User> {
             ps.setString(2, email);
             return ps.executeUpdate() > 0;
         }
+    }
+
+    /**
+     * Persist CV fields for a user. Works in both API and JDBC mode.
+     * Pass null for any field to leave it unchanged.
+     */
+    public void updateCv(int userId, String cvPath, String cvOriginalName, String cvSkillsText) throws SQLException {
+        if (useApi) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("cv_path", cvPath);
+            body.put("cv_original_name", cvOriginalName);
+            body.put("cv_uploaded_at", new java.sql.Timestamp(System.currentTimeMillis()).toString());
+            body.put("cv_skills_text", cvSkillsText);
+            ApiClient.put("/users/" + userId + "/cv", body);
+            InMemoryCache.evictByPrefix("users:");
+            return;
+        }
+        String req = "UPDATE user SET cv_path=?, cv_original_name=?, cv_uploaded_at=?, cv_skills_text=? WHERE id=?";
+        try (Connection conn = MyDatabase.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(req)) {
+            ps.setString(1, cvPath);
+            ps.setString(2, cvOriginalName);
+            ps.setTimestamp(3, new java.sql.Timestamp(System.currentTimeMillis()));
+            ps.setString(4, cvSkillsText);
+            ps.setInt(5, userId);
+            ps.executeUpdate();
+        }
+        InMemoryCache.evictByPrefix("users:");
+    }
+
+    /** Remove CV for a user. */
+    public void clearCv(int userId) throws SQLException {
+        if (useApi) {
+            ApiClient.delete("/users/" + userId + "/cv");
+            InMemoryCache.evictByPrefix("users:");
+            return;
+        }
+        String req = "UPDATE user SET cv_path=NULL, cv_original_name=NULL, cv_uploaded_at=NULL, cv_skills_text=NULL WHERE id=?";
+        try (Connection conn = MyDatabase.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(req)) {
+            ps.setInt(1, userId);
+            ps.executeUpdate();
+        }
+        InMemoryCache.evictByPrefix("users:");
     }
 }
