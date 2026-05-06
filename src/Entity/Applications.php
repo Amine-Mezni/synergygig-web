@@ -99,10 +99,4 @@ class Applications
         return $this;
     }
 
-    public function removeContracts(Contracts $contracts): self
-    {
-        $this->contractss->removeElement($contracts);
-
-        return $this;
-    }
 }
