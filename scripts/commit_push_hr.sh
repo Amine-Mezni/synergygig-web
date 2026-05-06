@@ -7,6 +7,12 @@ cd "$ROOT_DIR"
 git config user.name "Anas-Kordoghli"
 git config user.email "anaskor03@gmail.com"
 
+random_sleep() {
+  local delay=$((30 + RANDOM % 16))
+  echo "Sleeping ${delay}s..."
+  sleep "$delay"
+}
+
 commit_if_changed() {
   local message="$1"
   shift
@@ -14,6 +20,7 @@ commit_if_changed() {
   git add -- "$@"
 
   if ! git diff --cached --quiet; then
+    random_sleep
     git commit -m "$message"
   fi
 }
