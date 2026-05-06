@@ -6,7 +6,6 @@ use Doctrine\ORM\Mapping as ORM;
 use App\Repository\BookmarkRepository;
 use App\Entity\Trait\TimestampTrait;
 use App\Entity\Trait\BlameableTrait;
-
 #[ORM\Entity(repositoryClass: BookmarkRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'bookmark')]
@@ -15,7 +14,7 @@ class Bookmark
 {
     use TimestampTrait;
     use BlameableTrait;
-
+/////////////
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
