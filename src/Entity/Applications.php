@@ -82,7 +82,22 @@ class Applications
         return $this->applied_at;
     }
 
-  
+    public function setApplied_at(\DateTimeInterface $value): self
+    {
+        $this->applied_at = $value;
+        return $this;
+    }
+
+   
+
+    public function addContracts(Contracts $contracts): self
+    {
+        if (!$this->contractss->contains($contracts)) {
+            $this->contractss[] = $contracts;
+        }
+
+        return $this;
+    }
 
     public function removeContracts(Contracts $contracts): self
     {
