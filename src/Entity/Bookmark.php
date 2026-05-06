@@ -14,7 +14,7 @@ class Bookmark
 {
     use TimestampTrait;
     use BlameableTrait;
-/////////////
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
