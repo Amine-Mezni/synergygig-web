@@ -1,4 +1,5 @@
 services:
+  # Symfony PHP-FPM service
   php:
     build:
       context: ./docker
